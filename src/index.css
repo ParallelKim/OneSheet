@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+
+:root {
+  --bg-0: #0f141c;
+  --bg-1: #171e2a;
+  --bg-2: #222b3a;
+  --line: #314056;
+  --text: #e8eef7;
+  --muted: #93a0b5;
+  --accent: #e8b84a;
+  --accent-dim: #b8892a;
+  --paper: #f4efe4;
+  --paper-ink: #1c2430;
+  --paper-line: #d7d0c2;
+  --danger: #e07171;
+  --ok: #6fbf8b;
+  --font-ui: 'Outfit', sans-serif;
+  --font-brand: 'Archivo', sans-serif;
+  --font-chord: 'IBM Plex Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #2a3348 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #3a2f1c 0%, transparent 50%),
+    linear-gradient(165deg, var(--bg-0), var(--bg-1) 45%, #121821);
+  background-attachment: fixed;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.brand-mark {
+  font-family: var(--font-brand);
+  letter-spacing: -0.03em;
+}
+
+.chord-font {
+  font-family: var(--font-chord);
+}
+
+.paper {
+  background: var(--paper);
+  color: var(--paper-ink);
+}
+
+.paper-line {
+  border-color: var(--paper-line);
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+.print-only {
+  display: none;
+}
