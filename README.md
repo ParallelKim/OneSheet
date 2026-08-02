@@ -28,6 +28,7 @@ npm run build
 
 - Hosting: https://onesheet-app.web.app
 - Console: https://console.firebase.google.com/project/onesheet-app/overview
+- Analytics (GA4): measurement ID `G-5CM64JNEVF` / property `onesheet-app`
 
 ## Firebase
 

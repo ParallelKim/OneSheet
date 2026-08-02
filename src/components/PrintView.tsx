@@ -1,3 +1,4 @@
+import { AnalyticsEvents } from '../firebase/analytics'
 import type { Song } from '../types/song'
 
 interface PrintViewProps {
@@ -18,7 +19,10 @@ export function PrintView({ song, onBack }: PrintViewProps) {
         </button>
         <button
           type="button"
-          onClick={() => window.print()}
+          onClick={() => {
+            void AnalyticsEvents.print()
+            window.print()
+          }}
           className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-[#1a1408] hover:bg-[#f0c868]"
         >
           인쇄 / PDF

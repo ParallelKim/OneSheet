@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { PrintView } from './components/PrintView'
 import { SongEditor } from './components/SongEditor'
 import { SongList } from './components/SongList'
+import { AnalyticsEvents, initAnalytics } from './firebase/analytics'
 import { useSongStore } from './store/songStore'
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
 
   useEffect(() => {
     void hydrate()
+    void initAnalytics()
   }, [hydrate])
 
   if (!hydrated) {
@@ -42,7 +44,13 @@ export default function App() {
   if (currentSong && viewMode === 'play') {
     return (
       <div className="app-shell">
-        <PrintView song={currentSong} onBack={() => setViewMode('edit')} />
+        <PrintView
+          song={currentSong}
+          onBack={() => {
+            void AnalyticsEvents.viewEdit()
+            setViewMode('edit')
+          }}
+        />
       </div>
     )
   }
@@ -54,10 +62,19 @@ export default function App() {
           song={currentSong}
           status={status}
           onBack={closeSong}
-          onPlayMode={() => setViewMode('play')}
-          onDelete={() => void deleteCurrentSong()}
+          onPlayMode={() => {
+            void AnalyticsEvents.viewPlay()
+            setViewMode('play')
+          }}
+          onDelete={() => {
+            void AnalyticsEvents.songDelete()
+            void deleteCurrentSong()
+          }}
           onUpdateMeta={updateMeta}
-          onAddSection={addSection}
+          onAddSection={(name) => {
+            void AnalyticsEvents.sectionAdd(name ?? 'Section')
+            addSection(name)
+          }}
           onRemoveSection={removeSection}
           onMoveSection={moveSection}
           onDuplicateSection={duplicateSection}
@@ -72,9 +89,18 @@ export default function App() {
     <div className="app-shell">
       <SongList
         songs={songs}
-        onOpen={(id) => void openSong(id)}
-        onCreate={() => void createNewSong()}
-        onDelete={(id) => void deleteSongById(id)}
+        onOpen={(id) => {
+          void AnalyticsEvents.songOpen(id)
+          void openSong(id)
+        }}
+        onCreate={() => {
+          void AnalyticsEvents.songCreate()
+          void createNewSong()
+        }}
+        onDelete={(id) => {
+          void AnalyticsEvents.songDelete()
+          void deleteSongById(id)
+        }}
       />
     </div>
   )
