@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { chunkBars } from '../lib/bars'
 import type { Part } from '../types/song'
 
 interface PartEditorProps {
@@ -23,6 +24,9 @@ export function PartEditor({
   canRemove,
 }: PartEditorProps) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const rows = chunkBars(
+    part.chords.map((chord, index) => ({ chord, index })),
+  )
 
   return (
     <section className="paper overflow-hidden rounded-2xl border border-[var(--paper-line)] shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
@@ -48,29 +52,36 @@ export function PartEditor({
         </div>
       </div>
 
-      <div className="overflow-x-auto px-3 py-5 sm:px-5">
-        <div className="flex min-w-max items-end">
-          <div className="brand-mark mr-3 mb-3 text-4xl font-bold text-[var(--paper-ink)]/20 select-none">
-            {part.label}
-          </div>
-          {part.chords.map((chord, index) => (
-            <ChordCell
-              key={`${part.id}-${index}`}
-              index={index}
-              value={chord ?? ''}
-              inputRef={(el) => {
-                inputRefs.current[index] = el
-              }}
-              onChange={(value) => onSetChord(index, value)}
-              onNext={() => inputRefs.current[index + 1]?.focus()}
-              onPrev={() => inputRefs.current[index - 1]?.focus()}
-            />
+      <div className="flex items-start gap-2 px-3 py-5 sm:gap-3 sm:px-5">
+        <div className="brand-mark w-7 shrink-0 pt-5 text-3xl font-bold text-[var(--paper-ink)]/20 select-none sm:w-10 sm:text-4xl">
+          {part.label}
+        </div>
+        <div className="min-w-0 flex-1 space-y-3">
+          {rows.map((row) => (
+            <div
+              key={`row-${row[0].index}`}
+              className="bar-row grid w-full grid-cols-4"
+            >
+              {row.map(({ chord, index }) => (
+                <ChordCell
+                  key={`${part.id}-${index}`}
+                  index={index}
+                  value={chord ?? ''}
+                  inputRef={(el) => {
+                    inputRefs.current[index] = el
+                  }}
+                  onChange={(value) => onSetChord(index, value)}
+                  onNext={() => inputRefs.current[index + 1]?.focus()}
+                  onPrev={() => inputRefs.current[index - 1]?.focus()}
+                />
+              ))}
+            </div>
           ))}
         </div>
       </div>
 
       <p className="border-t border-[var(--paper-line)] px-4 py-2 text-xs text-[var(--paper-ink)]/45 sm:px-5">
-        Tab / Enter로 다음 마디 · 이 파트를 만든 뒤 아래에서 송폼으로 조합
+        Tab / Enter로 다음 마디 · 한 줄 4마디
       </p>
     </section>
   )
@@ -98,7 +109,7 @@ function ChordCell({
   }, [value])
 
   return (
-    <div className="flex w-[4.75rem] flex-col items-center border-r border-[var(--paper-line)] px-1 last:border-r-0 sm:w-[5.5rem]">
+    <div className="flex min-w-0 flex-col items-center border-r border-[var(--paper-line)] px-0.5 last:border-r-0">
       <span className="mb-1 text-[10px] tracking-wide text-[var(--paper-ink)]/35">
         {index + 1}
       </span>
@@ -125,7 +136,7 @@ function ChordCell({
             onPrev()
           }
         }}
-        className="chord-font w-full bg-transparent py-2 text-center text-xl font-semibold text-[var(--paper-ink)] outline-none sm:text-2xl"
+        className="chord-font w-full min-w-0 bg-transparent py-2 text-center text-lg font-semibold text-[var(--paper-ink)] outline-none sm:text-2xl"
         placeholder="—"
         spellCheck={false}
         aria-label={`${index + 1}마디 코드`}

@@ -1,4 +1,5 @@
 import { AnalyticsEvents } from '../firebase/analytics'
+import { chunkBars } from '../lib/bars'
 import type { Song } from '../types/song'
 
 interface PrintViewProps {
@@ -10,8 +11,8 @@ export function PrintView({ song, onBack }: PrintViewProps) {
   const partMap = new Map(song.parts.map((part) => [part.id, part]))
 
   return (
-    <div className="min-h-screen px-4 py-6 sm:px-8">
-      <div className="no-print mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center gap-2">
+    <div className="px-3 py-4 pb-10 sm:px-8 sm:py-6">
+      <div className="no-print mx-auto mb-4 flex w-full max-w-[210mm] flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={onBack}
@@ -31,9 +32,11 @@ export function PrintView({ song, onBack }: PrintViewProps) {
         </button>
       </div>
 
-      <article className="print-sheet paper mx-auto w-full max-w-[210mm] rounded-sm border border-[var(--paper-line)] px-8 py-8 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
-        <header className="mb-6 border-b border-[var(--paper-line)] pb-4">
-          <h1 className="brand-mark text-3xl font-bold tracking-tight">{song.title}</h1>
+      <article className="print-sheet paper mx-auto w-full max-w-[210mm] rounded-sm border border-[var(--paper-line)] px-4 py-5 shadow-[0_20px_60px_rgba(0,0,0,0.35)] sm:px-8 sm:py-8">
+        <header className="mb-5 border-b border-[var(--paper-line)] pb-3 sm:mb-6 sm:pb-4">
+          <h1 className="brand-mark text-2xl font-bold tracking-tight sm:text-3xl">
+            {song.title}
+          </h1>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--paper-ink)]/70">
             {song.artist && <span>{song.artist}</span>}
             {song.key && <span>Key {song.key}</span>}
@@ -41,35 +44,49 @@ export function PrintView({ song, onBack }: PrintViewProps) {
           </div>
         </header>
 
-        <div className="mb-8 flex flex-col gap-5">
-          {song.parts.map((part) => (
-            <section key={part.id} className="flex items-end gap-3">
-              <h2 className="brand-mark mb-2 w-10 shrink-0 text-2xl font-bold">
-                {part.label}
-              </h2>
-              <div className="flex flex-wrap items-end">
-                {part.chords.map((chord, index) => (
-                  <div
-                    key={`${part.id}-print-${index}`}
-                    className="mb-1 flex w-[4.25rem] flex-col items-center border-r border-[var(--paper-line)] last:border-r-0"
-                  >
-                    <div className="chord-font min-h-[1.5rem] text-center text-base font-semibold">
-                      {chord || '—'}
+        <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:gap-5">
+          {song.parts.map((part) => {
+            const rows = chunkBars(
+              part.chords.map((chord, index) => ({ chord, index })),
+            )
+            return (
+              <section key={part.id} className="flex items-start gap-2 sm:gap-3">
+                <h2 className="brand-mark w-7 shrink-0 pt-1 text-xl font-bold sm:w-10 sm:text-2xl">
+                  {part.label}
+                </h2>
+                <div className="min-w-0 flex-1 space-y-2">
+                  {rows.map((row) => (
+                    <div
+                      key={`${part.id}-row-${row[0].index}`}
+                      className="bar-row grid w-full grid-cols-4"
+                    >
+                      {row.map(({ chord, index }) => (
+                        <div
+                          key={`${part.id}-print-${index}`}
+                          className="flex min-w-0 flex-col items-center border-r border-[var(--paper-line)] px-0.5 last:border-r-0"
+                        >
+                          <div className="chord-font flex min-h-[1.4rem] w-full items-end justify-center text-center text-sm font-semibold leading-tight sm:min-h-[1.5rem] sm:text-base">
+                            <span className="max-w-full truncate">
+                              {chord || '—'}
+                            </span>
+                          </div>
+                          <div className="mt-1 h-px w-full bg-[var(--paper-ink)]" />
+                          <div className="mt-0.5 h-2 w-px bg-[var(--paper-ink)]/60" />
+                        </div>
+                      ))}
                     </div>
-                    <div className="mt-1 h-px w-full bg-[var(--paper-ink)]" />
-                    <div className="mt-0.5 h-2 w-px bg-[var(--paper-ink)]/60" />
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
+                  ))}
+                </div>
+              </section>
+            )
+          })}
         </div>
 
         <section className="border-t border-[var(--paper-line)] pt-4">
           <h2 className="mb-2 text-xs font-semibold tracking-[0.14em] text-[var(--paper-ink)]/50 uppercase">
             Form
           </h2>
-          <p className="chord-font text-lg font-semibold leading-relaxed">
+          <p className="chord-font text-base font-semibold leading-relaxed sm:text-lg">
             {song.form
               .map((step) => {
                 const part = partMap.get(step.partId)
@@ -81,7 +98,7 @@ export function PrintView({ song, onBack }: PrintViewProps) {
           </p>
         </section>
 
-        <footer className="mt-8 border-t border-[var(--paper-line)] pt-3 text-[10px] tracking-[0.14em] text-[var(--paper-ink)]/45 uppercase">
+        <footer className="mt-6 border-t border-[var(--paper-line)] pt-3 text-[10px] tracking-[0.14em] text-[var(--paper-ink)]/45 uppercase sm:mt-8">
           OneSheet
         </footer>
       </article>

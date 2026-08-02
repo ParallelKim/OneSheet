@@ -27,6 +27,7 @@ html,
 body,
 #root {
   min-height: 100%;
+  height: auto;
 }
 
 body {
@@ -37,7 +38,9 @@ body {
     radial-gradient(1200px 600px at 10% -10%, #2a3348 0%, transparent 55%),
     radial-gradient(900px 500px at 100% 0%, #3a2f1c 0%, transparent 50%),
     linear-gradient(165deg, var(--bg-0), var(--bg-1) 45%, #121821);
-  background-attachment: fixed;
+  /* fixed backgrounds cause odd overscroll gutters on mobile browsers */
+  background-attachment: scroll;
+  overflow-x: hidden;
 }
 
 button,
@@ -52,7 +55,8 @@ button {
 }
 
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: 100svh;
 }
 
 .brand-mark {
@@ -71,6 +75,11 @@ button {
 
 .paper-line {
   border-color: var(--paper-line);
+}
+
+.bar-row {
+  /* keep exactly 4 equal bar slots on one staff line */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 @media print {
