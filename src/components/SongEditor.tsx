@@ -1,9 +1,10 @@
-import { SECTION_PRESETS } from '../lib/songFactory'
-import type { Section, Song } from '../types/song'
-import { SectionBlock } from './SectionBlock'
+import type { Part, Song } from '../types/song'
+import { FormBuilder } from './FormBuilder'
+import { PartEditor } from './PartEditor'
 
 interface SongEditorProps {
   song: Song
+  activePartId: string | null
   status: string
   onBack: () => void
   onPlayMode: () => void
@@ -11,31 +12,40 @@ interface SongEditorProps {
   onUpdateMeta: (
     patch: Partial<Pick<Song, 'title' | 'artist' | 'key' | 'bpm' | 'timeSignature'>>,
   ) => void
-  onAddSection: (name?: string) => void
-  onRemoveSection: (id: string) => void
-  onMoveSection: (id: string, direction: -1 | 1) => void
-  onDuplicateSection: (id: string) => void
-  onUpdateSection: (
-    id: string,
-    patch: Partial<Pick<Section, 'name' | 'bars' | 'repeat' | 'note'>>,
-  ) => void
-  onSetChord: (sectionId: string, barIndex: number, value: string) => void
+  onSelectPart: (partId: string) => void
+  onAddPart: () => void
+  onAddVariation: (partId: string) => void
+  onRemovePart: (partId: string) => void
+  onUpdatePart: (partId: string, patch: Partial<Pick<Part, 'label' | 'bars'>>) => void
+  onSetChord: (partId: string, barIndex: number, value: string) => void
+  onAppendFormStep: (partId: string) => void
+  onRemoveFormStep: (stepId: string) => void
+  onMoveFormStep: (stepId: string, direction: -1 | 1) => void
+  onUpdateFormStep: (stepId: string, repeat: number) => void
 }
 
 export function SongEditor({
   song,
+  activePartId,
   status,
   onBack,
   onPlayMode,
   onDelete,
   onUpdateMeta,
-  onAddSection,
-  onRemoveSection,
-  onMoveSection,
-  onDuplicateSection,
-  onUpdateSection,
+  onSelectPart,
+  onAddPart,
+  onAddVariation,
+  onRemovePart,
+  onUpdatePart,
   onSetChord,
+  onAppendFormStep,
+  onRemoveFormStep,
+  onMoveFormStep,
+  onUpdateFormStep,
 }: SongEditorProps) {
+  const activePart =
+    song.parts.find((part) => part.id === activePartId) ?? song.parts[0]
+
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
       <div className="no-print mb-5 flex flex-wrap items-center gap-2">
@@ -67,90 +77,119 @@ export function SongEditor({
         </span>
       </div>
 
-      <section className="mb-8 rounded-xl border border-[var(--line)] bg-[var(--bg-2)]/60 p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block sm:col-span-2">
-            <span className="mb-1 block text-xs text-[var(--muted)]">Title</span>
-            <input
-              value={song.title}
-              onChange={(e) => onUpdateMeta({ title: e.target.value })}
-              className="brand-mark w-full rounded-md border border-[var(--line)] bg-[var(--bg-0)] px-3 py-2 text-2xl font-semibold outline-none focus:border-[var(--accent-dim)]"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs text-[var(--muted)]">Artist</span>
-            <input
-              value={song.artist}
-              onChange={(e) => onUpdateMeta({ artist: e.target.value })}
-              className="w-full rounded-md border border-[var(--line)] bg-[var(--bg-0)] px-3 py-2 outline-none focus:border-[var(--accent-dim)]"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs text-[var(--muted)]">Key</span>
-            <input
-              value={song.key}
-              onChange={(e) => onUpdateMeta({ key: e.target.value })}
-              placeholder="Am"
-              className="chord-font w-full rounded-md border border-[var(--line)] bg-[var(--bg-0)] px-3 py-2 outline-none focus:border-[var(--accent-dim)]"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs text-[var(--muted)]">BPM</span>
-            <input
-              type="number"
-              min={1}
-              max={300}
-              value={song.bpm ?? ''}
-              onChange={(e) =>
-                onUpdateMeta({
-                  bpm: e.target.value === '' ? null : Number(e.target.value),
-                })
-              }
-              className="w-full rounded-md border border-[var(--line)] bg-[var(--bg-0)] px-3 py-2 outline-none focus:border-[var(--accent-dim)]"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs text-[var(--muted)]">Time</span>
-            <input
-              value={song.timeSignature}
-              onChange={(e) => onUpdateMeta({ timeSignature: e.target.value })}
-              className="w-full rounded-md border border-[var(--line)] bg-[var(--bg-0)] px-3 py-2 outline-none focus:border-[var(--accent-dim)]"
-            />
-          </label>
-        </div>
-      </section>
-
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <h2 className="mr-2 text-lg font-semibold">Sections</h2>
-        {SECTION_PRESETS.map((name) => (
-          <button
-            key={name}
-            type="button"
-            onClick={() => onAddSection(name)}
-            className="rounded-md border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--muted)] hover:border-[var(--accent-dim)] hover:text-[var(--text)]"
-          >
-            + {name}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-col gap-4">
-        {song.sections.map((section, index) => (
-          <SectionBlock
-            key={section.id}
-            section={section}
-            canRemove={song.sections.length > 1}
-            canMoveUp={index > 0}
-            canMoveDown={index < song.sections.length - 1}
-            onUpdate={(patch) => onUpdateSection(section.id, patch)}
-            onRemove={() => onRemoveSection(section.id)}
-            onMoveUp={() => onMoveSection(section.id, -1)}
-            onMoveDown={() => onMoveSection(section.id, 1)}
-            onDuplicate={() => onDuplicateSection(section.id)}
-            onSetChord={(barIndex, value) => onSetChord(section.id, barIndex, value)}
+      <header className="mb-6">
+        <input
+          value={song.title}
+          onChange={(e) => onUpdateMeta({ title: e.target.value })}
+          className="brand-mark w-full bg-transparent text-3xl font-bold outline-none placeholder:text-[var(--muted)] sm:text-4xl"
+          placeholder="곡 제목"
+        />
+        <div className="mt-3 flex flex-wrap gap-2">
+          <MetaField
+            label="Key"
+            value={song.key}
+            placeholder="Am"
+            onChange={(value) => onUpdateMeta({ key: value })}
+            mono
           />
-        ))}
+          <MetaField
+            label="BPM"
+            value={song.bpm?.toString() ?? ''}
+            placeholder="120"
+            onChange={(value) =>
+              onUpdateMeta({ bpm: value === '' ? null : Number(value) || null })
+            }
+          />
+          <MetaField
+            label="Artist"
+            value={song.artist}
+            placeholder="optional"
+            onChange={(value) => onUpdateMeta({ artist: value })}
+          />
+        </div>
+      </header>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h2 className="mr-1 text-sm font-semibold tracking-wide">Parts</h2>
+        {song.parts.map((part) => {
+          const selected = part.id === activePart.id
+          return (
+            <button
+              key={part.id}
+              type="button"
+              onClick={() => onSelectPart(part.id)}
+              className={`chord-font min-h-10 min-w-10 rounded-md border px-3 py-2 text-sm font-bold transition ${
+                selected
+                  ? 'border-[var(--accent)] bg-[var(--accent)] text-[#1a1408]'
+                  : 'border-[var(--line)] text-[var(--muted)] hover:border-[var(--accent-dim)] hover:text-[var(--text)]'
+              }`}
+            >
+              {part.label}
+            </button>
+          )
+        })}
+        <button
+          type="button"
+          onClick={onAddPart}
+          className="rounded-md border border-dashed border-[var(--line)] px-3 py-2 text-sm text-[var(--muted)] hover:border-[var(--accent-dim)] hover:text-[var(--text)]"
+        >
+          + Part
+        </button>
       </div>
+
+      {activePart && (
+        <div className="mb-6">
+          <PartEditor
+            part={activePart}
+            canRemove={song.parts.length > 1}
+            onUpdate={(patch) => onUpdatePart(activePart.id, patch)}
+            onSetChord={(barIndex, value) => onSetChord(activePart.id, barIndex, value)}
+            onAddBar={() => onUpdatePart(activePart.id, { bars: activePart.bars + 1 })}
+            onRemoveBar={() =>
+              onUpdatePart(activePart.id, { bars: Math.max(1, activePart.bars - 1) })
+            }
+            onMakeVariation={() => onAddVariation(activePart.id)}
+            onRemove={() => onRemovePart(activePart.id)}
+          />
+        </div>
+      )}
+
+      <FormBuilder
+        parts={song.parts}
+        form={song.form}
+        onAppend={onAppendFormStep}
+        onRemove={onRemoveFormStep}
+        onMove={onMoveFormStep}
+        onUpdateRepeat={onUpdateFormStep}
+      />
     </div>
+  )
+}
+
+function MetaField({
+  label,
+  value,
+  placeholder,
+  onChange,
+  mono,
+}: {
+  label: string
+  value: string
+  placeholder: string
+  onChange: (value: string) => void
+  mono?: boolean
+}) {
+  return (
+    <label className="flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--bg-2)]/50 px-2.5 py-1.5">
+      <span className="text-[10px] tracking-wide text-[var(--muted)] uppercase">
+        {label}
+      </span>
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className={`w-24 bg-transparent text-sm outline-none ${mono ? 'chord-font' : ''}`}
+      />
+    </label>
   )
 }

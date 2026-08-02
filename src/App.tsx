@@ -9,6 +9,7 @@ export default function App() {
   const {
     songs,
     currentSong,
+    activePartId,
     viewMode,
     hydrated,
     status,
@@ -17,15 +18,19 @@ export default function App() {
     createNewSong,
     closeSong,
     setViewMode,
+    setActivePart,
     deleteCurrentSong,
     deleteSongById,
     updateMeta,
-    addSection,
-    removeSection,
-    moveSection,
-    duplicateSection,
-    updateSection,
+    addPart,
+    addVariation,
+    removePart,
+    updatePart,
     setChord,
+    appendFormStep,
+    removeFormStep,
+    moveFormStep,
+    updateFormStep,
   } = useSongStore()
 
   useEffect(() => {
@@ -60,6 +65,7 @@ export default function App() {
       <div className="app-shell">
         <SongEditor
           song={currentSong}
+          activePartId={activePartId}
           status={status}
           onBack={closeSong}
           onPlayMode={() => {
@@ -71,15 +77,19 @@ export default function App() {
             void deleteCurrentSong()
           }}
           onUpdateMeta={updateMeta}
-          onAddSection={(name) => {
-            void AnalyticsEvents.sectionAdd(name ?? 'Section')
-            addSection(name)
+          onSelectPart={setActivePart}
+          onAddPart={() => {
+            void AnalyticsEvents.sectionAdd('part')
+            addPart()
           }}
-          onRemoveSection={removeSection}
-          onMoveSection={moveSection}
-          onDuplicateSection={duplicateSection}
-          onUpdateSection={updateSection}
+          onAddVariation={addVariation}
+          onRemovePart={removePart}
+          onUpdatePart={updatePart}
           onSetChord={setChord}
+          onAppendFormStep={appendFormStep}
+          onRemoveFormStep={removeFormStep}
+          onMoveFormStep={moveFormStep}
+          onUpdateFormStep={(stepId, repeat) => updateFormStep(stepId, { repeat })}
         />
       </div>
     )

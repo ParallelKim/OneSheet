@@ -1,8 +1,9 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Song } from '../types/song'
+import { normalizeSong } from '../lib/migrate'
+import type { Song, StoredSong } from '../types/song'
 
 class OneSheetDB extends Dexie {
-  songs!: EntityTable<Song, 'id'>
+  songs!: EntityTable<StoredSong, 'id'>
 
   constructor() {
     super('onesheet')
@@ -15,11 +16,13 @@ class OneSheetDB extends Dexie {
 export const db = new OneSheetDB()
 
 export async function listSongs(): Promise<Song[]> {
-  return db.songs.orderBy('updatedAt').reverse().toArray()
+  const rows = await db.songs.orderBy('updatedAt').reverse().toArray()
+  return rows.map((row) => normalizeSong(row))
 }
 
 export async function getSong(id: string): Promise<Song | undefined> {
-  return db.songs.get(id)
+  const row = await db.songs.get(id)
+  return row ? normalizeSong(row) : undefined
 }
 
 export async function saveSong(song: Song): Promise<void> {

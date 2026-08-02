@@ -27,7 +27,7 @@ export function SongList({ songs, onOpen, onCreate, onDelete }: SongListProps) {
           OneSheet
         </h1>
         <p className="mt-4 max-w-md text-base text-[var(--muted)]">
-          합주용 한 장 차트. 송폼, 코드, 반복, 메모만.
+          파트를 만들고, 조합해 한 장으로.
         </p>
       </header>
 
@@ -50,7 +50,7 @@ export function SongList({ songs, onOpen, onCreate, onDelete }: SongListProps) {
             onClick={onCreate}
             className="mt-4 text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
           >
-            첫 차트 만들기
+            첫 파트 만들기
           </button>
         </div>
       ) : (
@@ -67,7 +67,9 @@ export function SongList({ songs, onOpen, onCreate, onDelete }: SongListProps) {
               >
                 <div className="truncate text-base font-semibold">{song.title}</div>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
-                  {song.artist && <span>{song.artist}</span>}
+                  <span className="chord-font">
+                    {song.parts.map((p) => p.label).join(' · ')}
+                  </span>
                   {song.key && <span>Key {song.key}</span>}
                   {song.bpm != null && <span>{song.bpm} BPM</span>}
                   <span>{formatDate(song.updatedAt)}</span>

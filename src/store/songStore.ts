@@ -6,12 +6,19 @@ import {
   saveSong,
 } from '../db/database'
 import { normalizeChord, resizeChords } from '../lib/chords'
-import { createSection, createSong } from '../lib/songFactory'
-import type { Section, Song, ViewMode } from '../types/song'
+import {
+  createFormStep,
+  createPart,
+  createSong,
+  nextPartLabel,
+  variationLabel,
+} from '../lib/songFactory'
+import type { FormStep, Part, Song, ViewMode } from '../types/song'
 
 interface SongState {
   songs: Song[]
   currentSong: Song | null
+  activePartId: string | null
   viewMode: ViewMode
   hydrated: boolean
   status: 'idle' | 'loading' | 'saving' | 'error'
@@ -22,21 +29,27 @@ interface SongState {
   createNewSong: () => Promise<void>
   closeSong: () => void
   setViewMode: (mode: ViewMode) => void
+  setActivePart: (partId: string) => void
   deleteCurrentSong: () => Promise<void>
   deleteSongById: (id: string) => Promise<void>
 
   updateMeta: (
     patch: Partial<Pick<Song, 'title' | 'artist' | 'key' | 'bpm' | 'timeSignature'>>,
   ) => void
-  addSection: (name?: string) => void
-  removeSection: (sectionId: string) => void
-  moveSection: (sectionId: string, direction: -1 | 1) => void
-  duplicateSection: (sectionId: string) => void
-  updateSection: (
-    sectionId: string,
-    patch: Partial<Pick<Section, 'name' | 'bars' | 'repeat' | 'note'>>,
+
+  addPart: () => void
+  addVariation: (partId: string) => void
+  removePart: (partId: string) => void
+  updatePart: (
+    partId: string,
+    patch: Partial<Pick<Part, 'label' | 'bars'>>,
   ) => void
-  setChord: (sectionId: string, barIndex: number, value: string) => void
+  setChord: (partId: string, barIndex: number, value: string) => void
+
+  appendFormStep: (partId: string) => void
+  removeFormStep: (stepId: string) => void
+  moveFormStep: (stepId: string, direction: -1 | 1) => void
+  updateFormStep: (stepId: string, patch: Partial<Pick<FormStep, 'repeat'>>) => void
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -71,9 +84,30 @@ function touchSong(song: Song): Song {
   return { ...song, updatedAt: Date.now() }
 }
 
+function withSong(
+  get: () => SongState,
+  set: (
+    partial:
+      | Partial<SongState>
+      | ((state: SongState) => Partial<SongState>),
+  ) => void,
+  updater: (song: Song) => Song,
+  activePartId?: string | null,
+): void {
+  const current = get().currentSong
+  if (!current) return
+  const next = touchSong(updater(current))
+  set({
+    currentSong: next,
+    ...(activePartId !== undefined ? { activePartId } : {}),
+  })
+  scheduleSave(get, set)
+}
+
 export const useSongStore = create<SongState>((set, get) => ({
   songs: [],
   currentSong: null,
+  activePartId: null,
   viewMode: 'edit',
   hydrated: false,
   status: 'idle',
@@ -96,26 +130,37 @@ export const useSongStore = create<SongState>((set, get) => ({
   openSong: async (id) => {
     const song = await getSong(id)
     if (!song) return
-    set({ currentSong: song, viewMode: 'edit' })
+    set({
+      currentSong: song,
+      activePartId: song.parts[0]?.id ?? null,
+      viewMode: 'edit',
+    })
   },
 
   createNewSong: async () => {
     const song = createSong()
     await persist(song)
     const songs = await listSongs()
-    set({ songs, currentSong: song, viewMode: 'edit' })
+    set({
+      songs,
+      currentSong: song,
+      activePartId: song.parts[0]?.id ?? null,
+      viewMode: 'edit',
+    })
   },
 
-  closeSong: () => set({ currentSong: null, viewMode: 'edit' }),
+  closeSong: () => set({ currentSong: null, activePartId: null, viewMode: 'edit' }),
 
   setViewMode: (mode) => set({ viewMode: mode }),
+
+  setActivePart: (partId) => set({ activePartId: partId }),
 
   deleteCurrentSong: async () => {
     const song = get().currentSong
     if (!song) return
     await deleteSongFromDb(song.id)
     const songs = await listSongs()
-    set({ songs, currentSong: null, viewMode: 'edit' })
+    set({ songs, currentSong: null, activePartId: null, viewMode: 'edit' })
   },
 
   deleteSongById: async (id) => {
@@ -125,108 +170,134 @@ export const useSongStore = create<SongState>((set, get) => ({
     set({
       songs,
       currentSong: current?.id === id ? null : current,
+      activePartId: current?.id === id ? null : get().activePartId,
     })
   },
 
   updateMeta: (patch) => {
-    const current = get().currentSong
-    if (!current) return
-    const next = touchSong({ ...current, ...patch })
-    set({ currentSong: next })
-    scheduleSave(get, set)
+    withSong(get, set, (song) => ({ ...song, ...patch }))
   },
 
-  addSection: (name) => {
+  addPart: () => {
     const current = get().currentSong
     if (!current) return
-    const section = createSection({ name: name ?? 'Section' })
-    const next = touchSong({
-      ...current,
-      sections: [...current.sections, section],
-    })
-    set({ currentSong: next })
-    scheduleSave(get, set)
+    const label = nextPartLabel(current.parts.map((p) => p.label))
+    const part = createPart({ label })
+    withSong(
+      get,
+      set,
+      (song) => ({ ...song, parts: [...song.parts, part] }),
+      part.id,
+    )
   },
 
-  removeSection: (sectionId) => {
-    const current = get().currentSong
-    if (!current || current.sections.length <= 1) return
-    const next = touchSong({
-      ...current,
-      sections: current.sections.filter((s) => s.id !== sectionId),
-    })
-    set({ currentSong: next })
-    scheduleSave(get, set)
-  },
-
-  moveSection: (sectionId, direction) => {
+  addVariation: (partId) => {
     const current = get().currentSong
     if (!current) return
-    const index = current.sections.findIndex((s) => s.id === sectionId)
-    if (index < 0) return
-    const target = index + direction
-    if (target < 0 || target >= current.sections.length) return
-    const sections = [...current.sections]
-    const [item] = sections.splice(index, 1)
-    sections.splice(target, 0, item)
-    const next = touchSong({ ...current, sections })
-    set({ currentSong: next })
-    scheduleSave(get, set)
-  },
-
-  duplicateSection: (sectionId) => {
-    const current = get().currentSong
-    if (!current) return
-    const index = current.sections.findIndex((s) => s.id === sectionId)
-    if (index < 0) return
-    const source = current.sections[index]
-    const copy = createSection({
-      name: source.name,
+    const source = current.parts.find((p) => p.id === partId)
+    if (!source) return
+    const part = createPart({
+      label: variationLabel(source.label),
       bars: source.bars,
-      repeat: source.repeat,
       chords: [...source.chords],
-      note: source.note,
     })
-    const sections = [...current.sections]
-    sections.splice(index + 1, 0, copy)
-    const next = touchSong({ ...current, sections })
-    set({ currentSong: next })
-    scheduleSave(get, set)
+    const index = current.parts.findIndex((p) => p.id === partId)
+    withSong(
+      get,
+      set,
+      (song) => {
+        const parts = [...song.parts]
+        parts.splice(index + 1, 0, part)
+        return { ...song, parts }
+      },
+      part.id,
+    )
   },
 
-  updateSection: (sectionId, patch) => {
+  removePart: (partId) => {
     const current = get().currentSong
-    if (!current) return
-    const sections = current.sections.map((section) => {
-      if (section.id !== sectionId) return section
-      const bars = patch.bars ?? section.bars
-      return {
-        ...section,
-        ...patch,
-        bars,
-        chords:
-          patch.bars !== undefined
-            ? resizeChords(section.chords, bars)
-            : section.chords,
-      }
-    })
-    const next = touchSong({ ...current, sections })
-    set({ currentSong: next })
-    scheduleSave(get, set)
+    if (!current || current.parts.length <= 1) return
+    const parts = current.parts.filter((p) => p.id !== partId)
+    const form = current.form.filter((step) => step.partId !== partId)
+    const nextActive =
+      get().activePartId === partId ? (parts[0]?.id ?? null) : get().activePartId
+    withSong(
+      get,
+      set,
+      (song) => ({
+        ...song,
+        parts,
+        form: form.length ? form : [createFormStep(parts[0].id)],
+      }),
+      nextActive,
+    )
   },
 
-  setChord: (sectionId, barIndex, value) => {
-    const current = get().currentSong
-    if (!current) return
+  updatePart: (partId, patch) => {
+    withSong(get, set, (song) => ({
+      ...song,
+      parts: song.parts.map((part) => {
+        if (part.id !== partId) return part
+        const bars = patch.bars ?? part.bars
+        return {
+          ...part,
+          ...patch,
+          bars,
+          chords:
+            patch.bars !== undefined
+              ? resizeChords(part.chords, bars)
+              : part.chords,
+        }
+      }),
+    }))
+  },
+
+  setChord: (partId, barIndex, value) => {
     const normalized = normalizeChord(value)
-    const sections = current.sections.map((section) => {
-      if (section.id !== sectionId) return section
-      const chords = [...section.chords]
-      chords[barIndex] = normalized || null
-      return { ...section, chords }
+    withSong(get, set, (song) => ({
+      ...song,
+      parts: song.parts.map((part) => {
+        if (part.id !== partId) return part
+        const chords = [...part.chords]
+        chords[barIndex] = normalized || null
+        return { ...part, chords }
+      }),
+    }))
+  },
+
+  appendFormStep: (partId) => {
+    withSong(get, set, (song) => ({
+      ...song,
+      form: [...song.form, createFormStep(partId)],
+    }))
+  },
+
+  removeFormStep: (stepId) => {
+    withSong(get, set, (song) => {
+      if (song.form.length <= 1) return song
+      return { ...song, form: song.form.filter((step) => step.id !== stepId) }
     })
-    const next = touchSong({ ...current, sections })
-    set({ currentSong: next })
-    scheduleSave(get, set)
+  },
+
+  moveFormStep: (stepId, direction) => {
+    withSong(get, set, (song) => {
+      const index = song.form.findIndex((step) => step.id === stepId)
+      if (index < 0) return song
+      const target = index + direction
+      if (target < 0 || target >= song.form.length) return song
+      const form = [...song.form]
+      const [item] = form.splice(index, 1)
+      form.splice(target, 0, item)
+      return { ...song, form }
+    })
+  },
+
+  updateFormStep: (stepId, patch) => {
+    withSong(get, set, (song) => ({
+      ...song,
+      form: song.form.map((step) =>
+        step.id === stepId ? { ...step, ...patch } : step,
+      ),
+    }))
   },
 }))
