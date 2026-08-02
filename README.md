@@ -24,13 +24,17 @@ npm test
 npm run build
 ```
 
+## Live
+
+- Hosting: https://onesheet-app.web.app
+- Console: https://console.firebase.google.com/project/onesheet-app/overview
+
 ## Firebase
 
-1. Firebase 프로젝트 생성 후 `.firebaserc`의 `onesheet-app`을 실제 프로젝트 ID로 변경
-2. `.env.example`을 복사해 `.env`에 웹 앱 설정 입력
-3. 배포:
+프로젝트 ID: `onesheet-app`
 
 ```bash
+# .env.example → .env (웹 앱 설정)
 firebase login
 npm run deploy:hosting
 ```
