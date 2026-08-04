@@ -1,53 +1,5 @@
 # OneSheet
 
-합주용 한 장 기타 차트 메이커.
+Teenage Engineering에 영감받은 기타 악보 편집/재생기.
 
-송폼 · 코드 · 반복 · 짧은 메모를 한 페이지로 정리하고, 연주/인쇄 모드로 바로 본다.
-
-## 스택
-
-- React + TypeScript + Vite
-- Zustand (편집 상태)
-- Dexie / IndexedDB (로컬 저장)
-- Tailwind CSS
-- Firebase Hosting (+ 향후 Auth/Firestore 동기화)
-
-## 로컬 실행
-
-```bash
-npm install
-npm run dev
-```
-
-```bash
-npm test
-npm run build
-```
-
-## Live
-
-- Hosting: https://onesheet-app.web.app
-- Console: https://console.firebase.google.com/project/onesheet-app/overview
-- Analytics (GA4): measurement ID `G-5CM64JNEVF` / property `onesheet-app`
-
-## Firebase
-
-프로젝트 ID: `onesheet-app`
-
-```bash
-# .env.example → .env (웹 앱 설정)
-firebase login
-npm run deploy:hosting
-```
-
-로컬 편집은 Firebase 없이도 Dexie로 동작한다.  
-원격 저장은 `src/firebase/sync.ts`에 Firestore 헬퍼를 준비해 두었고, 인증 UI는 다음 단계에서 연결한다.
-
-## 현재 MVP
-
-- 곡 목록 / 생성 / 삭제
-- **Part 정의** (A, B, A'…) + 마디별 코드
-- **Song Form 조립** (파트 조합 · 반복)
-- 코드 정규화 (`bm` → `Bm`)
-- 자동 저장 (IndexedDB, 레거시 Section 마이그레이션)
-- 연주/인쇄 뷰 (파트 정의 + 폼)
+장난감처럼 만지고, 바로 들어보는 한 장 차트.
