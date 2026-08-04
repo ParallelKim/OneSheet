@@ -1,9 +1,5 @@
 {
   "name": "OneSheet",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
-  },
   "install": "npm ci && npm run build",
   "start": "",
   "ports": [
