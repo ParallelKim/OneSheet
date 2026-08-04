@@ -7,6 +7,7 @@ import {
   type Sheet,
 } from './sheet'
 import { isPlaying, playSheet, stopSheet, updateSheet } from './engine'
+import { track } from './firebase'
 import './App.css'
 
 export default function App() {
@@ -29,10 +30,16 @@ export default function App() {
       if (playing) {
         stopSheet()
         setPlaying(false)
+        void track('play_stop', { bpm: sheet.bpm })
         return
       }
       await playSheet(sheet)
       setPlaying(true)
+      void track('play_start', {
+        bpm: sheet.bpm,
+        parts: sheet.parts.length,
+        form_steps: sheet.form.length,
+      })
     } catch (err) {
       setStatus(err instanceof Error ? err.message : String(err))
       setPlaying(false)
