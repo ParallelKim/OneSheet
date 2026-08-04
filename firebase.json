@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "onesheet-app",
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
@@ -9,6 +10,15 @@
       }
     ],
     "headers": [
+      {
+        "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
       {
         "source": "/assets/**",
         "headers": [

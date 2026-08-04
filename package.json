@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && firebase deploy --only hosting",
+    "deploy:preview": "npm run build && firebase hosting:channel:deploy preview --expires 30d"
   },
   "dependencies": {
     "@strudel/web": "^1.3.0",
@@ -19,6 +21,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
+    "firebase-tools": "^15.1.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"
   }

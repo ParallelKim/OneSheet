@@ -24,6 +24,16 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Check Firebase service account secret
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ONESHEET_APP }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::Missing GitHub Actions secret FIREBASE_SERVICE_ACCOUNT_ONESHEET_APP."
+            echo "Create it with: firebase login && firebase init hosting:github"
+            exit 1
+          fi
+
       - run: npm ci
       - run: npm run build
 
