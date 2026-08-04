@@ -1,5 +1,10 @@
 import { initializeApp } from 'firebase/app'
-import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics'
+import {
+  getAnalytics,
+  isSupported,
+  logEvent,
+  type Analytics,
+} from 'firebase/analytics'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyC-3ZG2sES5tdmTCDuuuzJILZ-DZ68wNlM',
@@ -39,6 +44,5 @@ export async function track(
 ): Promise<void> {
   const instance = await initFirebaseAnalytics()
   if (!instance) return
-  const { logEvent } = await import('firebase/analytics')
   logEvent(instance, eventName, params)
 }
