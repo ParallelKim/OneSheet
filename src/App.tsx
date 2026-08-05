@@ -356,97 +356,99 @@ export default function App() {
         className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode}`}
         style={{ "--mark-bar": markBar } as CSSProperties}
       >
-        <div className="pad-back" aria-hidden>
-          {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
+        <div className="pad-board">
+          <div className="pad-back" aria-hidden>
+            {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
+          </div>
+          {/* 재생 링: main + 행 wrap(prev/next)로 오른쪽↔왼쪽 이어짐 */}
+          {mode === "chart" && (
+            <div className="pad-play" aria-hidden>
+              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-prev" />
+              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-main" />
+              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-next" />
+            </div>
+          )}
+          {mode === "rhythm" && playBar === bar && (
+            <div className="pad-play pad-play-rhythm" aria-hidden>
+              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-prev" />
+              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-main" />
+              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-next" />
+            </div>
+          )}
+          <section className="pad-grid" aria-label={modeLabel(mode)}>
+            {mode === "chart" &&
+              Array.from({ length: SLOTS }, (_, i) => {
+                const degree = sheet.degrees[i] ?? null;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
+                    onClick={() => setSelected(i)}
+                  >
+                    <span className="pad-sub">{(i % BEATS) + 1}</span>
+                    <span className="pad-label">{slotLabel(sheet.key, degree)}</span>
+                    <span className="pad-roman">{slotRoman(degree)}</span>
+                  </button>
+                );
+              })}
+
+            {mode === "degree" &&
+              Array.from({ length: SLOTS }, (_, i) => {
+                if (i < 7) {
+                  const meta = DEGREE_META[i]!;
+                  return (
+                    <button
+                      key={meta.roman}
+                      type="button"
+                      className={`pad tool ${currentDegree === i ? "on" : ""} ${sheet.degrees.includes(i) ? "used" : ""}`}
+                      onClick={() => paintDegree(i)}
+                    >
+                      <span className="pad-label">{meta.roman}</span>
+                      <span className="pad-roman">{slotLabel(sheet.key, i)}</span>
+                    </button>
+                  );
+                }
+                if (i === 7) {
+                  return (
+                    <button
+                      key="rest"
+                      type="button"
+                      className={`pad tool ${currentDegree === null ? "on" : ""}`}
+                      onClick={() => paintDegree(null)}
+                    >
+                      <span className="pad-label">rest</span>
+                      <span className="pad-roman">—</span>
+                    </button>
+                  );
+                }
+                return <div key={`ghost-${i}`} className="pad ghost" aria-hidden />;
+              })}
+
+            {mode === "rhythm" &&
+              Array.from({ length: BAR_STEPS }, (_, step) => {
+                const art = barRhythm[step] ?? "rest";
+                const beatNo = Math.floor(step / SUBDIV) + 1;
+                const sub = step % SUBDIV;
+                const subMark = ["1", "e", "&", "a"][sub]!;
+                return (
+                  <button
+                    key={step}
+                    type="button"
+                    className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""}`}
+                    onClick={() => paintRhythm(step)}
+                  >
+                    <span className="pad-sub">
+                      {beatNo}
+                      {subMark}
+                    </span>
+                    <span className="pad-label">{artLabel(art)}</span>
+                    <span className="pad-roman">{artHint(art)}</span>
+                  </button>
+                );
+              })}
+          </section>
         </div>
-        {/* 재생 링: main + 행 wrap(prev/next)로 오른쪽↔왼쪽 이어짐 */}
-        {mode === "chart" && (
-          <div className="pad-play" aria-hidden>
-            <div className="pad-play-orb pad-play-orb-chart pad-play-orb-prev" />
-            <div className="pad-play-orb pad-play-orb-chart pad-play-orb-main" />
-            <div className="pad-play-orb pad-play-orb-chart pad-play-orb-next" />
-          </div>
-        )}
-        {mode === "rhythm" && playBar === bar && (
-          <div className="pad-play pad-play-rhythm" aria-hidden>
-            <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-prev" />
-            <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-main" />
-            <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-next" />
-          </div>
-        )}
-        <section className="pad-grid" aria-label={modeLabel(mode)}>
-          {mode === "chart" &&
-            Array.from({ length: SLOTS }, (_, i) => {
-              const degree = sheet.degrees[i] ?? null;
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
-                  onClick={() => setSelected(i)}
-                >
-                  <span className="pad-sub">{(i % BEATS) + 1}</span>
-                  <span className="pad-label">{slotLabel(sheet.key, degree)}</span>
-                  <span className="pad-roman">{slotRoman(degree)}</span>
-                </button>
-              );
-            })}
-
-          {mode === "degree" &&
-            Array.from({ length: SLOTS }, (_, i) => {
-              if (i < 7) {
-                const meta = DEGREE_META[i]!;
-                return (
-                  <button
-                    key={meta.roman}
-                    type="button"
-                    className={`pad tool ${currentDegree === i ? "on" : ""} ${sheet.degrees.includes(i) ? "used" : ""}`}
-                    onClick={() => paintDegree(i)}
-                  >
-                    <span className="pad-label">{meta.roman}</span>
-                    <span className="pad-roman">{slotLabel(sheet.key, i)}</span>
-                  </button>
-                );
-              }
-              if (i === 7) {
-                return (
-                  <button
-                    key="rest"
-                    type="button"
-                    className={`pad tool ${currentDegree === null ? "on" : ""}`}
-                    onClick={() => paintDegree(null)}
-                  >
-                    <span className="pad-label">rest</span>
-                    <span className="pad-roman">—</span>
-                  </button>
-                );
-              }
-              return <div key={`ghost-${i}`} className="pad ghost" aria-hidden />;
-            })}
-
-          {mode === "rhythm" &&
-            Array.from({ length: BAR_STEPS }, (_, step) => {
-              const art = barRhythm[step] ?? "rest";
-              const beatNo = Math.floor(step / SUBDIV) + 1;
-              const sub = step % SUBDIV;
-              const subMark = ["1", "e", "&", "a"][sub]!;
-              return (
-                <button
-                  key={step}
-                  type="button"
-                  className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""}`}
-                  onClick={() => paintRhythm(step)}
-                >
-                  <span className="pad-sub">
-                    {beatNo}
-                    {subMark}
-                  </span>
-                  <span className="pad-label">{artLabel(art)}</span>
-                  <span className="pad-roman">{artHint(art)}</span>
-                </button>
-              );
-            })}
-        </section>
       </div>
 
       {status ? <p className="status">{status}</p> : null}
