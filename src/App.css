@@ -386,10 +386,12 @@ button {
   overflow: visible;
 }
 
-/* 풀폭 보드. 셀·링 좌표는 inset 레이어에서 100%로 계산 */
+/* 풀폭 보드. 정사각 + cqw로 셀 길이 하나로 고정(링 정원) */
 .pad-board {
   --pad-inset: 12px;
   --pad-gap: 8px;
+  /* 자손의 cqw = 보드 가로(=세로, aspect 1) */
+  container-type: size;
   position: relative;
   isolation: isolate;
   width: 100%;
@@ -401,13 +403,11 @@ button {
 .pad-back,
 .pad-play,
 .pad-grid {
-  --pad-cell: calc((100% - 3 * var(--pad-gap)) / 4);
+  /* cqw는 축과 무관 → width/height/% top 어디에 써도 같은 길이 */
+  --pad-cell: calc((100cqw - 2 * var(--pad-inset) - 3 * var(--pad-gap)) / 4);
   --pad-stride: calc(var(--pad-cell) + var(--pad-gap));
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--pad-inset);
-  right: var(--pad-inset);
+  inset: var(--pad-inset);
 }
 
 .pad-back {
@@ -435,9 +435,9 @@ button {
 }
 
 /*
- * 재생 링: inset 레이어 좌표.
- * overflow:hidden → wrap 고스트(±4열)가 화면 끝으로 새지 않음.
- * 본 링(0..3)은 레이어 안에 완전히 들어가 잘리지 않음.
+ * 재생 링: 정사각 inset 레이어 좌표.
+ * overflow:hidden → wrap 고스트(±4열)만 클립. 본 링은 레이어 안에 들어감.
+ * 바깥 glow 금지 — app/레이어에 잘림.
  */
 .pad-play {
   z-index: 2;
@@ -449,15 +449,16 @@ button {
 .pad-play-orb {
   position: absolute;
   width: var(--pad-cell);
-  height: var(--pad-cell);
+  /* height에 같은 % 변수를 쓰면 비정사각 조상에서 타원 → width만 + aspect-ratio */
+  aspect-ratio: 1;
+  height: auto;
   border-radius: 50%;
   border: 2px solid var(--fg);
   background: rgba(255, 255, 255, 0.06);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.2),
-    0 0 8px rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
   transform: translate(-50%, -50%);
   will-change: left, top;
+  box-sizing: border-box;
 }
 
 .pad-play-orb-chart.pad-play-orb-main {
@@ -494,12 +495,15 @@ button {
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
   gap: var(--pad-gap);
 }
 
 .pad {
-  aspect-ratio: 1;
   width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: transparent;
@@ -509,8 +513,6 @@ button {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  min-width: 0;
-  min-height: 0;
   overflow: visible;
 }
 
