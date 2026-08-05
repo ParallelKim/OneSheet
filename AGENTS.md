@@ -6,7 +6,7 @@
 
 OneSheet is a Vite + React + TypeScript SPA. Sound uses `@strudel/web` in the browser (Web Audio). There is no backend server.
 
-Current UI: 4×4 quarter-note chart, diatonic degrees, metronome, bottom transport row. See `HANDOFF.md`.
+Current UI: single 4×4 launchpad (modes remap pads), LCD chart beads, metronome, bottom transport. See `HANDOFF.md`.
 
 ## Commands
 
