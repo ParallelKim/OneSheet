@@ -29,6 +29,7 @@ SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
 - dim 코드 심볼은 `Bo` (`dim` 아님) — triads 딕셔너리
 - 음색은 WebAudio 신스만 (soundfont 없음)
 - 재생 중 편집 → `evaluateStrudel` 재평가 (직렬 큐)
+- **플레이헤드**: `getCyclePhase()` → LCD/패드/헤더에 현재 마디·박 표시
 
 ```bash
 npm test

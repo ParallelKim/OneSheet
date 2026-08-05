@@ -3,6 +3,7 @@ import { evaluate, hush, initStrudel } from "@strudel/web";
 type Repl = Awaited<ReturnType<typeof initStrudel>>;
 
 let boot: Promise<Repl> | null = null;
+let replRef: Repl | null = null;
 /** evaluate 직렬화 — 재생 중 연속 편집 시 레이스 방지 */
 let queue: Promise<void> = Promise.resolve();
 let lastCode = "";
@@ -20,12 +21,38 @@ export function getPlaybackEpoch(): number {
   return epoch;
 }
 
+/**
+ * 현재 사이클 위상 0..1 (한 사이클 = 차트 전체 16박).
+ * 엔진 미준비·정지 직후면 null.
+ */
+export function getCyclePhase(): number | null {
+  const scheduler = replRef?.scheduler as
+    | { now?: () => number; started?: boolean }
+    | undefined;
+  if (!scheduler?.now) return null;
+  try {
+    const t = scheduler.now();
+    if (!Number.isFinite(t)) return null;
+    // 음수·정지 후 0 고착 대비
+    const phase = ((t % 1) + 1) % 1;
+    return phase;
+  } catch {
+    return null;
+  }
+}
+
 export async function initStrudelEngine(): Promise<Repl> {
   if (!boot) {
-    boot = initStrudel().catch((err) => {
-      boot = null;
-      throw err;
-    });
+    boot = initStrudel()
+      .then((repl) => {
+        replRef = repl;
+        return repl;
+      })
+      .catch((err) => {
+        boot = null;
+        replRef = null;
+        throw err;
+      });
   }
   return boot;
 }
@@ -44,7 +71,6 @@ export async function evaluateStrudel(code: string): Promise<boolean> {
     if (my !== epoch) return false;
     await evaluate(code);
     if (my !== epoch) {
-      // 평가 도중 정지됨 → 방금 올린 패턴을 끊는다
       try {
         hush();
       } catch {

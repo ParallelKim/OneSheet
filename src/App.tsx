@@ -14,11 +14,18 @@ import {
   slotLabel,
   slotRoman,
   SUBDIV,
+  TOTAL_STEPS,
   toStrudel,
   type Articulation,
   type SheetState,
 } from "./sheet";
-import { evaluateStrudel, getLastStrudelCode, hushStrudel, initStrudelEngine } from "./engine";
+import {
+  evaluateStrudel,
+  getCyclePhase,
+  getLastStrudelCode,
+  hushStrudel,
+  initStrudelEngine,
+} from "./engine";
 import "./App.css";
 
 type EngineState = "idle" | "ready" | "playing" | "error";
@@ -32,12 +39,38 @@ export default function App() {
   const [brush, setBrush] = useState<Articulation>("D");
   const [engine, setEngine] = useState<EngineState>("idle");
   const [status, setStatus] = useState("차트 준비됨");
+  /** 재생 헤드: 4분 슬롯 0–15 (null = 정지) */
+  const [playSlot, setPlaySlot] = useState<number | null>(null);
+  /** 재생 헤드: 16분 스텝 0–63 */
+  const [playStep, setPlayStep] = useState<number | null>(null);
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
 
   useEffect(() => {
     sheetRef.current = sheet;
   }, [sheet]);
+
+  // Strudel 사이클 → 플레이헤드
+  useEffect(() => {
+    if (engine !== "playing") {
+      setPlaySlot(null);
+      setPlayStep(null);
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const phase = getCyclePhase();
+      if (phase !== null) {
+        const slot = Math.min(SLOTS - 1, Math.floor(phase * SLOTS));
+        const step = Math.min(TOTAL_STEPS - 1, Math.floor(phase * TOTAL_STEPS));
+        setPlaySlot((prev) => (prev === slot ? prev : slot));
+        setPlayStep((prev) => (prev === step ? prev : step));
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [engine]);
 
   const pushPattern = useCallback(async (next: SheetState) => {
     if (!playingRef.current) return;
@@ -146,13 +179,19 @@ export default function App() {
   const bar = barIndex(selected);
   const beat = (selected % BEATS) + 1;
   const barRhythm = sheet.rhythm[bar] ?? [];
+  const playBar = playSlot !== null ? barIndex(playSlot) : null;
+  const playBeat = playSlot !== null ? (playSlot % BEATS) + 1 : null;
+  const playStepInBar =
+    playStep !== null && playBar === bar ? playStep % BAR_STEPS : null;
 
   return (
     <div className="app">
       <header className="top">
         <p className="brand">OneSheet</p>
-        <p className="pos">
-          {bar + 1}마디 · {beat}박
+        <p className={`pos ${playing ? "playing" : ""}`}>
+          {playing && playBar !== null && playBeat !== null
+            ? `▶ ${playBar + 1}마디 · ${playBeat}박`
+            : `${bar + 1}마디 · ${beat}박`}
         </p>
       </header>
 
@@ -180,12 +219,11 @@ export default function App() {
           </label>
         </div>
 
-        {/* 얇은 한 줄 차트 — 코드만, 도수는 선택 칸에만 */}
         <div className="staff" aria-label="차트">
           {Array.from({ length: BARS }, (_, bi) => (
             <div
               key={bi}
-              className={`measure ${bar === bi ? "focus" : ""}`}
+              className={`measure ${bar === bi ? "focus" : ""} ${playBar === bi ? "play" : ""}`}
               role="group"
               aria-label={`${bi + 1}마디`}
               onClick={() => selectBar(bi)}
@@ -195,11 +233,12 @@ export default function App() {
                   const i = bi * BEATS + qi;
                   const d = sheet.degrees[i] ?? null;
                   const on = selected === i;
+                  const head = playSlot === i;
                   return (
                     <button
                       key={i}
                       type="button"
-                      className={`chord-cell ${on ? "on" : ""} ${d === null ? "empty" : ""}`}
+                      className={`chord-cell ${on ? "on" : ""} ${head ? "play" : ""} ${d === null ? "empty" : ""}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelected(i);
@@ -287,7 +326,7 @@ export default function App() {
               <button
                 key={i}
                 type="button"
-                className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
+                className={`pad ${selected === i ? "on" : ""} ${playSlot === i ? "play" : ""} ${degree === null ? "empty" : ""}`}
                 onClick={() => setSelected(i)}
               >
                 <span className="pad-sub">{(i % BEATS) + 1}</span>
@@ -339,7 +378,7 @@ export default function App() {
               <button
                 key={step}
                 type="button"
-                className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""}`}
+                className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""} ${playStepInBar === step ? "play" : ""}`}
                 onClick={() => paintRhythm(step)}
               >
                 <span className="pad-sub">
@@ -356,7 +395,11 @@ export default function App() {
       </section>
 
       <p className="status">
-        {mode === "rhythm" ? `${bar + 1}마디 리듬 · 탭으로 ${brushLabel(brush)}` : status}
+        {playing && playBar !== null && playBeat !== null
+          ? `재생 중 · ${playBar + 1}마디 ${playBeat}박`
+          : mode === "rhythm"
+            ? `${bar + 1}마디 리듬 · 탭으로 ${brushLabel(brush)}`
+            : status}
       </p>
     </div>
   );

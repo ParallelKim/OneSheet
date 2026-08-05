@@ -74,6 +74,10 @@ button {
   color: var(--muted);
 }
 
+.pos.playing {
+  color: var(--fg);
+}
+
 .lcd {
   display: flex;
   flex-direction: column;
@@ -129,6 +133,12 @@ button {
   border-radius: 8px;
 }
 
+.measure.play {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--fg);
+}
+
 .measure-chords {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -144,14 +154,28 @@ button {
   gap: 2px;
   min-width: 0;
   padding: 0;
+  border-radius: 6px;
 }
 
 .chord-cell.on .chord-name {
   color: var(--fg);
 }
 
+.chord-cell.play .chord-name {
+  color: var(--bg);
+}
+
+.chord-cell.play {
+  background: var(--fg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
 .chord-cell.empty .chord-name {
   opacity: 0.3;
+}
+
+.chord-cell.play.empty .chord-name {
+  opacity: 0.7;
 }
 
 .chord-name {
@@ -163,6 +187,14 @@ button {
 
 .measure.focus .chord-name {
   color: var(--fg);
+}
+
+.measure.play .chord-name {
+  color: var(--fg);
+}
+
+.chord-cell.play .chord-name {
+  color: var(--bg);
 }
 
 .degree-dot {
@@ -296,6 +328,19 @@ button {
   background: var(--fill-2);
   border-color: var(--fg);
   box-shadow: var(--shadow-on);
+}
+
+.pad.play {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+  box-shadow: var(--shadow-on);
+}
+
+.pad.play .pad-sub,
+.pad.play .pad-roman {
+  color: var(--bg);
+  opacity: 0.75;
 }
 
 .pad.used:not(.on) {
