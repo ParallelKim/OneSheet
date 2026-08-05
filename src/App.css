@@ -9,6 +9,12 @@
   --chord: #5ec8ff;
   --beat: #ff8f6b;
   --surface: #2c3a33;
+  --deg0: #5ec8ff;
+  --deg1: #7eb8a8;
+  --deg2: #9aa88a;
+  --deg3: #e0c35a;
+  --deg4: #ff8f6b;
+  --deg5: #c89bff;
   --font-display: "Fraunces", "Georgia", serif;
   --font-ui: "Pretendard", "Apple SD Gothic Neo", sans-serif;
   --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
@@ -55,7 +61,7 @@ button {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
 }
 
 .top {
@@ -68,7 +74,7 @@ button {
 .brand {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2.1rem, 9vw, 2.7rem);
+  font-size: clamp(2rem, 9vw, 2.6rem);
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 0.95;
@@ -77,16 +83,16 @@ button {
 .tag {
   margin: 8px 0 0;
   color: var(--ink-dim);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 .play {
-  width: 58px;
-  height: 58px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   font-weight: 700;
   flex-shrink: 0;
   box-shadow: 0 8px 24px rgba(200, 245, 74, 0.25);
@@ -103,75 +109,166 @@ button {
   box-shadow: none;
 }
 
+.key-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.key-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--line);
+}
+
+.key-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
 .chords {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 
 .chord {
-  aspect-ratio: 1.05;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--chord) 16%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--chord) 35%, transparent);
+  aspect-ratio: 1.15;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--chord) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--chord) 28%, transparent);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  transition: transform 0.12s ease, background 0.12s ease;
+  gap: 4px;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .chord:active {
   transform: scale(0.97);
 }
 
+.chord.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 .chord.empty {
-  opacity: 0.45;
+  opacity: 0.5;
   background: var(--surface);
   border-color: var(--line);
 }
 
 .chord-i {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--ink-dim);
 }
 
 .chord-v {
   font-family: var(--font-display);
-  font-size: clamp(1.6rem, 8vw, 2.1rem);
+  font-size: clamp(1.45rem, 7vw, 1.9rem);
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
-.beats {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
+.palette-label,
 .beats-label {
-  margin: 0;
-  font-size: 0.78rem;
+  margin: 0 0 8px;
+  font-size: 0.75rem;
   color: var(--ink-dim);
   letter-spacing: 0.04em;
+}
+
+.palette-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  text-align: left;
+  transition: transform 0.1s ease, border-color 0.12s ease;
+}
+
+.swatch:active {
+  transform: scale(0.96);
+}
+
+.swatch-deg {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--ink-dim);
+}
+
+.swatch-chord {
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.swatch.deg-0 {
+  border-color: color-mix(in srgb, var(--deg0) 45%, transparent);
+}
+.swatch.deg-0 .swatch-chord {
+  color: var(--deg0);
+}
+.swatch.deg-1 {
+  border-color: color-mix(in srgb, var(--deg1) 45%, transparent);
+}
+.swatch.deg-2 {
+  border-color: color-mix(in srgb, var(--deg2) 45%, transparent);
+}
+.swatch.deg-3 {
+  border-color: color-mix(in srgb, var(--deg3) 45%, transparent);
+}
+.swatch.deg-3 .swatch-chord {
+  color: var(--deg3);
+}
+.swatch.deg-4 {
+  border-color: color-mix(in srgb, var(--deg4) 45%, transparent);
+}
+.swatch.deg-4 .swatch-chord {
+  color: var(--deg4);
+}
+.swatch.deg-5 {
+  border-color: color-mix(in srgb, var(--deg5) 45%, transparent);
+}
+.swatch.deg-5 .swatch-chord {
+  color: var(--deg5);
+}
+
+.swatch.rest {
+  opacity: 0.7;
 }
 
 .beat-row {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
+  gap: 5px;
 }
 
 .dot {
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: 9px;
   background: var(--surface);
   border: 1px solid var(--line);
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: 0.55rem;
   font-weight: 600;
   color: transparent;
   transition: transform 0.1s ease, background 0.12s ease, color 0.12s ease;
@@ -195,8 +292,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 14px;
-  border-radius: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--line);
 }
@@ -208,7 +305,7 @@ button {
   gap: 12px;
   width: 100%;
   text-align: left;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .tempo {
@@ -224,7 +321,7 @@ button {
 }
 
 .ctrl-label {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--ink-dim);
 }
 
@@ -239,13 +336,13 @@ button {
 
 .status {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
 .hint {
   margin: 4px 0 0;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--ink-dim);
 }
 
@@ -256,5 +353,9 @@ button {
 
   .chord {
     aspect-ratio: 0.95;
+  }
+
+  .palette-row {
+    grid-template-columns: repeat(7, 1fr);
   }
 }
