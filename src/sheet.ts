@@ -24,7 +24,7 @@ export function createPart(label: string, chords?: Part['chords']): Part {
   return {
     id: createId(),
     label,
-    chords: chords ?? ['Am', 'C', 'G', 'F'],
+    chords: chords ?? ['', '', '', ''],
   }
 }
 
