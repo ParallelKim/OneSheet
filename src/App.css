@@ -123,8 +123,38 @@ button {
 
 .chart-line {
   display: grid;
-  grid-template-columns: repeat(16, 1fr);
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.bar-group {
+  display: grid;
+  grid-template-columns: auto repeat(4, 1fr);
   gap: 2px;
+  align-items: stretch;
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  min-width: 0;
+}
+
+.bar-group.focus {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.bar-tag {
+  padding: 0 3px;
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  color: var(--ink-dim);
+  border-radius: 3px;
+  line-height: 1;
+  align-self: center;
+}
+
+.bar-group.focus .bar-tag {
+  color: var(--accent);
 }
 
 .bead {
@@ -132,7 +162,7 @@ button {
   min-width: 0;
   border-radius: 4px;
   font-family: var(--font-mono);
-  font-size: 0.52rem;
+  font-size: 0.5rem;
   line-height: 1;
   color: var(--ink-dim);
   background: rgba(255, 255, 255, 0.04);
@@ -147,6 +177,40 @@ button {
 
 .bead.empty {
   opacity: 0.45;
+}
+
+.brush-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.brush {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 2px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--line);
+}
+
+.brush.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.brush-mark {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.brush-hint {
+  font-size: 0.55rem;
+  color: var(--ink-dim);
 }
 
 .lcd-meta {
@@ -232,6 +296,30 @@ button {
   pointer-events: none;
   opacity: 0.28;
   background: color-mix(in srgb, var(--pad) 55%, transparent);
+}
+
+.pad.rhythm.art-rest {
+  opacity: 0.55;
+}
+
+.pad.rhythm.art-hold .pad-label {
+  opacity: 0.5;
+}
+
+.pad.rhythm.art-D.hit {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.pad.rhythm.art-U.hit {
+  border-color: color-mix(in srgb, #7ec8ff 55%, transparent);
+}
+
+.pad.rhythm.art-X.hit {
+  border-color: color-mix(in srgb, #e8a87c 55%, transparent);
+}
+
+.pad.in-bar:not(.on) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .pad-sub {

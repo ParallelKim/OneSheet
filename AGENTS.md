@@ -6,7 +6,7 @@
 
 OneSheet is a Vite + React + TypeScript SPA. Sound uses `@strudel/web` in the browser (Web Audio). There is no backend server.
 
-Current UI: single 4×4 launchpad (modes remap pads), LCD chart beads, metronome, bottom transport. See `HANDOFF.md`.
+Current UI: single 4×4 launchpad (chart / degree / rhythm lenses), LCD bar beads, metronome. See `HANDOFF.md`.
 
 ## Commands
 
@@ -20,8 +20,9 @@ Current UI: single 4×4 launchpad (modes remap pads), LCD chart beads, metronome
 ## Verify
 
 1. Start the dev server and open `http://localhost:5173`.
-2. Confirm 4×4 chart, degree/preset palette, and transport (play / metronome / modes).
+2. Confirm 4×4 launchpad, LCD bar beads, degree/rhythm lenses, and transport (play / metronome / modes).
 3. Click Play (browser gesture required for audio). Editing while playing should re-evaluate via Strudel.
+4. Rhythm mode: select a bar in LCD, paint D/U/X/hold/rest on the 16th grid.
 
 ## Firebase Hosting
 

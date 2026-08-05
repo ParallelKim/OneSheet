@@ -1,16 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  applyPreset,
+  ARTICULATIONS,
+  artLabel,
+  barIndex,
   BEATS,
+  BARS,
+  BAR_STEPS,
   createInitialSheet,
   DEGREE_META,
   nextKey,
-  PRESETS,
+  setBarArticulation,
   SLOTS,
   slotLabel,
   slotRoman,
+  SUBDIV,
   toStrudel,
   VOICES,
+  type Articulation,
   type SheetState,
   type VoiceId,
 } from "./sheet";
@@ -19,12 +25,13 @@ import "./App.css";
 
 type EngineState = "idle" | "ready" | "playing" | "error";
 /** 렌즈: 같은 4×4 패드의 의미를 바꾼다 */
-type Mode = "chart" | "degree" | "preset";
+type Mode = "chart" | "degree" | "rhythm";
 
 export default function App() {
   const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
   const [selected, setSelected] = useState(0);
   const [mode, setMode] = useState<Mode>("chart");
+  const [brush, setBrush] = useState<Articulation>("D");
   const [engine, setEngine] = useState<EngineState>("idle");
   const [status, setStatus] = useState("차트 준비됨");
   const sheetRef = useRef(sheet);
@@ -106,90 +113,142 @@ export default function App() {
     });
   };
 
+  const paintRhythm = (step: number) => {
+    const bar = barIndex(selected);
+    update((prev) => {
+      const current = prev.rhythm[bar]?.[step] ?? "rest";
+      const nextArt = current === brush ? "rest" : brush;
+      return {
+        ...prev,
+        rhythm: setBarArticulation(prev.rhythm, bar, step, nextArt),
+      };
+    });
+  };
+
+  const selectBar = (bar: number) => {
+    setSelected(bar * BEATS + (selected % BEATS));
+  };
+
   const playing = engine === "playing";
   const voice = VOICES.find((v) => v.id === sheet.voice) ?? VOICES[0]!;
   const currentDegree = sheet.degrees[selected] ?? null;
-  const bar = Math.floor(selected / BEATS) + 1;
+  const bar = barIndex(selected);
   const beat = (selected % BEATS) + 1;
+  const barRhythm = sheet.rhythm[bar] ?? [];
 
   return (
     <div className="app">
       <header className="top">
         <p className="brand">OneSheet</p>
         <p className="pos">
-          {bar}마디 · {beat}박
+          {bar + 1}마디 · {beat}박
         </p>
       </header>
 
-      {/* PO식 작은 디스플레이: 상태·재료 한 줄 */}
       <section className="lcd" aria-label="상태">
         <div className="lcd-row">
           <span className="lcd-chord">{slotLabel(sheet.key, currentDegree)}</span>
           <span className="lcd-roman">{slotRoman(currentDegree) || "rest"}</span>
           <span className="lcd-mode">{modeLabel(mode)}</span>
         </div>
+
+        {/* 마디 구분된 차트 요약 */}
         <div className="chart-line" aria-label="차트 요약">
-          {Array.from({ length: SLOTS }, (_, i) => {
-            const d = sheet.degrees[i] ?? null;
-            return (
+          {Array.from({ length: BARS }, (_, bi) => (
+            <div
+              key={bi}
+              className={`bar-group ${bar === bi ? "focus" : ""}`}
+              role="group"
+              aria-label={`${bi + 1}마디`}
+            >
               <button
-                key={i}
                 type="button"
-                className={`bead ${selected === i ? "on" : ""} ${d === null ? "empty" : ""}`}
-                onClick={() => setSelected(i)}
-                aria-label={`${Math.floor(i / BEATS) + 1}마디 ${(i % BEATS) + 1}박`}
+                className="bar-tag"
+                onClick={() => selectBar(bi)}
               >
-                {d === null ? "·" : slotRoman(d)}
+                {bi + 1}
               </button>
-            );
-          })}
+              {Array.from({ length: BEATS }, (_, qi) => {
+                const i = bi * BEATS + qi;
+                const d = sheet.degrees[i] ?? null;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`bead ${selected === i ? "on" : ""} ${d === null ? "empty" : ""}`}
+                    onClick={() => setSelected(i)}
+                    aria-label={`${bi + 1}마디 ${qi + 1}박`}
+                  >
+                    {d === null ? "·" : slotRoman(d)}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
-        <div className="lcd-meta">
-          <button
-            type="button"
-            className="chip"
-            onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
-          >
-            <span className="chip-k">조성</span>
-            <span className="chip-v">{sheet.key}</span>
-          </button>
-          <button
-            type="button"
-            className="chip"
-            onClick={() => {
-              const i = VOICES.findIndex((v) => v.id === sheet.voice);
-              const next = VOICES[(i + 1) % VOICES.length]!;
-              update((prev) => ({ ...prev, voice: next.id as VoiceId }));
-            }}
-          >
-            <span className="chip-k">음색</span>
-            <span className="chip-v">{voice.label}</span>
-          </button>
-          <label className="chip tempo-chip">
-            <span className="chip-k">BPM</span>
-            <input
-              type="range"
-              min={70}
-              max={140}
-              step={1}
-              value={sheet.bpm}
-              onChange={(e) => update((prev) => ({ ...prev, bpm: Number(e.target.value) }))}
-            />
-            <span className="chip-v">{sheet.bpm}</span>
-          </label>
-        </div>
+
+        {mode === "rhythm" ? (
+          <div className="brush-row" aria-label="주법">
+            {ARTICULATIONS.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className={`brush ${brush === a.id ? "on" : ""} art-${a.id}`}
+                onClick={() => setBrush(a.id)}
+              >
+                <span className="brush-mark">{a.label}</span>
+                <span className="brush-hint">{a.hint}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="lcd-meta">
+            <button
+              type="button"
+              className="chip"
+              onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
+            >
+              <span className="chip-k">조성</span>
+              <span className="chip-v">{sheet.key}</span>
+            </button>
+            <button
+              type="button"
+              className="chip"
+              onClick={() => {
+                const i = VOICES.findIndex((v) => v.id === sheet.voice);
+                const next = VOICES[(i + 1) % VOICES.length]!;
+                update((prev) => ({ ...prev, voice: next.id as VoiceId }));
+              }}
+            >
+              <span className="chip-k">음색</span>
+              <span className="chip-v">{voice.label}</span>
+            </button>
+            <label className="chip tempo-chip">
+              <span className="chip-k">BPM</span>
+              <input
+                type="range"
+                min={70}
+                max={140}
+                step={1}
+                value={sheet.bpm}
+                onChange={(e) => update((prev) => ({ ...prev, bpm: Number(e.target.value) }))}
+              />
+              <span className="chip-v">{sheet.bpm}</span>
+            </label>
+          </div>
+        )}
       </section>
 
-      {/* 단일 4×4 — 모드가 패드 의미를 바꾼다 */}
       <section className="pad-grid" aria-label={modeLabel(mode)}>
         {mode === "chart" &&
           Array.from({ length: SLOTS }, (_, i) => {
             const degree = sheet.degrees[i] ?? null;
+            const rowBar = barIndex(i);
             return (
               <button
                 key={i}
                 type="button"
-                className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
+                className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""} ${bar === rowBar ? "in-bar" : ""}`}
                 onClick={() => setSelected(i)}
               >
                 <span className="pad-sub">{(i % BEATS) + 1}</span>
@@ -231,29 +290,35 @@ export default function App() {
             return <div key={`ghost-${i}`} className="pad ghost" aria-hidden />;
           })}
 
-        {mode === "preset" &&
-          Array.from({ length: SLOTS }, (_, i) => {
-            const preset = PRESETS[i];
-            if (!preset) {
-              return <div key={`ghost-${i}`} className="pad ghost" aria-hidden />;
-            }
-            const applied = applyPreset(preset.bar);
-            const active = applied.every((d, idx) => d === sheet.degrees[idx]);
+        {mode === "rhythm" &&
+          Array.from({ length: BAR_STEPS }, (_, step) => {
+            const art = barRhythm[step] ?? "rest";
+            const beatNo = Math.floor(step / SUBDIV) + 1;
+            const sub = step % SUBDIV;
+            const subMark = ["1", "e", "&", "a"][sub]!;
             return (
               <button
-                key={preset.id}
+                key={step}
                 type="button"
-                className={`pad tool ${active ? "on" : ""}`}
-                onClick={() => update((prev) => ({ ...prev, degrees: applyPreset(preset.bar) }))}
+                className={`pad rhythm art-${art} ${art !== "rest" && art !== "hold" ? "hit" : ""}`}
+                onClick={() => paintRhythm(step)}
               >
-                <span className="pad-label sm">{preset.name}</span>
-                <span className="pad-roman">{preset.label}</span>
+                <span className="pad-sub">
+                  {beatNo}
+                  {subMark}
+                </span>
+                <span className="pad-label">{artLabel(art)}</span>
+                <span className="pad-roman">
+                  {art === "hold" ? "링" : art === "rest" ? "쉼" : art === "X" ? "뮤트" : art === "D" ? "다운" : "업"}
+                </span>
               </button>
             );
           })}
       </section>
 
-      <p className="status">{status}</p>
+      <p className="status">
+        {mode === "rhythm" ? `${bar + 1}마디 리듬 · 탭으로 ${brushLabel(brush)}` : status}
+      </p>
 
       <nav className="transport" aria-label="공통 조작">
         <button
@@ -292,11 +357,11 @@ export default function App() {
         </button>
         <button
           type="button"
-          className={`tr-btn ${mode === "preset" ? "on" : ""}`}
-          onClick={() => setMode("preset")}
+          className={`tr-btn ${mode === "rhythm" ? "on" : ""}`}
+          onClick={() => setMode("rhythm")}
         >
-          <span className="tr-icon">⌘</span>
-          <span className="tr-label">진행</span>
+          <span className="tr-icon">♩♪</span>
+          <span className="tr-label">리듬</span>
         </button>
       </nav>
     </div>
@@ -306,5 +371,9 @@ export default function App() {
 function modeLabel(mode: Mode): string {
   if (mode === "chart") return "차트";
   if (mode === "degree") return "도수";
-  return "진행";
+  return "리듬";
+}
+
+function brushLabel(art: Articulation): string {
+  return ARTICULATIONS.find((a) => a.id === art)?.hint ?? art;
 }

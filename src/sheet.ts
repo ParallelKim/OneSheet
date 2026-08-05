@@ -1,14 +1,18 @@
 /**
- * 차트 = 4행 × 4열.
- * 각 칸 = 4분음표, 각 행 = 한 마디(4/4).
- * 리듬 머신 없음 — 메트로놈만.
+ * 차트 = 4행(마디) × 4열(박).
+ * 리듬 = 선택 마디의 4×4 (행=4분, 칸=16분).
+ * 셀: D / U / X(뮤트) / hold(링) / rest(쉼).
  */
+
+export type Articulation = "D" | "U" | "X" | "hold" | "rest";
 
 export type SheetState = {
   bpm: number;
   key: string;
-  /** 16 slots: row-major, each = quarter note. null = rest */
+  /** 16 slots: row-major, each = quarter note. null = chord rest */
   degrees: Array<number | null>;
+  /** 4 bars × 16 sixteenths */
+  rhythm: Articulation[][];
   voice: VoiceId;
   gain: number;
   metro: boolean;
@@ -30,7 +34,22 @@ export const VOICES: readonly {
 
 export const BARS = 4;
 export const BEATS = 4;
-export const SLOTS = BARS * BEATS; // 16
+export const SLOTS = BARS * BEATS; // 16 quarters
+export const SUBDIV = 4; // sixteenths per quarter
+export const BAR_STEPS = BEATS * SUBDIV; // 16 sixteenths per bar
+export const TOTAL_STEPS = BARS * BAR_STEPS; // 64
+
+export const ARTICULATIONS: readonly {
+  id: Articulation;
+  label: string;
+  hint: string;
+}[] = [
+  { id: "D", label: "D", hint: "다운" },
+  { id: "U", label: "U", hint: "업" },
+  { id: "X", label: "X", hint: "뮤트" },
+  { id: "hold", label: "·", hint: "링" },
+  { id: "rest", label: "∅", hint: "쉼" },
+] as const;
 
 export const MAJOR_KEYS: Record<string, readonly string[]> = {
   C: ["C", "D", "E", "F", "G", "A", "B"],
@@ -54,24 +73,16 @@ export const DEGREE_META = [
   { roman: "vii°", quality: "dim" },
 ] as const;
 
-export type Preset = {
-  id: string;
-  name: string;
-  label: string;
-  /** one bar (4 quarters); repeated across all bars */
-  bar: Array<number | null>;
-};
+/** 한 박: 다운 후 링 ×3 → 4분 스트로크 */
+const QUARTER_DOWN: Articulation[] = ["D", "hold", "hold", "hold"];
 
-export const PRESETS: readonly Preset[] = [
-  { id: "pop", name: "Pop", label: "I V vi IV", bar: [0, 4, 5, 3] },
-  { id: "50s", name: "50s", label: "I vi IV V", bar: [0, 5, 3, 4] },
-  { id: "canon", name: "Canon", label: "I V vi iii", bar: [0, 4, 5, 2] },
-  { id: "axis", name: "Axis", label: "vi IV I V", bar: [5, 3, 0, 4] },
-  { id: "folk", name: "Folk", label: "I IV V I", bar: [0, 3, 4, 0] },
-  { id: "turn", name: "Turn", label: "ii V I IV", bar: [1, 4, 0, 3] },
-  { id: "fall", name: "Fall", label: "vi V IV V", bar: [5, 4, 3, 4] },
-  { id: "rise", name: "Rise", label: "I iii IV V", bar: [0, 2, 3, 4] },
-] as const;
+function defaultBarRhythm(): Articulation[] {
+  return Array.from({ length: BEATS }, () => [...QUARTER_DOWN]).flat();
+}
+
+function defaultRhythm(): Articulation[][] {
+  return Array.from({ length: BARS }, () => defaultBarRhythm());
+}
 
 function repeatBar(bar: Array<number | null>): Array<number | null> {
   return Array.from({ length: SLOTS }, (_, i) => bar[i % BEATS] ?? null);
@@ -82,14 +93,11 @@ export function createInitialSheet(): SheetState {
     bpm: 96,
     key: "C",
     degrees: repeatBar([5, 0, 4, 3]), // vi I V IV
+    rhythm: defaultRhythm(),
     voice: "warm",
     gain: 0.35,
     metro: true,
   };
-}
-
-export function applyPreset(bar: Array<number | null>): Array<number | null> {
-  return repeatBar(bar);
 }
 
 export function scaleOf(key: string): readonly string[] {
@@ -123,37 +131,99 @@ export function voiceById(id: VoiceId) {
   return VOICES.find((v) => v.id === id) ?? VOICES[0]!;
 }
 
+export function barIndex(slot: number): number {
+  return Math.floor(slot / BEATS);
+}
+
+export function artLabel(art: Articulation): string {
+  if (art === "hold") return "·";
+  if (art === "rest") return "∅";
+  return art;
+}
+
+export function setBarArticulation(
+  rhythm: Articulation[][],
+  bar: number,
+  step: number,
+  art: Articulation,
+): Articulation[][] {
+  return rhythm.map((row, bi) => {
+    if (bi !== bar) return row;
+    return row.map((cell, si) => (si === step ? art : cell));
+  });
+}
+
 function mini(tokens: string[]): string {
   return tokens.join(" ");
 }
 
+function isAttack(art: Articulation): boolean {
+  return art === "D" || art === "U" || art === "X";
+}
+
+/** 공격 뒤 이어지는 hold 개수 (rest·다음 공격 전) */
+function holdRun(barRhythm: Articulation[], from: number): number {
+  let n = 0;
+  for (let i = from + 1; i < barRhythm.length; i++) {
+    if (barRhythm[i] !== "hold") break;
+    n++;
+  }
+  return n;
+}
+
 export function toStrudel(sheet: SheetState): string {
-  // 16 quarters = 4 bars → one cycle spans 16 beats
+  // 64 sixteenths = 4 bars → cycle length same as 16 quarters
   const cps = sheet.bpm / 60 / SLOTS;
   const voice = voiceById(sheet.voice);
 
-  const chordTokens = sheet.degrees.map((d) =>
-    d === null ? "~" : chordFromDegree(sheet.key, d),
-  );
-  const hasChords = chordTokens.some((t) => t !== "~");
+  const chordTok: string[] = [];
+  const clipTok: string[] = [];
+  const gainTok: string[] = [];
 
+  for (let bar = 0; bar < BARS; bar++) {
+    const barRhythm = sheet.rhythm[bar] ?? defaultBarRhythm();
+    for (let step = 0; step < BAR_STEPS; step++) {
+      const art = barRhythm[step] ?? "rest";
+      const beat = Math.floor(step / SUBDIV);
+      const degree = sheet.degrees[bar * BEATS + beat] ?? null;
+
+      if (!isAttack(art) || degree === null) {
+        chordTok.push("~");
+        clipTok.push("1");
+        gainTok.push("0");
+        continue;
+      }
+
+      const holds = holdRun(barRhythm, step);
+      const clip = art === "X" ? 0.45 : 1 + holds;
+      const base = sheet.gain;
+      const gain =
+        art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
+
+      chordTok.push(chordFromDegree(sheet.key, degree));
+      clipTok.push(String(Number(clip.toFixed(2))));
+      gainTok.push(gain.toFixed(2));
+    }
+  }
+
+  const hasHits = chordTok.some((t) => t !== "~");
   const parts: string[] = [];
 
-  if (hasChords) {
+  if (hasHits) {
     parts.push(
       [
-        `chord("<${mini(chordTokens)}>")`,
+        `chord("<${mini(chordTok)}>")`,
         `.voicing('legacy')`,
         `.s("${voice.sound}")`,
-        `.gain(${sheet.gain.toFixed(2)})`,
+        `.gain("<${mini(gainTok)}>")`,
         `.cutoff(${voice.cutoff})`,
-        `.clip(0.85)`,
+        `.clip("<${mini(clipTok)}>")`,
       ].join(""),
     );
   }
 
   if (sheet.metro) {
-    // quiet quarter click through the 16-beat cycle
+    // quarter click across 64-step cycle (every 4 sixteenths)
     parts.push(`s("woodblock").struct("x*${SLOTS}").gain(0.08)`);
   }
 
