@@ -274,7 +274,7 @@ export default function App() {
             <button
               key={a.id}
               type="button"
-              className={`brush ${brush === a.id ? "on" : ""} art-${a.id}`}
+              className={`brush ${brush === a.id ? "on" : ""}`}
               onClick={() => setBrush(a.id)}
             >
               <span className="brush-mark">{a.label}</span>
@@ -288,12 +288,11 @@ export default function App() {
         {mode === "chart" &&
           Array.from({ length: SLOTS }, (_, i) => {
             const degree = sheet.degrees[i] ?? null;
-            const rowBar = barIndex(i);
             return (
               <button
                 key={i}
                 type="button"
-                className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""} ${bar === rowBar ? "in-bar" : ""}`}
+                className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
                 onClick={() => setSelected(i)}
               >
                 <span className="pad-sub">{(i % BEATS) + 1}</span>
@@ -345,7 +344,7 @@ export default function App() {
               <button
                 key={step}
                 type="button"
-                className={`pad rhythm art-${art} ${art !== "rest" && art !== "hold" ? "hit" : ""}`}
+                className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""}`}
                 onClick={() => paintRhythm(step)}
               >
                 <span className="pad-sub">
