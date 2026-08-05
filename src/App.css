@@ -1,14 +1,16 @@
 :root {
-  --po-body: #1a1c1e;
-  --po-face: #2a2d31;
-  --po-key: #3a3e44;
-  --po-key-edge: #0d0e10;
-  --lcd: #2a1f0a;
-  --lcd-glow: #ffb347;
-  --lcd-ink: #ffc15e;
-  --ink: #e8e4dc;
-  --mute: #8b9098;
-  --play: #ff5a1f;
+  --pcb: #111314;
+  --pcb-edge: #000;
+  --silk: #9aa3ad;
+  --silk-hi: #d7dde3;
+  --lcd-bg: #9aa890;
+  --lcd-ink: #1a2218;
+  --lcd-dim: #5a6454;
+  --key: #2a2e33;
+  --pad: #1c1f23;
+  --led: #3a1515;
+  --led-on: #ff2a2a;
+  --accent: #ff5a1f;
   --font: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
@@ -25,8 +27,8 @@ body,
 
 body {
   font-family: var(--font);
-  color: var(--ink);
-  background: #0e0f11;
+  background: #070809;
+  color: var(--silk-hi);
   min-height: 100dvh;
 }
 
@@ -38,42 +40,46 @@ input {
 
 button {
   cursor: pointer;
+  border: 0;
+  background: none;
 }
 
 .device {
   min-height: 100dvh;
   display: flex;
   justify-content: center;
-  padding: 0.65rem;
+  padding: 0.55rem;
 }
 
 .po {
-  width: min(100%, 400px);
+  width: min(100%, 380px);
   margin: auto 0;
-  background: var(--po-body);
-  border: 2px solid #000;
-  border-radius: 10px;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.04), transparent 28%),
+    var(--pcb);
+  border: 1px solid #000;
+  border-radius: 4px 4px 14px 14px;
   box-shadow:
-    0 16px 0 #050505,
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  padding: 0.65rem 0.7rem 0.85rem;
+    0 14px 0 #050505,
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 0.35rem 0.65rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  animation: boot 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  gap: 0.45rem;
+  animation: boot 360ms cubic-bezier(0.2, 0.85, 0.2, 1) both;
 }
 
 .is-playing .po {
   box-shadow:
-    0 16px 0 #050505,
-    0 0 0 1px var(--play),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 14px 0 #050505,
+    0 0 0 1px color-mix(in srgb, var(--accent) 70%, #000),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 @keyframes boot {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -81,288 +87,407 @@ button {
   }
 }
 
-.po-brand {
-  margin: 0;
-  font-weight: 800;
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--mute);
-  text-align: center;
+.hang {
+  width: 42%;
+  height: 0.55rem;
+  margin: 0 auto 0.15rem;
+  border: 1px solid #2e3338;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  opacity: 0.7;
 }
 
-/* —— PART rail (top) —— */
-.part-rail {
+.silk {
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  color: var(--silk);
+  font-weight: 600;
+}
+
+/* —— PART —— */
+.part-row {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.35rem;
+  padding: 0.15rem 0.1rem;
 }
 
-.rail-label {
-  font-size: 0.55rem;
-  letter-spacing: 0.14em;
-  color: var(--mute);
-  font-weight: 700;
-}
-
-.rail-keys {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  flex: 1;
-}
-
-.part-key {
-  --part: #888;
-  min-width: 2.35rem;
-  min-height: 2.35rem;
-  border: 1px solid #000;
-  background: color-mix(in srgb, var(--part) 35%, var(--po-key));
-  color: var(--ink);
+.part-dot {
+  --dot: #666;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #4a5058, var(--key));
+  box-shadow:
+    0 2px 0 #000,
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: var(--silk-hi);
+  font-size: 0.72rem;
   font-weight: 800;
-  font-size: 0.95rem;
-  box-shadow: 0 2px 0 var(--po-key-edge);
 }
 
-.part-key.on {
-  background: var(--part);
+.part-dot.on {
+  background: radial-gradient(circle at 35% 30%, #fff, var(--dot));
   color: #111;
+}
+
+.part-dot.add {
+  color: var(--silk);
+}
+
+.part-dot:active {
   transform: translateY(1px);
-  box-shadow: 0 1px 0 var(--po-key-edge);
-}
-
-.part-key.add {
-  background: var(--po-face);
-  color: var(--mute);
-}
-
-.part-key:active {
-  transform: translateY(2px);
-  box-shadow: none;
+  box-shadow: 0 1px 0 #000;
 }
 
 .status {
   margin: 0;
-  padding: 0.4rem 0.5rem;
-  background: #3a1a16;
-  color: #ffc8bc;
-  font-size: 0.7rem;
+  padding: 0.35rem 0.45rem;
+  background: #2a1210;
+  color: #ffb4a8;
+  font-size: 0.68rem;
 }
 
-/* —— DISPLAY (LCD) —— */
-.display {
-  --part: #ff8a3d;
-  background: var(--lcd);
+/* —— LCD (display only) —— */
+.lcd {
+  background: linear-gradient(180deg, #a8b49a 0%, var(--lcd-bg) 100%);
   border: 2px solid #000;
   box-shadow:
-    inset 0 0 24px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 180, 70, 0.15);
-  padding: 0.55rem;
+    inset 0 0 18px rgba(0, 0, 0, 0.18),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 0.4rem 0.45rem 0.45rem;
+  color: var(--lcd-ink);
+  min-height: 9.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.28rem;
 }
 
-.lcd-meta {
+.lcd-top {
   display: flex;
   justify-content: space-between;
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: color-mix(in srgb, var(--lcd-ink) 80%, #000);
-}
-
-.lcd-pads {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.35rem;
-}
-
-.lcd-cell {
-  position: relative;
-  display: block;
-  min-height: 4.6rem;
-  background: color-mix(in srgb, var(--part) 28%, #1a1408);
-  border: 1px solid color-mix(in srgb, var(--lcd-glow) 35%, #000);
-  padding: 0.35rem;
-}
-
-.lcd-cell.focus {
-  background: color-mix(in srgb, var(--part) 45%, #2a1c08);
-  box-shadow: inset 0 0 12px rgba(255, 180, 70, 0.25);
-}
-
-.lcd-idx {
-  position: absolute;
-  top: 0.25rem;
-  left: 0.35rem;
   font-size: 0.55rem;
-  color: color-mix(in srgb, var(--lcd-ink) 55%, transparent);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--lcd-dim);
+}
+
+.lcd-brand {
+  text-transform: lowercase;
+}
+
+.lcd-main {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.lcd-part {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.lcd-bpm {
+  margin: 0.15rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.lcd-bpm small {
+  font-size: 0.55rem;
+  margin-left: 0.2rem;
+  color: var(--lcd-dim);
+}
+
+.lcd-glyph {
+  width: 3.4rem;
+  height: 2.2rem;
+  position: relative;
+}
+
+.glyph-box {
+  position: absolute;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 2px solid var(--lcd-ink);
+}
+
+.glyph-box:first-child {
+  left: 0.4rem;
+  top: 0.35rem;
+}
+
+.glyph-box:nth-child(2) {
+  right: 0.35rem;
+  bottom: 0.25rem;
+}
+
+.glyph-line {
+  position: absolute;
+  left: 1rem;
+  top: 0.85rem;
+  width: 1.4rem;
+  height: 2px;
+  background: var(--lcd-ink);
+  transform: rotate(28deg);
+}
+
+.lcd-chords {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.2rem;
+  margin-top: 0.1rem;
+}
+
+.lcd-chord {
+  border: 1px solid color-mix(in srgb, var(--lcd-ink) 25%, transparent);
+  padding: 0.2rem 0.15rem;
+  text-align: center;
+  min-height: 2.1rem;
+}
+
+.lcd-chord.sel {
+  background: color-mix(in srgb, var(--lcd-ink) 14%, transparent);
+  outline: 1px solid var(--lcd-ink);
+}
+
+.lcd-n {
+  display: block;
+  font-size: 0.5rem;
+  color: var(--lcd-dim);
   font-weight: 700;
 }
 
-.lcd-cell input {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  background: transparent;
-  text-align: center;
+.lcd-c {
+  display: block;
+  font-size: 0.85rem;
   font-weight: 800;
-  font-size: clamp(1.25rem, 7vw, 1.55rem);
-  color: var(--lcd-ink);
-  outline: none;
-  padding-top: 0.45rem;
-  text-shadow: 0 0 8px rgba(255, 170, 60, 0.35);
-}
-
-.lcd-cell input::placeholder {
-  color: color-mix(in srgb, var(--lcd-ink) 28%, transparent);
+  letter-spacing: -0.02em;
 }
 
 .lcd-form {
   display: flex;
-  align-items: center;
+  justify-content: space-between;
   gap: 0.4rem;
-  min-height: 1.8rem;
-  border-top: 1px solid color-mix(in srgb, var(--lcd-glow) 22%, transparent);
-  padding-top: 0.4rem;
-}
-
-.lcd-form-label {
-  font-size: 0.55rem;
-  letter-spacing: 0.12em;
-  color: color-mix(in srgb, var(--lcd-ink) 55%, transparent);
+  font-size: 0.62rem;
   font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--lcd-dim);
+  border-top: 1px solid color-mix(in srgb, var(--lcd-ink) 18%, transparent);
+  padding-top: 0.25rem;
 }
 
-.lcd-form-empty {
-  color: color-mix(in srgb, var(--lcd-ink) 35%, transparent);
-  font-size: 0.85rem;
-}
-
-.lcd-form-row {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-}
-
-.lcd-brick {
-  --part: #888;
-  min-width: 1.55rem;
-  min-height: 1.55rem;
-  border: 1px solid color-mix(in srgb, var(--lcd-glow) 40%, #000);
-  background: color-mix(in srgb, var(--part) 40%, #1a1408);
+.lcd-form-seq {
   color: var(--lcd-ink);
-  font-weight: 800;
-  font-size: 0.75rem;
-  padding: 0 0.3rem;
+  letter-spacing: 0.12em;
 }
 
-/* —— CONTROLS —— */
-.controls {
+/* —— param + knobs —— */
+.param-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.4rem;
+  grid-template-columns: 1fr auto;
+  gap: 0.45rem;
+  align-items: end;
 }
 
-.ctrl {
+.param {
   display: grid;
   gap: 0.15rem;
-  justify-items: center;
-  align-content: center;
-  min-height: 3.6rem;
+}
+
+.param input {
+  width: 100%;
+  background: #0a0b0c;
   border: 1px solid #000;
-  background: var(--po-key);
-  box-shadow: 0 3px 0 var(--po-key-edge);
-  padding: 0.4rem 0.25rem;
-  transition: transform 80ms ease, box-shadow 80ms ease;
+  color: var(--silk-hi);
+  padding: 0.45rem 0.5rem;
+  font-weight: 700;
+  font-size: 0.95rem;
 }
 
-.ctrl:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 var(--po-key-edge);
+.knobs {
+  display: flex;
+  gap: 0.45rem;
 }
 
-.ctrl:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
+.knob {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
 }
 
-.ctrl-k {
-  font-size: 0.58rem;
-  letter-spacing: 0.1em;
-  font-weight: 800;
-  color: var(--mute);
+.knob-cap {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  background:
+    conic-gradient(from 210deg, #222, #666, #222 60%, #111 75%, #444);
+  box-shadow:
+    0 2px 0 #000,
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  position: relative;
 }
 
-.ctrl-v {
-  font-size: 0.78rem;
-  font-weight: 800;
+.knob-cap::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0.28rem;
+  width: 2px;
+  height: 0.55rem;
+  background: #eee;
+  transform: translateX(-50%);
 }
 
-.ctrl.write .ctrl-v {
-  color: var(--lcd-glow);
+.knob-cap.a {
+  outline: 2px solid color-mix(in srgb, var(--accent) 80%, #fff);
+  outline-offset: 1px;
 }
 
-.ctrl.play {
-  grid-column: span 2;
-  background: var(--play);
+.knob-cap.b {
+  outline: 2px solid #4cc9f0;
+  outline-offset: 1px;
 }
 
-.ctrl.play .ctrl-k,
-.ctrl.play .ctrl-v {
-  color: #fff;
+.knob:active .knob-cap {
+  transform: scale(0.96);
 }
 
-.ctrl.play.on {
-  background: #f0eee8;
-  animation: pulse 1.1s ease-in-out infinite;
+/* —— board / matrix —— */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
-.ctrl.play.on .ctrl-k,
-.ctrl.play.on .ctrl-v {
-  color: #111;
+.func-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
 }
 
-.ctrl.bpm {
-  cursor: text;
+.key,
+.side-key {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem 0;
 }
 
-.ctrl.bpm input {
-  width: 3rem;
-  border: 0;
-  background: transparent;
-  text-align: center;
-  font-weight: 800;
-  font-size: 1rem;
-  outline: none;
-  -moz-appearance: textfield;
+.key-label {
+  font-size: 0.52rem;
+  letter-spacing: 0.04em;
+  color: var(--silk);
+  font-weight: 600;
 }
 
-.ctrl.bpm input::-webkit-outer-spin-button,
-.ctrl.bpm input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
+.led {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: var(--led);
+  box-shadow: inset 0 0 2px #000;
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    filter: brightness(1);
-  }
-  50% {
-    filter: brightness(1.08);
-  }
+.led.on {
+  background: var(--led-on);
+  box-shadow: 0 0 6px rgba(255, 42, 42, 0.7);
 }
 
-@media (min-width: 420px) {
-  .lcd-pads {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
+.led.red.on {
+  background: #ff1e1e;
+}
 
-  .lcd-cell {
-    min-height: 5.2rem;
+.matrix {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.45rem;
+  align-items: start;
+}
+
+.pads {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem 0.45rem;
+}
+
+.pad {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #3a4048, var(--pad));
+  box-shadow:
+    0 2px 0 #000,
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  display: grid;
+  place-items: center;
+  position: relative;
+  min-height: 2.35rem;
+}
+
+.pad.bar {
+  outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.pad.lit {
+  background: radial-gradient(circle at 35% 30%, #5a6270, #222);
+}
+
+.pad:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #000;
+}
+
+.pad-led {
+  position: absolute;
+  top: 0.2rem;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 50%;
+  background: #2a1010;
+}
+
+.pad-led.on {
+  background: var(--led-on);
+  box-shadow: 0 0 5px rgba(255, 40, 40, 0.75);
+}
+
+.pad-n {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--silk);
+  margin-top: 0.2rem;
+}
+
+.side {
+  display: grid;
+  gap: 0.55rem;
+  padding-top: 0.1rem;
+}
+
+.side-key {
+  width: 2.5rem;
+}
+
+.side-key.play.on .key-label,
+.side-key.write.on .key-label {
+  color: var(--silk-hi);
+}
+
+.legend {
+  margin: 0.1rem 0 0;
+  font-size: 0.52rem;
+  color: #66707a;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+@media (min-width: 400px) {
+  .pad {
+    min-height: 2.6rem;
   }
 }
