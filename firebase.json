@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "onesheetplay",
+    "site": "gridplay",
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
