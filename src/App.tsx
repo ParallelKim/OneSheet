@@ -187,57 +187,102 @@ export default function App() {
           ))}
         </div>
 
-        {mode === "rhythm" ? (
-          <div className="brush-row" aria-label="주법">
-            {ARTICULATIONS.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                className={`brush ${brush === a.id ? "on" : ""} art-${a.id}`}
-                onClick={() => setBrush(a.id)}
-              >
-                <span className="brush-mark">{a.label}</span>
-                <span className="brush-hint">{a.hint}</span>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="lcd-meta">
-            <button
-              type="button"
-              className="chip"
-              onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
-            >
-              <span className="chip-k">조성</span>
-              <span className="chip-v">{sheet.key}</span>
-            </button>
-            <button
-              type="button"
-              className="chip"
-              onClick={() => {
-                const i = VOICES.findIndex((v) => v.id === sheet.voice);
-                const next = VOICES[(i + 1) % VOICES.length]!;
-                update((prev) => ({ ...prev, voice: next.id as VoiceId }));
-              }}
-            >
-              <span className="chip-k">음색</span>
-              <span className="chip-v">{voice.label}</span>
-            </button>
-            <label className="chip tempo-chip">
-              <span className="chip-k">BPM</span>
-              <input
-                type="range"
-                min={70}
-                max={140}
-                step={1}
-                value={sheet.bpm}
-                onChange={(e) => update((prev) => ({ ...prev, bpm: Number(e.target.value) }))}
-              />
-              <span className="chip-v">{sheet.bpm}</span>
-            </label>
-          </div>
-        )}
+        <div className="lcd-meta">
+          <button
+            type="button"
+            className="chip"
+            onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
+          >
+            <span className="chip-k">조성</span>
+            <span className="chip-v">{sheet.key}</span>
+          </button>
+          <button
+            type="button"
+            className="chip"
+            onClick={() => {
+              const i = VOICES.findIndex((v) => v.id === sheet.voice);
+              const next = VOICES[(i + 1) % VOICES.length]!;
+              update((prev) => ({ ...prev, voice: next.id as VoiceId }));
+            }}
+          >
+            <span className="chip-k">음색</span>
+            <span className="chip-v">{voice.label}</span>
+          </button>
+          <label className="chip tempo-chip">
+            <span className="chip-k">BPM</span>
+            <input
+              type="range"
+              min={70}
+              max={140}
+              step={1}
+              value={sheet.bpm}
+              onChange={(e) => update((prev) => ({ ...prev, bpm: Number(e.target.value) }))}
+            />
+            <span className="chip-v">{sheet.bpm}</span>
+          </label>
+        </div>
       </section>
+
+      <nav className="transport" aria-label="공통 조작">
+        <button
+          type="button"
+          className={`tr-btn play ${playing ? "on" : ""}`}
+          onClick={() => void (playing ? onStop() : onPlay())}
+          aria-label={playing ? "일시정지" : "재생"}
+        >
+          <span className="tr-icon">{playing ? "■" : "▶"}</span>
+          <span className="tr-label">{playing ? "정지" : "재생"}</span>
+        </button>
+        <button
+          type="button"
+          className={`tr-btn ${sheet.metro ? "on" : ""}`}
+          onClick={() => update((prev) => ({ ...prev, metro: !prev.metro }))}
+          aria-pressed={sheet.metro}
+        >
+          <span className="tr-icon">♩</span>
+          <span className="tr-label">메트로</span>
+        </button>
+        <button
+          type="button"
+          className={`tr-btn ${mode === "chart" ? "on" : ""}`}
+          onClick={() => setMode("chart")}
+        >
+          <span className="tr-icon">▦</span>
+          <span className="tr-label">차트</span>
+        </button>
+        <button
+          type="button"
+          className={`tr-btn ${mode === "degree" ? "on" : ""}`}
+          onClick={() => setMode("degree")}
+        >
+          <span className="tr-icon">I</span>
+          <span className="tr-label">도수</span>
+        </button>
+        <button
+          type="button"
+          className={`tr-btn ${mode === "rhythm" ? "on" : ""}`}
+          onClick={() => setMode("rhythm")}
+        >
+          <span className="tr-icon">♩♪</span>
+          <span className="tr-label">리듬</span>
+        </button>
+      </nav>
+
+      {mode === "rhythm" && (
+        <div className="brush-row" aria-label="주법">
+          {ARTICULATIONS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              className={`brush ${brush === a.id ? "on" : ""} art-${a.id}`}
+              onClick={() => setBrush(a.id)}
+            >
+              <span className="brush-mark">{a.label}</span>
+              <span className="brush-hint">{a.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <section className="pad-grid" aria-label={modeLabel(mode)}>
         {mode === "chart" &&
@@ -319,51 +364,6 @@ export default function App() {
       <p className="status">
         {mode === "rhythm" ? `${bar + 1}마디 리듬 · 탭으로 ${brushLabel(brush)}` : status}
       </p>
-
-      <nav className="transport" aria-label="공통 조작">
-        <button
-          type="button"
-          className={`tr-btn play ${playing ? "on" : ""}`}
-          onClick={() => void (playing ? onStop() : onPlay())}
-          aria-label={playing ? "일시정지" : "재생"}
-        >
-          <span className="tr-icon">{playing ? "■" : "▶"}</span>
-          <span className="tr-label">{playing ? "정지" : "재생"}</span>
-        </button>
-        <button
-          type="button"
-          className={`tr-btn ${sheet.metro ? "on" : ""}`}
-          onClick={() => update((prev) => ({ ...prev, metro: !prev.metro }))}
-          aria-pressed={sheet.metro}
-        >
-          <span className="tr-icon">♩</span>
-          <span className="tr-label">메트로</span>
-        </button>
-        <button
-          type="button"
-          className={`tr-btn ${mode === "chart" ? "on" : ""}`}
-          onClick={() => setMode("chart")}
-        >
-          <span className="tr-icon">▦</span>
-          <span className="tr-label">차트</span>
-        </button>
-        <button
-          type="button"
-          className={`tr-btn ${mode === "degree" ? "on" : ""}`}
-          onClick={() => setMode("degree")}
-        >
-          <span className="tr-icon">I</span>
-          <span className="tr-label">도수</span>
-        </button>
-        <button
-          type="button"
-          className={`tr-btn ${mode === "rhythm" ? "on" : ""}`}
-          onClick={() => setMode("rhythm")}
-        >
-          <span className="tr-icon">♩♪</span>
-          <span className="tr-label">리듬</span>
-        </button>
-      </nav>
     </div>
   );
 }

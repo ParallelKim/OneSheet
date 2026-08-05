@@ -353,17 +353,17 @@ button {
 
 .status {
   margin: 0;
+  margin-top: auto;
   font-size: 0.78rem;
   color: var(--ink-dim);
   text-align: center;
+  padding-bottom: 2px;
 }
 
 .transport {
-  margin-top: auto;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 5px;
-  padding-top: 2px;
   flex-shrink: 0;
 }
 
@@ -373,8 +373,8 @@ button {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  min-height: 58px;
-  padding: 8px 2px;
+  min-height: 52px;
+  padding: 7px 2px;
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid var(--line);
