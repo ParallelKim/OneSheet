@@ -65,8 +65,11 @@ button {
   height: 100dvh;
   max-height: 100dvh;
   margin: 0 auto;
-  /* 상하만 페이지 여백 — 가로는 그리드가 풀폭 */
-  padding: 16px 0 calc(16px + env(safe-area-inset-bottom));
+  /* 상하: safe-area + 손가락/베젤 여유(~24). 가로는 그리드 풀폭 */
+  padding:
+    calc(24px + env(safe-area-inset-top, 0px))
+    0
+    calc(24px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 8px;
