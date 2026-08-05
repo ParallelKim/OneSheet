@@ -13,13 +13,10 @@ import {
   SLOTS,
   slotLabel,
   slotRoman,
-  strumGlyph,
   SUBDIV,
   toStrudel,
-  VOICES,
   type Articulation,
   type SheetState,
-  type VoiceId,
 } from "./sheet";
 import { evaluateStrudel, hushStrudel, initStrudelEngine } from "./engine";
 import "./App.css";
@@ -131,7 +128,6 @@ export default function App() {
   };
 
   const playing = engine === "playing";
-  const voice = VOICES.find((v) => v.id === sheet.voice) ?? VOICES[0]!;
   const currentDegree = sheet.degrees[selected] ?? null;
   const bar = barIndex(selected);
   const beat = (selected % BEATS) + 1;
@@ -156,18 +152,6 @@ export default function App() {
             <span className="chip-k">조성</span>
             <span className="chip-v">{sheet.key}</span>
           </button>
-          <button
-            type="button"
-            className="chip"
-            onClick={() => {
-              const i = VOICES.findIndex((v) => v.id === sheet.voice);
-              const next = VOICES[(i + 1) % VOICES.length]!;
-              update((prev) => ({ ...prev, voice: next.id as VoiceId }));
-            }}
-          >
-            <span className="chip-k">음색</span>
-            <span className="chip-v">{voice.label}</span>
-          </button>
           <label className="chip tempo-chip">
             <span className="chip-k">BPM</span>
             <input
@@ -180,57 +164,43 @@ export default function App() {
             />
             <span className="chip-v">{sheet.bpm}</span>
           </label>
-          <span className="lcd-mode">{modeLabel(mode)}</span>
         </div>
 
-        {/* 손악보식 요약: 마디선 · 코드+원 도수 · 스트럼 */}
+        {/* 얇은 한 줄 차트 — 코드만, 도수는 선택 칸에만 */}
         <div className="staff" aria-label="차트">
-          {Array.from({ length: BARS }, (_, bi) => {
-            const rhythm = sheet.rhythm[bi] ?? [];
-            const strum = Array.from({ length: BEATS }, (_, qi) => {
-              const step = qi * SUBDIV;
-              return strumGlyph(rhythm[step] ?? "rest");
-            }).join("");
-            return (
-              <div
-                key={bi}
-                className={`measure ${bar === bi ? "focus" : ""}`}
-                role="group"
-                aria-label={`${bi + 1}마디`}
-                onClick={() => selectBar(bi)}
-              >
-                <span className="measure-idx">{bi + 1}</span>
-                <div className="measure-body">
-                  <div className="measure-chords">
-                    {Array.from({ length: BEATS }, (_, qi) => {
-                      const i = bi * BEATS + qi;
-                      const d = sheet.degrees[i] ?? null;
-                      const roman = slotRoman(d);
-                      return (
-                        <button
-                          key={i}
-                          type="button"
-                          className={`chord-cell ${selected === i ? "on" : ""} ${d === null ? "empty" : ""}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelected(i);
-                          }}
-                          aria-label={`${bi + 1}마디 ${qi + 1}박`}
-                        >
-                          <span className="chord-name">{slotLabel(sheet.key, d)}</span>
-                          {roman ? <span className="degree-dot">{roman}</span> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="measure-rail" aria-hidden />
-                  <div className="measure-strum" aria-hidden>
-                    {strum}
-                  </div>
-                </div>
+          {Array.from({ length: BARS }, (_, bi) => (
+            <div
+              key={bi}
+              className={`measure ${bar === bi ? "focus" : ""}`}
+              role="group"
+              aria-label={`${bi + 1}마디`}
+              onClick={() => selectBar(bi)}
+            >
+              <div className="measure-chords">
+                {Array.from({ length: BEATS }, (_, qi) => {
+                  const i = bi * BEATS + qi;
+                  const d = sheet.degrees[i] ?? null;
+                  const on = selected === i;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`chord-cell ${on ? "on" : ""} ${d === null ? "empty" : ""}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelected(i);
+                      }}
+                      aria-label={`${bi + 1}마디 ${qi + 1}박`}
+                    >
+                      <span className="chord-name">{slotLabel(sheet.key, d)}</span>
+                      {on && d !== null ? <span className="degree-dot">{slotRoman(d)}</span> : null}
+                    </button>
+                  );
+                })}
               </div>
-            );
-          })}
+              <div className="measure-rail" aria-hidden />
+            </div>
+          ))}
         </div>
       </section>
 
