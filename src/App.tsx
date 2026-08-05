@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createInitialSheet,
-  KEY_ROOTS,
+  DEGREE_META,
   nextHit,
   nextKey,
-  QUALITIES,
-  ROOTS,
+  PRESETS,
   slotLabel,
+  slotRoman,
   toStrudel,
   VOICES,
-  type ChordSlot,
-  type Quality,
   type SheetState,
   type VoiceId,
 } from "./sheet";
@@ -18,12 +16,12 @@ import { evaluateStrudel, hushStrudel, initStrudelEngine } from "./engine";
 import "./App.css";
 
 type EngineState = "idle" | "ready" | "playing" | "error";
-type Context = "chart" | "root" | "quality" | "rhythm";
+type Context = "chart" | "degree" | "preset" | "rhythm";
 
 const CONTEXTS: readonly { id: Context; label: string }[] = [
   { id: "chart", label: "진행" },
-  { id: "root", label: "근음" },
-  { id: "quality", label: "화음" },
+  { id: "degree", label: "도수" },
+  { id: "preset", label: "프리셋" },
   { id: "rhythm", label: "리듬" },
 ];
 
@@ -109,15 +107,15 @@ export default function App() {
     setStatus("정지");
   }, []);
 
-  const current = sheet.chords[selected] ?? null;
-  const keyRoots = KEY_ROOTS[sheet.key] ?? KEY_ROOTS.C!;
   const voice = VOICES.find((v) => v.id === sheet.voice) ?? VOICES[0]!;
+  const currentDegree = sheet.degrees[selected] ?? null;
 
-  const patchSlot = (recipe: (prev: ChordSlot | null) => ChordSlot | null) => {
+  const toggleDegree = (degree: number) => {
     update((prev) => {
-      const chords = [...prev.chords];
-      chords[selected] = recipe(chords[selected] ?? null);
-      return { ...prev, chords };
+      const degrees = [...prev.degrees];
+      // 같은 도수면 끄기(토글), 아니면 칠하기
+      degrees[selected] = degrees[selected] === degree ? null : degree;
+      return { ...prev, degrees };
     });
   };
 
@@ -125,15 +123,15 @@ export default function App() {
     if (context === "chart") {
       return Array.from({ length: 16 }, (_, i) => {
         if (i < 4) {
-          const chord = sheet.chords[i] ?? null;
+          const degree = sheet.degrees[i] ?? null;
           return {
             key: `chart-${i}`,
-            label: slotLabel(chord),
-            sub: `${i + 1}`,
-            state: (selected === i ? "on" : chord ? "idle" : "empty") as Pad["state"],
+            label: slotLabel(sheet.key, degree),
+            sub: `${i + 1} · ${slotRoman(degree)}`,
+            state: (selected === i ? "on" : degree !== null ? "idle" : "empty") as Pad["state"],
             onPress: () => {
               setSelected(i);
-              setContext("root");
+              setContext("degree");
             },
           };
         }
@@ -146,27 +144,37 @@ export default function App() {
       });
     }
 
-    if (context === "root") {
+    if (context === "degree") {
       return Array.from({ length: 16 }, (_, i) => {
-        if (i < ROOTS.length) {
-          const root = ROOTS[i]!;
-          const inKey = keyRoots.includes(root);
-          const on = current?.root === root;
+        if (i < DEGREE_META.length) {
+          const meta = DEGREE_META[i]!;
+          const used = sheet.degrees.includes(i);
+          const on = currentDegree === i;
           return {
-            key: `root-${root}`,
-            label: root,
-            state: (on ? "on" : inKey ? "idle" : "dim") as Pad["state"],
+            key: `deg-${i}`,
+            label: meta.roman,
+            sub: slotLabel(sheet.key, i),
+            state: (on ? "on" : used ? "hit" : "idle") as Pad["state"],
+            onPress: () => toggleDegree(i),
+          };
+        }
+        if (i === 7) {
+          return {
+            key: "deg-rest",
+            label: "rest",
+            state: (currentDegree === null ? "on" : "idle") as Pad["state"],
             onPress: () => {
-              patchSlot((prev) => ({
-                root,
-                quality: prev?.quality ?? "maj",
-              }));
+              update((prev) => {
+                const degrees = [...prev.degrees];
+                degrees[selected] = null;
+                return { ...prev, degrees };
+              });
             },
           };
         }
         if (i === 15) {
           return {
-            key: "root-back",
+            key: "deg-back",
             label: "←",
             sub: "진행",
             state: "idle" as const,
@@ -174,7 +182,7 @@ export default function App() {
           };
         }
         return {
-          key: `root-x-${i}`,
+          key: `deg-x-${i}`,
           label: "",
           state: "dim" as const,
           disabled: true,
@@ -182,41 +190,28 @@ export default function App() {
       });
     }
 
-    if (context === "quality") {
-      const items: Array<{ id: string; label: string; run: () => void; on: boolean }> = [
-        ...QUALITIES.map((q) => ({
-          id: q.id,
-          label: q.label,
-          on: current?.quality === q.id,
-          run: () => {
-            const quality = q.id as Quality;
-            patchSlot((prev) => {
-              if (!prev) return { root: "C", quality };
-              return { ...prev, quality };
-            });
-          },
-        })),
-        {
-          id: "rest",
-          label: "rest",
-          on: current === null,
-          run: () => patchSlot(() => null),
-        },
-      ];
-
+    if (context === "preset") {
       return Array.from({ length: 16 }, (_, i) => {
-        if (i < items.length) {
-          const item = items[i]!;
+        if (i < PRESETS.length) {
+          const preset = PRESETS[i]!;
+          const active =
+            preset.degrees.length === sheet.degrees.length &&
+            preset.degrees.every((d, idx) => d === sheet.degrees[idx]);
           return {
-            key: `qual-${item.id}`,
-            label: item.label,
-            state: (item.on ? "on" : "idle") as Pad["state"],
-            onPress: item.run,
+            key: `pre-${preset.id}`,
+            label: preset.name,
+            sub: preset.label,
+            state: (active ? "on" : "idle") as Pad["state"],
+            onPress: () => {
+              update((prev) => ({ ...prev, degrees: [...preset.degrees] }));
+              setSelected(0);
+              setContext("chart");
+            },
           };
         }
         if (i === 15) {
           return {
-            key: "qual-back",
+            key: "pre-back",
             label: "←",
             sub: "진행",
             state: "idle" as const,
@@ -224,7 +219,7 @@ export default function App() {
           };
         }
         return {
-          key: `qual-x-${i}`,
+          key: `pre-x-${i}`,
           label: "",
           state: "dim" as const,
           disabled: true,
@@ -232,7 +227,6 @@ export default function App() {
       });
     }
 
-    // rhythm
     return sheet.beats.map((hit, i) => {
       const empty = hit === "~";
       return {
@@ -253,11 +247,11 @@ export default function App() {
 
   const contextHint =
     context === "chart"
-      ? `${selected + 1}번 칸 · ${slotLabel(current)}`
-      : context === "root"
-        ? `${selected + 1}번 근음`
-        : context === "quality"
-          ? `${selected + 1}번 화음`
+      ? `${selected + 1}번 · ${slotRoman(currentDegree)} · ${slotLabel(sheet.key, currentDegree)}`
+      : context === "degree"
+        ? `${sheet.key} 메이저 · 도수 토글`
+        : context === "preset"
+          ? "진행 프리셋"
           : "16분 리듬";
 
   return (
