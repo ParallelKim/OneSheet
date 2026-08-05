@@ -1,0 +1,47 @@
+# https://www.gstatic.com/firebasejs/ui/2.0.0/icons/auth/firebase-logo.png
+name: Deploy to Firebase Hosting on PR
+
+on:
+  pull_request:
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: hosting-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build_and_preview:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check Firebase service account secret
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ONESHEET_APP }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::Missing GitHub Actions secret FIREBASE_SERVICE_ACCOUNT_ONESHEET_APP."
+            echo "Create it with: firebase login && firebase init hosting:github"
+            echo "Or paste a Firebase Hosting Admin service-account JSON into that secret."
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run build
+
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ONESHEET_APP }}
+          projectId: onesheet-app
+          expires: 30d
