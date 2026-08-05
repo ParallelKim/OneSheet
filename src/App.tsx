@@ -229,9 +229,7 @@ export default function App() {
         >
           <div className="staff-back" aria-hidden>
             <div className="ind-measure" />
-            <div className="ind-playbar">
-              <div className="ind-playbar-fill" />
-            </div>
+            <div className="ind-cursor" />
           </div>
           <div className="staff-front">
             {Array.from({ length: BARS }, (_, bi) => (
@@ -242,28 +240,26 @@ export default function App() {
                 aria-label={`bar ${bi + 1}`}
                 onClick={() => selectBar(bi)}
               >
-                <div className="measure-chords">
-                  {Array.from({ length: BEATS }, (_, qi) => {
-                    const i = bi * BEATS + qi;
-                    const d = sheet.degrees[i] ?? null;
-                    const on = selected === i;
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        className={`chord-cell ${on ? "on" : ""} ${d === null ? "empty" : ""}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelected(i);
-                        }}
-                        aria-label={`bar ${bi + 1} beat ${qi + 1}`}
-                      >
-                        <span className="chord-name">{slotLabel(sheet.key, d)}</span>
-                        <span className="chord-deg">{d !== null ? slotRoman(d) : "·"}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                {Array.from({ length: BEATS }, (_, qi) => {
+                  const i = bi * BEATS + qi;
+                  const d = sheet.degrees[i] ?? null;
+                  const on = selected === i;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`chord-cell ${on ? "on" : ""} ${d === null ? "empty" : ""}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelected(i);
+                      }}
+                      aria-label={`bar ${bi + 1} beat ${qi + 1}`}
+                    >
+                      <span className="chord-name">{slotLabel(sheet.key, d)}</span>
+                      <span className="chord-deg">{d !== null ? slotRoman(d) : "·"}</span>
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>

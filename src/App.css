@@ -93,7 +93,7 @@ button {
   opacity: 0.85;
 }
 
-/* 얇은 한 줄 차트 — 뒤: 인디케이터 / 앞: 투명 코드 */
+/* 얇은 한 줄 차트 — 16등분 그리드에 마디/커서/선택 정렬 */
 .staff {
   --play-phase: -1;
   --mark-bar: 0;
@@ -109,7 +109,7 @@ button {
   overflow: hidden;
 }
 
-/* 마디: 약한 밴드 */
+/* 마디: 약한 밴드 (4등분 = measure) */
 .ind-measure {
   position: absolute;
   top: 0;
@@ -117,88 +117,71 @@ button {
   left: 0;
   width: 25%;
   z-index: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
   transform: translateX(calc(var(--mark-bar) * 100%));
   transition: transform 0.12s ease;
 }
 
-/* 재생: 일반적인 프로그레스 바 */
-.ind-playbar {
+/* 재생 헤드: Guitar Pro식 세로 커서 */
+.ind-cursor {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 2px;
+  bottom: 2px;
+  left: calc(max(0, var(--play-phase)) * 100%);
   z-index: 2;
-  height: 3px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.1);
-  opacity: 0;
-  overflow: hidden;
-}
-
-.staff.is-playing .ind-playbar {
-  opacity: 1;
-}
-
-.ind-playbar-fill {
-  height: 100%;
-  width: calc(max(0, var(--play-phase)) * 100%);
+  width: 2px;
+  border-radius: 1px;
   background: var(--fg);
-  border-radius: 2px;
-  will-change: width;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.45),
+    0 0 6px rgba(255, 255, 255, 0.35);
+  opacity: 0;
+  transform: translateX(-50%);
+  will-change: left;
+}
+
+.staff.is-playing .ind-cursor {
+  opacity: 1;
 }
 
 .staff-front {
   position: relative;
   z-index: 1;
-  display: flex;
-  gap: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   align-items: stretch;
 }
 
 .measure {
-  flex: 1 1 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: stretch;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 2px 0 8px;
+  padding: 4px 0;
   cursor: pointer;
   background: transparent;
-}
-
-.measure + .measure {
   border-left: 1px solid var(--fg);
-  padding-left: 4px;
-  margin-left: 2px;
 }
 
 .measure:first-child {
   border-left: 2px solid var(--fg);
-  padding-left: 4px;
 }
 
 .measure:last-child {
   border-right: 2px solid var(--fg);
-  padding-right: 4px;
-}
-
-.measure-chords {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0;
-  align-items: end;
-  min-height: 1.6rem;
 }
 
 .chord-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
+  width: 100%;
   min-width: 0;
-  padding: 3px 1px;
+  min-height: 2.2rem;
+  padding: 4px 2px;
   border-radius: 6px;
   background: transparent;
 }
@@ -228,6 +211,7 @@ button {
   font-weight: 700;
   line-height: 1;
   color: var(--muted);
+  text-align: center;
 }
 
 .chord-deg {
@@ -236,6 +220,7 @@ button {
   line-height: 1;
   color: var(--muted);
   letter-spacing: 0.02em;
+  text-align: center;
 }
 
 .chip {
