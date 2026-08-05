@@ -30,6 +30,7 @@ SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
 - dim 코드 심볼은 `Bo` (`dim` 아님) — triads 딕셔너리
 - 음색: `@strudel/soundfonts` GM 기타 (steel/nylon/clean). X는 `gm_electric_guitar_muted`
 - 주법: D=`n([0 1 2 3])` 다운스트럼, U=`n([3 2 1 0])` 업, X=동시타+짧은 clip
+- Play → 샘플 프리로드(스피너 LOAD) → 재생. 로딩 중 다시 누르면 취소
 - 재생 중 편집 → `evaluateStrudel` 재평가 (직렬 큐)
 - **플레이헤드**: Guitar Pro식 세로 커서(`--play-phase`) + 마디 밴드(`--mark-bar`). 선택은 셀 배경·글자 반전.
 

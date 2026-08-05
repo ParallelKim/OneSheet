@@ -23,12 +23,14 @@ import {
   evaluateStrudel,
   getCyclePhase,
   getLastStrudelCode,
+  getPlaybackEpoch,
   hushStrudel,
   initStrudelEngine,
+  preloadGuitarSamples,
 } from "./engine";
 import "./App.css";
 
-type EngineState = "idle" | "ready" | "playing" | "error";
+type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
 /** 렌즈: 같은 4×4 패드의 의미를 바꾼다 */
 type Mode = "chart" | "degree" | "rhythm";
 
@@ -135,32 +137,29 @@ export default function App() {
     [pushPattern],
   );
 
-  const ensureReady = useCallback(async () => {
-    if (engine === "ready" || engine === "playing") return true;
-    setStatus("audio…");
+  const onPlay = useCallback(async () => {
+    const gate = getPlaybackEpoch();
+    setEngine("loading");
+    setStatus("");
     try {
       await initStrudelEngine();
-      setEngine("ready");
-      setStatus("");
-      return true;
-    } catch (err) {
-      console.error(err);
-      setEngine("error");
-      setStatus("audio error");
-      return false;
-    }
-  }, [engine]);
-
-  const onPlay = useCallback(async () => {
-    const okReady = await ensureReady();
-    if (!okReady) return;
-    try {
+      if (getPlaybackEpoch() !== gate) {
+        setEngine((e) => (e === "error" ? e : "ready"));
+        return;
+      }
+      const warmed = await preloadGuitarSamples(
+        sheetRef.current.body,
+        gate,
+      );
+      if (!warmed || getPlaybackEpoch() !== gate) {
+        setEngine((e) => (e === "error" ? e : "ready"));
+        return;
+      }
       const code = toStrudel(sheetRef.current);
       const ok = await evaluateStrudel(code);
-      if (!ok) {
-        // 평가 중 정지된 경우
+      if (!ok || getPlaybackEpoch() !== gate) {
         playingRef.current = false;
-        setEngine("ready");
+        setEngine((e) => (e === "error" ? e : "ready"));
         setStatus("");
         return;
       }
@@ -173,7 +172,7 @@ export default function App() {
       setEngine("error");
       setStatus("play error");
     }
-  }, [ensureReady]);
+  }, []);
 
   const onStop = useCallback(() => {
     hushStrudel();
@@ -211,6 +210,7 @@ export default function App() {
   };
 
   const playing = engine === "playing";
+  const loading = engine === "loading";
   const currentDegree = sheet.degrees[selected] ?? null;
   const bar = barIndex(selected);
   const beat = (selected % BEATS) + 1;
@@ -300,12 +300,17 @@ export default function App() {
       <nav className="transport" aria-label="transport">
         <button
           type="button"
-          className={`tr-btn play ${playing ? "on" : ""}`}
-          onClick={() => void (playing ? onStop() : onPlay())}
-          aria-label={playing ? "stop" : "play"}
+          className={`tr-btn play ${playing ? "on" : ""} ${loading ? "loading" : ""}`}
+          onClick={() => void (playing || loading ? onStop() : onPlay())}
+          aria-label={loading ? "loading" : playing ? "stop" : "play"}
+          aria-busy={loading}
         >
-          <span className="tr-icon">{playing ? "■" : "▶"}</span>
-          <span className="tr-label">{playing ? "STOP" : "PLAY"}</span>
+          <span className="tr-icon" aria-hidden>
+            {loading ? <span className="spin" /> : playing ? "■" : "▶"}
+          </span>
+          <span className="tr-label">
+            {loading ? "LOAD" : playing ? "STOP" : "PLAY"}
+          </span>
         </button>
         <button
           type="button"

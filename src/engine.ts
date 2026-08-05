@@ -1,5 +1,16 @@
-import { registerSoundfonts } from "@strudel/soundfonts";
-import { evaluate, hush, initStrudel } from "@strudel/web";
+import { getFontBufferSource, registerSoundfonts } from "@strudel/soundfonts";
+import {
+  evaluate,
+  getAudioContext,
+  hush,
+  initAudio,
+  initStrudel,
+} from "@strudel/web";
+import {
+  bodyById,
+  MUTE_FONT,
+  type GuitarBodyId,
+} from "./sheet";
 
 /** initStrudel 반환 타입이 느슨해서 scheduler만 느슨히 잡는다 */
 // deno-lint-ignore no-explicit-any
@@ -15,6 +26,15 @@ let lastCode = "";
  * 진행 중이던 evaluate가 끝난 뒤 세트가 다르면 즉시 다시 stop.
  */
 let epoch = 0;
+
+/** 바디별 프리로드 완료 키 */
+const preloadedBodies = new Set<string>();
+
+/**
+ * 코드 보이싱이 닿는 MIDI 대역(약 E2–E5).
+ * 존마다 한 번씩 decode해 첫 히트 로딩을 피한다.
+ */
+const PRELOAD_MIDI = Array.from({ length: 13 }, (_, i) => 40 + i * 3);
 
 export function getLastStrudelCode(): string {
   return lastCode;
@@ -62,6 +82,44 @@ export async function initStrudelEngine(): Promise<Repl> {
 }
 
 /**
+ * 기타 soundfont를 미리 받아 디코드한다.
+ * @returns 이 호출이 여전히 유효한지 (로딩 중 정지면 false)
+ */
+export async function preloadGuitarSamples(
+  bodyId: GuitarBodyId,
+  gateEpoch: number,
+): Promise<boolean> {
+  if (gateEpoch !== epoch) return false;
+  await initStrudelEngine();
+  if (gateEpoch !== epoch) return false;
+
+  // Play 클릭(사용자 제스처)에서 AudioContext resume
+  await initAudio();
+  if (gateEpoch !== epoch) return false;
+
+  if (preloadedBodies.has(bodyId)) return true;
+
+  const ctx = getAudioContext() as AudioContext;
+  const openFont = bodyById(bodyId).font;
+  const fonts = [openFont, MUTE_FONT];
+
+  await Promise.all(
+    fonts.flatMap((font) =>
+      PRELOAD_MIDI.map((midi) =>
+        getFontBufferSource(font, { note: midi }, ctx).catch((err: unknown) => {
+          console.warn("soundfont preload", font, midi, err);
+          return null;
+        }),
+      ),
+    ),
+  );
+
+  if (gateEpoch !== epoch) return false;
+  preloadedBodies.add(bodyId);
+  return true;
+}
+
+/**
  * Strudel 코드 평가·재생.
  * @returns 이 호출이 여전히 유효한 재생인지 (정지 레이스면 false)
  */
@@ -93,7 +151,7 @@ export async function evaluateStrudel(code: string): Promise<boolean> {
   return next;
 }
 
-/** 재생 중지. 진행 중/대기 중 evaluate는 epoch로 무효화된다. */
+/** 재생 중지. 진행 중/대기 중 evaluate·프리로드는 epoch로 무효화된다. */
 export function hushStrudel(): void {
   epoch += 1;
   try {

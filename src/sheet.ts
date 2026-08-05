@@ -30,14 +30,32 @@ export const GUITAR_BODIES: readonly {
   id: GuitarBodyId;
   label: string;
   sound: string;
+  /** soundfonts 패키지 기본(n=0) 프리셋 파일명 */
+  font: string;
 }[] = [
-  { id: "nylon", label: "nylon", sound: "gm_acoustic_guitar_nylon" },
-  { id: "steel", label: "steel", sound: "gm_acoustic_guitar_steel" },
-  { id: "clean", label: "clean", sound: "gm_electric_guitar_clean" },
+  {
+    id: "nylon",
+    label: "nylon",
+    sound: "gm_acoustic_guitar_nylon",
+    font: "0240_JCLive_sf2_file",
+  },
+  {
+    id: "steel",
+    label: "steel",
+    sound: "gm_acoustic_guitar_steel",
+    font: "0253_Acoustic_Guitar_sf2_file",
+  },
+  {
+    id: "clean",
+    label: "clean",
+    sound: "gm_electric_guitar_clean",
+    font: "0270_Aspirin_sf2_file",
+  },
 ] as const;
 
 /** 뮤트(X) 전용 — palm mute 감 */
 export const MUTE_SOUND = "gm_electric_guitar_muted";
+export const MUTE_FONT = "0280_Aspirin_sf2_file";
 
 /** @deprecated VoiceId → GuitarBodyId. 구 상태 호환용 별칭 */
 export type VoiceId = GuitarBodyId;

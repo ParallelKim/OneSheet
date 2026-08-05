@@ -336,6 +336,28 @@ button {
   line-height: 1;
 }
 
+.tr-btn.loading .tr-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0.9rem;
+}
+
+.tr-btn .spin {
+  width: 0.72rem;
+  height: 0.72rem;
+  border: 1.5px solid var(--muted);
+  border-top-color: var(--fg);
+  border-radius: 50%;
+  animation: tr-spin 0.65s linear infinite;
+}
+
+@keyframes tr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .tr-label,
 .brush-hint {
   font-size: 0.58rem;
