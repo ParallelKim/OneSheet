@@ -18,7 +18,7 @@ import {
   type Articulation,
   type SheetState,
 } from "./sheet";
-import { evaluateStrudel, hushStrudel, initStrudelEngine } from "./engine";
+import { evaluateStrudel, getLastStrudelCode, hushStrudel, initStrudelEngine } from "./engine";
 import "./App.css";
 
 type EngineState = "idle" | "ready" | "playing" | "error";
@@ -44,7 +44,7 @@ export default function App() {
     try {
       await evaluateStrudel(toStrudel(next));
     } catch (err) {
-      console.error(err);
+      console.error(err, getLastStrudelCode());
       setEngine("error");
       setStatus("재생할 수 없는 진행입니다");
     }
@@ -80,12 +80,13 @@ export default function App() {
     const ok = await ensureReady();
     if (!ok) return;
     try {
-      await evaluateStrudel(toStrudel(sheetRef.current));
+      const code = toStrudel(sheetRef.current);
+      await evaluateStrudel(code);
       playingRef.current = true;
       setEngine("playing");
       setStatus("재생 중");
     } catch (err) {
-      console.error(err);
+      console.error(err, getLastStrudelCode());
       playingRef.current = false;
       setEngine("error");
       setStatus("재생에 실패했습니다");

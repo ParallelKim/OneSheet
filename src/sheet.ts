@@ -2,6 +2,8 @@
  * 차트 = 4행(마디) × 4열(박).
  * 리듬 = 선택 마디의 4×4 (행=4분, 칸=16분).
  * 셀: D / U / X(뮤트) / hold(링) / rest(쉼).
+ *
+ * toStrudel: SheetState → @strudel/web 평가 코드.
  */
 
 export type Articulation = "D" | "U" | "X" | "hold" | "rest";
@@ -20,6 +22,7 @@ export type SheetState = {
 
 export type VoiceId = "warm" | "bright" | "soft" | "keys";
 
+/** WebAudio 신스만 사용 (soundfont 미포함 번들) */
 export const VOICES: readonly {
   id: VoiceId;
   label: string;
@@ -29,7 +32,7 @@ export const VOICES: readonly {
   { id: "warm", label: "웜", sound: "sawtooth", cutoff: 1400 },
   { id: "bright", label: "샤프", sound: "square", cutoff: 3200 },
   { id: "soft", label: "소프트", sound: "triangle", cutoff: 1800 },
-  { id: "keys", label: "피아노", sound: "gm_epiano1", cutoff: 2400 },
+  { id: "keys", label: "피아노", sound: "triangle", cutoff: 2400 },
 ] as const;
 
 export const BARS = 4;
@@ -104,17 +107,25 @@ export function scaleOf(key: string): readonly string[] {
   return MAJOR_KEYS[key] ?? MAJOR_KEYS.C!;
 }
 
+/**
+ * Strudel chord() 심볼.
+ * dim은 딕셔너리 키 `o` (예: Bo). `dim` 표기는 voicing이 모를 수 있음.
+ */
 export function chordFromDegree(key: string, degree: number): string {
   const root = scaleOf(key)[degree] ?? "C";
   const q = DEGREE_META[degree]?.quality ?? "maj";
   if (q === "maj") return root;
   if (q === "min") return `${root}m`;
-  return `${root}dim`;
+  return `${root}o`;
 }
 
 export function slotLabel(key: string, degree: number | null): string {
   if (degree === null) return "—";
-  return chordFromDegree(key, degree);
+  const q = DEGREE_META[degree]?.quality ?? "maj";
+  const root = scaleOf(key)[degree] ?? "C";
+  if (q === "maj") return root;
+  if (q === "min") return `${root}m`;
+  return `${root}dim`;
 }
 
 export function slotRoman(degree: number | null): string {
@@ -162,8 +173,8 @@ export function setBarArticulation(
   });
 }
 
-function mini(tokens: string[]): string {
-  return tokens.join(" ");
+function mini(tokens: Array<string | number>): string {
+  return tokens.map(String).join(" ");
 }
 
 function isAttack(art: Articulation): boolean {
@@ -171,7 +182,7 @@ function isAttack(art: Articulation): boolean {
 }
 
 /** 공격 뒤 이어지는 hold 개수 (rest·다음 공격 전) */
-function holdRun(barRhythm: Articulation[], from: number): number {
+export function holdRun(barRhythm: Articulation[], from: number): number {
   let n = 0;
   for (let i = from + 1; i < barRhythm.length; i++) {
     if (barRhythm[i] !== "hold") break;
@@ -180,14 +191,28 @@ function holdRun(barRhythm: Articulation[], from: number): number {
   return n;
 }
 
-export function toStrudel(sheet: SheetState): string {
-  // 64 sixteenths = 4 bars → cycle length same as 16 quarters
-  const cps = sheet.bpm / 60 / SLOTS;
-  const voice = voiceById(sheet.voice);
+/** 한 사이클 = 4마디 = 16박. cps = bpm/60/16 */
+export function cyclesPerSecond(bpm: number): number {
+  return bpm / 60 / SLOTS;
+}
 
-  const chordTok: string[] = [];
-  const clipTok: string[] = [];
-  const gainTok: string[] = [];
+export type StrudelParts = {
+  cps: number;
+  hasHits: boolean;
+  chordSeq: string[];
+  clipSeq: number[];
+  gainSeq: number[];
+  metro: boolean;
+  sound: string;
+  cutoff: number;
+};
+
+/** UI 상태 → 재생에 쓰는 중간 표현 (테스트·디버그용) */
+export function compileSheet(sheet: SheetState): StrudelParts {
+  const voice = voiceById(sheet.voice);
+  const chordSeq: string[] = [];
+  const clipSeq: number[] = [];
+  const gainSeq: number[] = [];
 
   for (let bar = 0; bar < BARS; bar++) {
     const barRhythm = sheet.rhythm[bar] ?? defaultBarRhythm();
@@ -197,46 +222,66 @@ export function toStrudel(sheet: SheetState): string {
       const degree = sheet.degrees[bar * BEATS + beat] ?? null;
 
       if (!isAttack(art) || degree === null) {
-        chordTok.push("~");
-        clipTok.push("1");
-        gainTok.push("0");
+        chordSeq.push("~");
+        clipSeq.push(1);
+        gainSeq.push(0);
         continue;
       }
 
       const holds = holdRun(barRhythm, step);
       const clip = art === "X" ? 0.45 : 1 + holds;
       const base = sheet.gain;
-      const gain =
-        art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
+      const gain = art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
 
-      chordTok.push(chordFromDegree(sheet.key, degree));
-      clipTok.push(String(Number(clip.toFixed(2))));
-      gainTok.push(gain.toFixed(2));
+      chordSeq.push(chordFromDegree(sheet.key, degree));
+      clipSeq.push(Number(clip.toFixed(2)));
+      gainSeq.push(Number(gain.toFixed(3)));
     }
   }
 
-  const hasHits = chordTok.some((t) => t !== "~");
-  const parts: string[] = [];
+  return {
+    cps: cyclesPerSecond(sheet.bpm),
+    hasHits: chordSeq.some((t) => t !== "~"),
+    chordSeq,
+    clipSeq,
+    gainSeq,
+    metro: sheet.metro,
+    sound: voice.sound,
+    cutoff: voice.cutoff,
+  };
+}
 
-  if (hasHits) {
-    parts.push(
+/**
+ * SheetState → Strudel 코드 문자열.
+ * evaluate(code)로 바로 재생 가능.
+ */
+export function toStrudel(sheet: SheetState): string {
+  const parts = compileSheet(sheet);
+  const layers: string[] = [];
+
+  if (parts.hasHits) {
+    layers.push(
       [
-        `chord("<${mini(chordTok)}>")`,
-        `.voicing('legacy')`,
-        `.s("${voice.sound}")`,
-        `.gain("<${mini(gainTok)}>")`,
-        `.cutoff(${voice.cutoff})`,
-        `.clip("<${mini(clipTok)}>")`,
+        `chord("<${mini(parts.chordSeq)}>")`,
+        `.dict("triads")`,
+        `.voicing()`,
+        `.s("${parts.sound}")`,
+        `.gain("<${mini(parts.gainSeq)}>")`,
+        `.cutoff(${parts.cutoff})`,
+        `.clip("<${mini(parts.clipSeq)}>")`,
       ].join(""),
     );
   }
 
-  if (sheet.metro) {
-    // quarter click across 64-step cycle (every 4 sixteenths)
-    parts.push(`s("woodblock").struct("x*${SLOTS}").gain(0.08)`);
+  if (parts.metro) {
+    // 16분 64스텝 사이클 안에서 4분마다 클릭
+    layers.push(`s("woodblock").struct("x*${SLOTS}").gain(0.08)`);
   }
 
-  if (parts.length === 0) return "silence";
-  if (parts.length === 1) return [`setcps(${cps})`, parts[0]!].join("\n");
-  return [`setcps(${cps})`, `stack(\n  ${parts.join(",\n  ")}\n)`].join("\n");
+  if (layers.length === 0) return "silence";
+
+  const body =
+    layers.length === 1 ? layers[0]! : `stack(\n  ${layers.join(",\n  ")}\n)`;
+
+  return `setcps(${parts.cps})\n${body}`;
 }
