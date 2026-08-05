@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState, type CSSProperties } from 'react'
 import {
   createId,
   createPart,
@@ -10,10 +10,34 @@ import { isPlaying, playSheet, stopSheet, updateSheet } from './engine'
 import { track } from './firebase'
 import './App.css'
 
+const PART_COLORS = ['#2ec4ff', '#ffd60a', '#ff4d6d', '#7bf1a8', '#c77dff', '#ff9f1c']
+
+function partColor(index: number): string {
+  return PART_COLORS[index % PART_COLORS.length]!
+}
+
+function boot(): { sheet: Sheet; activePartId: string } {
+  const sheet = createSheet()
+  return { sheet, activePartId: sheet.parts[0]!.id }
+}
+
 export default function App() {
-  const [sheet, setSheet] = useState<Sheet>(createSheet)
+  const [bootState] = useState(boot)
+  const [sheet, setSheet] = useState<Sheet>(bootState.sheet)
+  const [activePartId, setActivePartId] = useState(bootState.activePartId)
   const [playing, setPlaying] = useState(false)
   const [status, setStatus] = useState('')
+  const [focusBar, setFocusBar] = useState<number | null>(null)
+
+  const parts = sheet.parts
+  const activePart =
+    parts.find((p) => p.id === activePartId) ?? parts[0] ?? null
+
+  const colorById = useMemo(() => {
+    const map = new Map<string, string>()
+    parts.forEach((p, i) => map.set(p.id, partColor(i)))
+    return map
+  }, [parts])
 
   const commit = useCallback((next: Sheet) => {
     setSheet(next)
@@ -55,12 +79,11 @@ export default function App() {
     })
   }
 
-  function setChord(partId: string, index: number, chord: string) {
-    const part = sheet.parts.find((p) => p.id === partId)
-    if (!part) return
-    const chords = [...part.chords] as Part['chords']
+  function setChord(index: number, chord: string) {
+    if (!activePart) return
+    const chords = [...activePart.chords] as Part['chords']
     chords[index] = chord
-    updatePart(partId, { chords })
+    updatePart(activePart.id, { chords })
   }
 
   function addPart() {
@@ -68,20 +91,11 @@ export default function App() {
     commit({
       ...sheet,
       parts: [...sheet.parts, part],
-      form: [...sheet.form, { id: createId(), partId: part.id }],
     })
+    setActivePartId(part.id)
   }
 
-  function removePart(partId: string) {
-    if (sheet.parts.length <= 1) return
-    commit({
-      ...sheet,
-      parts: sheet.parts.filter((p) => p.id !== partId),
-      form: sheet.form.filter((step) => step.partId !== partId),
-    })
-  }
-
-  function appendToForm(partId: string) {
+  function stampToForm(partId: string) {
     commit({
       ...sheet,
       form: [...sheet.form, { id: createId(), partId }],
@@ -99,16 +113,31 @@ export default function App() {
     commit({ ...sheet, form: [] })
   }
 
+  function removeActivePart() {
+    if (!activePart || sheet.parts.length <= 1) return
+    const nextParts = sheet.parts.filter((p) => p.id !== activePart.id)
+    commit({
+      ...sheet,
+      parts: nextParts,
+      form: sheet.form.filter((step) => step.partId !== activePart.id),
+    })
+    setActivePartId(nextParts[0]!.id)
+  }
+
+  if (!activePart) return null
+
+  const activeColor = colorById.get(activePart.id) ?? PART_COLORS[0]!
+
   return (
-    <div className="app">
-      <header className="top">
-        <div className="brand">
-          <h1>OneSheet</h1>
-          <p>장난감처럼 만지고, 바로 들어보는 한 장 차트</p>
-        </div>
-        <div className="transport">
-          <label className="bpm">
-            BPM
+    <div className={`device${playing ? ' is-playing' : ''}`}>
+      <div className="shell">
+        <header className="mast">
+          <div className="brand-block">
+            <p className="brand">OneSheet</p>
+            <p className="tag">한 장 · 만지면 들린다</p>
+          </div>
+          <label className="bpm-dial">
+            <span>BPM</span>
             <input
               type="number"
               min={40}
@@ -124,92 +153,120 @@ export default function App() {
           </label>
           <button
             type="button"
-            className={playing ? 'stop' : 'play'}
+            className={`transport ${playing ? 'on' : 'off'}`}
             onClick={() => void togglePlay()}
+            aria-pressed={playing}
           >
-            {playing ? 'Stop' : 'Play'}
+            {playing ? 'STOP' : 'PLAY'}
           </button>
-        </div>
-      </header>
+        </header>
 
-      {status ? <p className="status">{status}</p> : null}
+        {status ? <p className="status">{status}</p> : null}
 
-      <section className="zone parts-zone">
-        <div className="zone-head">
-          <h2>Parts</h2>
-          <button type="button" onClick={addPart}>
-            + Part
-          </button>
-        </div>
-        <div className="parts">
-          {sheet.parts.map((part) => (
-            <article key={part.id} className="part">
-              <div className="part-head">
-                <input
-                  className="part-name"
-                  value={part.label}
-                  onChange={(e) => updatePart(part.id, { label: e.target.value })}
-                  aria-label="파트 이름"
-                />
-                <button type="button" onClick={() => appendToForm(part.id)}>
-                  Form에 추가
-                </button>
-                <button
-                  type="button"
-                  className="danger"
-                  disabled={sheet.parts.length <= 1}
-                  onClick={() => removePart(part.id)}
-                >
-                  삭제
-                </button>
-              </div>
-              <div className="bars">
-                {part.chords.map((chord, i) => (
-                  <label key={i} className="bar">
-                    <span>{i + 1}</span>
-                    <input
-                      value={chord}
-                      onChange={(e) => setChord(part.id, i, e.target.value)}
-                      placeholder="Am"
-                      spellCheck={false}
-                    />
-                  </label>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="zone form-zone">
-        <div className="zone-head">
-          <h2>Form</h2>
-          <button type="button" onClick={clearForm} disabled={sheet.form.length === 0}>
-            Clear
-          </button>
-        </div>
-        {sheet.form.length === 0 ? (
-          <p className="empty">파트에서 「Form에 추가」로 순서를 만드세요.</p>
-        ) : (
-          <ol className="form">
-            {sheet.form.map((step, index) => {
-              const part = sheet.parts.find((p) => p.id === step.partId)
+        <section className="lens" aria-label="파트">
+          <div className="lens-row">
+            {sheet.parts.map((part, i) => {
+              const color = partColor(i)
+              const selected = part.id === activePart.id
               return (
-                <li key={step.id}>
-                  <span className="form-index">{index + 1}</span>
-                  <span className="form-name">{part?.label ?? '?'}</span>
-                  <span className="form-chords">
-                    {(part?.chords ?? []).filter(Boolean).join(' · ') || '—'}
-                  </span>
-                  <button type="button" onClick={() => removeFromForm(index)}>
-                    ×
-                  </button>
-                </li>
+                <button
+                  key={part.id}
+                  type="button"
+                  className={`chip${selected ? ' selected' : ''}`}
+                  style={{ '--chip': color } as CSSProperties}
+                  onClick={() => setActivePartId(part.id)}
+                  aria-pressed={selected}
+                >
+                  {part.label}
+                </button>
               )
             })}
-          </ol>
-        )}
-      </section>
+            <button type="button" className="chip add" onClick={addPart} aria-label="파트 추가">
+              +
+            </button>
+          </div>
+          <div className="lens-actions">
+            <button
+              type="button"
+              className="stamp"
+              style={{ '--chip': activeColor } as CSSProperties}
+              onClick={() => stampToForm(activePart.id)}
+            >
+              FORM에 찍기
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={sheet.parts.length <= 1}
+              onClick={removeActivePart}
+            >
+              빼기
+            </button>
+          </div>
+        </section>
+
+        <section
+          className="pads"
+          style={{ '--active': activeColor } as CSSProperties}
+          aria-label="네 마디"
+        >
+          {activePart.chords.map((chord, i) => (
+            <label
+              key={i}
+              className={`pad${focusBar === i ? ' focus' : ''}`}
+            >
+              <span className="pad-idx">{i + 1}</span>
+              <input
+                value={chord}
+                onFocus={() => setFocusBar(i)}
+                onBlur={() => setFocusBar(null)}
+                onChange={(e) => setChord(i, e.target.value)}
+                placeholder="—"
+                spellCheck={false}
+                aria-label={`${i + 1}마디 코드`}
+              />
+            </label>
+          ))}
+        </section>
+
+        <section className="tape" aria-label="폼">
+          <div className="tape-head">
+            <span>FORM</span>
+            <button
+              type="button"
+              className="ghost"
+              disabled={sheet.form.length === 0}
+              onClick={clearForm}
+            >
+              CLEAR
+            </button>
+          </div>
+          {sheet.form.length === 0 ? (
+            <p className="tape-empty">색 블록을 찍어 순서를 만드세요</p>
+          ) : (
+            <ol className="tape-row">
+              {sheet.form.map((step, index) => {
+                const part = sheet.parts.find((p) => p.id === step.partId)
+                const color = colorById.get(step.partId) ?? '#999'
+                return (
+                  <li key={step.id}>
+                    <button
+                      type="button"
+                      className="brick"
+                      style={{ '--chip': color } as CSSProperties}
+                      onClick={() => removeFromForm(index)}
+                      title="탭해서 제거"
+                    >
+                      <span className="brick-n">{index + 1}</span>
+                      <span className="brick-l">{part?.label ?? '?'}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+        </section>
+      </div>
     </div>
   )
 }
