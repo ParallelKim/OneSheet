@@ -15,19 +15,21 @@ base `main` · PR3 (재생 파이프라인)
 
 ```
 SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
-  degrees[]      64스텝 시퀀스      setcps+chord      @strudel/web
-  rhythm[][]     clip/gain          .dict.triads
+  degrees[]      64스텝 시퀀스      setcps+n+chord   @strudel/web
+  rhythm[][]     art/clip/gain      .dict.triads     + soundfonts
   bpm/metro                         .voicing()
+                                    GM guitar s()
 ```
 
 | 파일 | 역할 |
 |------|------|
-| `src/sheet.ts` | 모델 · `compileSheet` · `toStrudel` |
-| `src/engine.ts` | init / evaluate 큐 / hush |
+| `src/sheet.ts` | 모델 · `compileSheet` · `toStrudel` · 스트럼 n |
+| `src/engine.ts` | init(+registerSoundfonts) / evaluate 큐 / hush |
 | `src/sheet.test.ts` | 변환 단위 테스트 |
 
 - dim 코드 심볼은 `Bo` (`dim` 아님) — triads 딕셔너리
-- 음색은 WebAudio 신스만 (soundfont 없음)
+- 음색: `@strudel/soundfonts` GM 기타 (steel/nylon/clean). X는 `gm_electric_guitar_muted`
+- 주법: D=`n([0 1 2 3])` 다운스트럼, U=`n([3 2 1 0])` 업, X=동시타+짧은 clip
 - 재생 중 편집 → `evaluateStrudel` 재평가 (직렬 큐)
 - **플레이헤드**: Guitar Pro식 세로 커서(`--play-phase`) + 마디 밴드(`--mark-bar`). 선택은 셀 배경·글자 반전.
 
@@ -45,4 +47,4 @@ LCD: 얇은 한 줄 차트 · transport · 4×4(차트/도수/리듬)
 
 ## 다음
 
-- 플레이헤드 · 아르페지오 · 사운드 설득력 · 조성 UX
+- 조성 UX · 바디(nylon/steel) UI · 아르페지오 프리셋

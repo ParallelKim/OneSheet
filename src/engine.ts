@@ -1,3 +1,4 @@
+import { registerSoundfonts } from "@strudel/soundfonts";
 import { evaluate, hush, initStrudel } from "@strudel/web";
 
 /** initStrudel 반환 타입이 느슨해서 scheduler만 느슨히 잡는다 */
@@ -41,7 +42,12 @@ export function getCyclePhase(): number | null {
 
 export async function initStrudelEngine(): Promise<Repl> {
   if (!boot) {
-    boot = initStrudel()
+    boot = initStrudel({
+      // GM 기타 샘플 (nylon/steel/clean/muted) — 기본 번들은 신스만 등록
+      prebake: async () => {
+        registerSoundfonts();
+      },
+    })
       .then((repl: Repl) => {
         replRef = repl;
         return repl;

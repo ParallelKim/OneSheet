@@ -5,6 +5,7 @@
  *
  * toStrudel: SheetState → @strudel/web 평가 코드.
  * 길이는 mini `@n` 가중치로 표현 (clip 남용으로 한 음에 붙는 문제 회피).
+ * 주법: D/U = n 순서로 스트럼, X = 뮤트 샘플 + 짧은 clip.
  */
 
 export type Articulation = "D" | "U" | "X" | "hold" | "rest";
@@ -16,25 +17,30 @@ export type SheetState = {
   degrees: Array<number | null>;
   /** 4 bars × 16 sixteenths */
   rhythm: Articulation[][];
-  voice: VoiceId;
+  /** 기타 바디 (GM soundfont). 주법(D/U/X)과 축이 다름 */
+  body: GuitarBodyId;
   gain: number;
   metro: boolean;
 };
 
-export type VoiceId = "warm" | "bright" | "soft" | "keys";
+export type GuitarBodyId = "nylon" | "steel" | "clean";
 
-/** WebAudio 신스만 사용 (soundfont 미포함 번들) */
-export const VOICES: readonly {
-  id: VoiceId;
+/** GM 기타 바디. 파형(신스) 대신 실제 기타 샘플 */
+export const GUITAR_BODIES: readonly {
+  id: GuitarBodyId;
   label: string;
   sound: string;
-  cutoff: number;
 }[] = [
-  { id: "warm", label: "warm", sound: "sawtooth", cutoff: 1400 },
-  { id: "bright", label: "bright", sound: "square", cutoff: 3200 },
-  { id: "soft", label: "soft", sound: "triangle", cutoff: 1800 },
-  { id: "keys", label: "keys", sound: "triangle", cutoff: 2400 },
+  { id: "nylon", label: "nylon", sound: "gm_acoustic_guitar_nylon" },
+  { id: "steel", label: "steel", sound: "gm_acoustic_guitar_steel" },
+  { id: "clean", label: "clean", sound: "gm_electric_guitar_clean" },
 ] as const;
+
+/** 뮤트(X) 전용 — palm mute 감 */
+export const MUTE_SOUND = "gm_electric_guitar_muted";
+
+/** @deprecated VoiceId → GuitarBodyId. 구 상태 호환용 별칭 */
+export type VoiceId = GuitarBodyId;
 
 export const BARS = 4;
 export const BEATS = 4;
@@ -98,8 +104,8 @@ export function createInitialSheet(): SheetState {
     key: "C",
     degrees: repeatBar([5, 0, 4, 3]), // vi I V IV
     rhythm: defaultRhythm(),
-    voice: "warm",
-    gain: 0.35,
+    body: "steel",
+    gain: 0.55,
     metro: true,
   };
 }
@@ -139,8 +145,13 @@ export function nextKey(current: string): string {
   return KEY_LIST[((i < 0 ? 0 : i) + 1) % KEY_LIST.length]!;
 }
 
-export function voiceById(id: VoiceId) {
-  return VOICES.find((v) => v.id === id) ?? VOICES[0]!;
+export function bodyById(id: GuitarBodyId) {
+  return GUITAR_BODIES.find((v) => v.id === id) ?? GUITAR_BODIES[0]!;
+}
+
+/** @deprecated bodyById 사용 */
+export function voiceById(id: GuitarBodyId) {
+  return bodyById(id);
 }
 
 export function barIndex(slot: number): number {
@@ -192,12 +203,16 @@ export function cyclesPerSecond(bpm: number): number {
   return bpm / 60 / SLOTS;
 }
 
+export type AttackArt = "D" | "U" | "X";
+
 export type TimedEvent = {
   /** null = rest */
   chord: string | null;
   /** 16분음표 개수 (mini @n) */
   steps: number;
   gain: number;
+  /** 공격 주법. rest면 null */
+  art: AttackArt | null;
 };
 
 export type StrudelParts = {
@@ -206,13 +221,12 @@ export type StrudelParts = {
   events: TimedEvent[];
   totalSteps: number;
   metro: boolean;
-  sound: string;
-  cutoff: number;
+  openSound: string;
 };
 
 /** 리듬 그리드를 길이 가중 이벤트로 펼친다 */
 export function compileSheet(sheet: SheetState): StrudelParts {
-  const voice = voiceById(sheet.voice);
+  const body = bodyById(sheet.body);
   const events: TimedEvent[] = [];
 
   for (let bar = 0; bar < BARS; bar++) {
@@ -228,15 +242,17 @@ export function compileSheet(sheet: SheetState): StrudelParts {
         // 뮤트는 짧게, 나머지는 hold까지 이어서 한 음
         const steps = art === "X" ? 1 : 1 + holds;
         const base = sheet.gain;
-        const gain = art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
+        const gain =
+          art === "X" ? base * 0.55 : art === "U" ? base * 0.82 : base;
         events.push({
           chord: chordFromDegree(sheet.key, degree),
           steps,
           gain: Number(gain.toFixed(3)),
+          art: art as AttackArt,
         });
         // X도 그리드상 hold가 있으면 나머진 쉼으로 소비
         if (art === "X" && holds > 0) {
-          events.push({ chord: null, steps: holds, gain: 0 });
+          events.push({ chord: null, steps: holds, gain: 0, art: null });
         }
         step += 1 + holds;
         continue;
@@ -253,7 +269,7 @@ export function compileSheet(sheet: SheetState): StrudelParts {
         span += 1;
         step += 1;
       }
-      events.push({ chord: null, steps: span, gain: 0 });
+      events.push({ chord: null, steps: span, gain: 0, art: null });
     }
   }
 
@@ -265,20 +281,70 @@ export function compileSheet(sheet: SheetState): StrudelParts {
     events,
     totalSteps,
     metro: sheet.metro,
-    sound: voice.sound,
-    cutoff: voice.cutoff,
+    openSound: body.sound,
   };
 }
 
-function timedMini(events: TimedEvent[], field: "chord" | "gain"): string {
+/**
+ * 스트럼 n 패턴.
+ * D: 저→고, U: 고→저 — 첫 16분 안에 몰아 치고 나머지는 링(~).
+ * X: 동시 타현 (뮤트 샘플과 짝).
+ */
+export function strumN(art: AttackArt, steps: number): string {
+  if (art === "X") {
+    return steps === 1 ? "[0,1,2]" : `[0,1,2]@${steps}`;
+  }
+  const order = art === "D" ? "[0 1 2 3]" : "[3 2 1 0]";
+  if (steps <= 1) return order;
+  return `[${order}@1 ~@${steps - 1}]@${steps}`;
+}
+
+function timedChord(events: TimedEvent[]): string {
   return events
     .map((e) => {
-      if (field === "chord") {
-        const tok = e.chord ?? "~";
-        return e.steps === 1 ? tok : `${tok}@${e.steps}`;
+      const tok = e.chord ?? "~";
+      return e.steps === 1 ? tok : `${tok}@${e.steps}`;
+    })
+    .join(" ");
+}
+
+function timedN(events: TimedEvent[]): string {
+  return events
+    .map((e) => {
+      if (!e.chord || !e.art) {
+        return e.steps === 1 ? "~" : `~@${e.steps}`;
       }
+      return strumN(e.art, e.steps);
+    })
+    .join(" ");
+}
+
+function timedGain(events: TimedEvent[]): string {
+  return events
+    .map((e) => {
       const g = e.chord ? e.gain : 0;
       return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
+    })
+    .join(" ");
+}
+
+function timedSound(events: TimedEvent[], openSound: string): string {
+  return events
+    .map((e) => {
+      if (!e.chord) return e.steps === 1 ? "~" : `~@${e.steps}`;
+      const s = e.art === "X" ? MUTE_SOUND : openSound;
+      return e.steps === 1 ? s : `${s}@${e.steps}`;
+    })
+    .join(" ");
+}
+
+/** 오픈은 길게 울리고, 뮤트는 짧게 끊는다 */
+function timedClip(events: TimedEvent[]): string {
+  return events
+    .map((e) => {
+      if (!e.chord) return e.steps === 1 ? "0" : `0@${e.steps}`;
+      const c = e.art === "X" ? 0.12 : 0.95;
+      return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
     })
     .join(" ");
 }
@@ -286,6 +352,7 @@ function timedMini(events: TimedEvent[], field: "chord" | "gain"): string {
 /**
  * SheetState → Strudel 코드.
  * `Am@4 C@4 …` 가중 시퀀스 = 한 사이클(4마디) 안에서 박이 진행된다.
+ * n()으로 D/U 스트럼·X 동시타를 붙인다.
  */
 export function toStrudel(sheet: SheetState): string {
   const parts = compileSheet(sheet);
@@ -294,13 +361,13 @@ export function toStrudel(sheet: SheetState): string {
   if (parts.hasHits) {
     layers.push(
       [
-        `chord("${timedMini(parts.events, "chord")}")`,
+        `n("${timedN(parts.events)}")`,
+        `.chord("${timedChord(parts.events)}")`,
         `.dict("triads")`,
         `.voicing()`,
-        `.s("${parts.sound}")`,
-        `.gain("${timedMini(parts.events, "gain")}")`,
-        `.cutoff(${parts.cutoff})`,
-        `.clip(0.95)`,
+        `.s("${timedSound(parts.events, parts.openSound)}")`,
+        `.gain("${timedGain(parts.events)}")`,
+        `.clip("${timedClip(parts.events)}")`,
       ].join(""),
     );
   }

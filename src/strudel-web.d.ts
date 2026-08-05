@@ -3,3 +3,10 @@ declare module '@strudel/web' {
   export function evaluate(code: string): Promise<unknown>
   export function hush(): void
 }
+
+declare module '@strudel/soundfonts' {
+  export function registerSoundfonts(): void
+  export function loadSoundfont(url: string): Promise<unknown>
+  export function setSoundfontUrl(url: string): void
+}
+
