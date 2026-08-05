@@ -14,7 +14,6 @@ import {
   slotLabel,
   slotRoman,
   SUBDIV,
-  TOTAL_STEPS,
   toStrudel,
   type Articulation,
   type SheetState,
@@ -43,7 +42,6 @@ export default function App() {
   const [playSlot, setPlaySlot] = useState<number | null>(null);
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
-  const selectedRef = useRef(selected);
   const staffRef = useRef<HTMLDivElement>(null);
   const padStageRef = useRef<HTMLDivElement>(null);
 
@@ -51,17 +49,11 @@ export default function App() {
     sheetRef.current = sheet;
   }, [sheet]);
 
-  useEffect(() => {
-    selectedRef.current = selected;
-  }, [selected]);
-
   // Strudel 사이클 → 백레이어 CSS 변수 (셀 클래스 하이라이트 없음)
   useEffect(() => {
     if (engine !== "playing") {
       setPlaySlot(null);
       staffRef.current?.style.setProperty("--play-phase", "-1");
-      padStageRef.current?.style.setProperty("--play-on", "0");
-      padStageRef.current?.style.setProperty("--play-step-on", "0");
       return;
     }
     let raf = 0;
@@ -69,25 +61,14 @@ export default function App() {
       const phase = getCyclePhase();
       if (phase !== null) {
         const slot = Math.min(SLOTS - 1, Math.floor(phase * SLOTS));
-        const step = Math.min(TOTAL_STEPS - 1, Math.floor(phase * TOTAL_STEPS));
         const barIdx = Math.floor(slot / BEATS);
-        const editBar = Math.floor(selectedRef.current / BEATS);
         setPlaySlot((prev) => (prev === slot ? prev : slot));
         const staff = staffRef.current;
         if (staff) {
           staff.style.setProperty("--play-phase", phase.toFixed(5));
           staff.style.setProperty("--mark-bar", String(barIdx));
         }
-        const el = padStageRef.current;
-        if (el) {
-          el.style.setProperty("--play-on", "1");
-          el.style.setProperty("--mark-bar", String(barIdx));
-          el.style.setProperty("--play-col", String(slot % BEATS));
-          el.style.setProperty("--play-row", String(barIdx));
-          el.style.setProperty("--play-step-col", String(step % BEATS));
-          el.style.setProperty("--play-step-row", String(Math.floor((step % BAR_STEPS) / BEATS)));
-          el.style.setProperty("--play-step-on", barIdx === editBar ? "1" : "0");
-        }
+        padStageRef.current?.style.setProperty("--mark-bar", String(barIdx));
       }
       raf = requestAnimationFrame(tick);
     };
@@ -248,7 +229,9 @@ export default function App() {
         >
           <div className="staff-back" aria-hidden>
             <div className="ind-measure" />
-            <div className="ind-head" />
+            <div className="ind-playbar">
+              <div className="ind-playbar-fill" />
+            </div>
           </div>
           <div className="staff-front">
             {Array.from({ length: BARS }, (_, bi) => (
@@ -276,12 +259,11 @@ export default function App() {
                         aria-label={`bar ${bi + 1} beat ${qi + 1}`}
                       >
                         <span className="chord-name">{slotLabel(sheet.key, d)}</span>
-                        {on && d !== null ? <span className="degree-dot">{slotRoman(d)}</span> : null}
+                        <span className="chord-deg">{d !== null ? slotRoman(d) : "·"}</span>
                       </button>
                     );
                   })}
                 </div>
-                <div className="measure-rail" aria-hidden />
               </div>
             ))}
           </div>
@@ -369,10 +351,8 @@ export default function App() {
             <>
               <div className="pad-ind pad-ind-bar" />
               <div className="pad-ind pad-ind-sel" />
-              <div className="pad-ind pad-ind-play" />
             </>
           )}
-          {mode === "rhythm" && <div className="pad-ind pad-ind-play-step" />}
         </div>
         <section className="pad-grid" aria-label={modeLabel(mode)}>
           {mode === "chart" &&

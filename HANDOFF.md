@@ -29,7 +29,7 @@ SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
 - dim 코드 심볼은 `Bo` (`dim` 아님) — triads 딕셔너리
 - 음색은 WebAudio 신스만 (soundfont 없음)
 - 재생 중 편집 → `evaluateStrudel` 재평가 (직렬 큐)
-- **플레이헤드**: `getCyclePhase()` → 백레이어(z-index)로 마디 밴드·헤드 슬라이드. 셀에 `.play` 클래스 안 씀.
+- **플레이헤드**: `getCyclePhase()` → LCD 프로그레스 바(`--play-phase`) + 마디 밴드(`--mark-bar`). 패드 셀 하이라이트 없음.
 
 ```bash
 npm test

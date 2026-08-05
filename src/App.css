@@ -122,22 +122,29 @@ button {
   transition: transform 0.12s ease;
 }
 
-.ind-head {
+/* 재생: 일반적인 프로그레스 바 */
+.ind-playbar {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
   left: 0;
-  width: calc(100% / 16);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
   opacity: 0;
-  transform: translateX(calc(var(--play-phase) * 1600%));
-  will-change: transform;
+  overflow: hidden;
 }
 
-.staff.is-playing .ind-head {
+.staff.is-playing .ind-playbar {
   opacity: 1;
+}
+
+.ind-playbar-fill {
+  height: 100%;
+  width: calc(max(0, var(--play-phase)) * 100%);
+  background: var(--fg);
+  border-radius: 2px;
+  will-change: width;
 }
 
 .staff-front {
@@ -154,7 +161,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 2px 0;
+  padding: 2px 0 8px;
   cursor: pointer;
   background: transparent;
 }
@@ -193,11 +200,13 @@ button {
   background: transparent;
 }
 
-.chord-cell.on .chord-name {
+.chord-cell.on .chord-name,
+.chord-cell.on .chord-deg {
   color: var(--fg);
 }
 
-.chord-cell.empty .chord-name {
+.chord-cell.empty .chord-name,
+.chord-cell.empty .chord-deg {
   opacity: 0.3;
 }
 
@@ -208,23 +217,12 @@ button {
   color: var(--muted);
 }
 
-.degree-dot {
-  width: 0.95rem;
-  height: 0.95rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--fg);
-  display: grid;
-  place-items: center;
-  font-size: 0.45rem;
+.chord-deg {
+  font-size: 0.5rem;
   font-weight: 700;
-  background: var(--fg);
-  color: var(--bg);
-}
-
-.measure-rail {
-  height: 1px;
-  background: var(--fg);
-  opacity: 0.9;
+  line-height: 1;
+  color: var(--muted);
+  letter-spacing: 0.02em;
 }
 
 .chip {
@@ -315,12 +313,6 @@ button {
 }
 
 .pad-stage {
-  --play-on: 0;
-  --play-step-on: 0;
-  --play-col: 0;
-  --play-row: 0;
-  --play-step-col: 0;
-  --play-step-row: 0;
   --sel-col: 0;
   --sel-row: 0;
   --mark-bar: 0;
@@ -357,24 +349,6 @@ button {
   grid-column: calc(var(--sel-col) + 1);
   grid-row: calc(var(--sel-row) + 1);
   background: rgba(255, 255, 255, 0.12);
-}
-
-/* 재생 헤드 칸 */
-.pad-ind-play {
-  grid-column: calc(var(--play-col) + 1);
-  grid-row: calc(var(--play-row) + 1);
-  background: rgba(255, 255, 255, 0.22);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-  opacity: var(--play-on);
-}
-
-/* 리듬: 16분 스텝 헤드 (편집 중인 마디일 때만) */
-.pad-ind-play-step {
-  grid-column: calc(var(--play-step-col) + 1);
-  grid-row: calc(var(--play-step-row) + 1);
-  background: rgba(255, 255, 255, 0.22);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-  opacity: var(--play-step-on);
 }
 
 .pad-grid {
