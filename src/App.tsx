@@ -225,10 +225,16 @@ export default function App() {
           ref={staffRef}
           className={`staff ${playing ? "is-playing" : ""}`}
           aria-label="chart"
-          style={{ "--mark-bar": markBar } as CSSProperties}
+          style={
+            {
+              "--mark-bar": markBar,
+              "--sel-slot": selected,
+            } as CSSProperties
+          }
         >
           <div className="staff-back" aria-hidden>
             <div className="ind-measure" />
+            <div className="ind-sel" />
             <div className="ind-playbar">
               <div className="ind-playbar-fill" />
             </div>

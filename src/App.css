@@ -97,6 +97,7 @@ button {
 .staff {
   --play-phase: -1;
   --mark-bar: 0;
+  --sel-slot: 0;
   position: relative;
   isolation: isolate;
 }
@@ -109,17 +110,35 @@ button {
   overflow: hidden;
 }
 
+/* 마디: 약한 밴드 */
 .ind-measure {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
   width: 25%;
+  z-index: 0;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
   transform: translateX(calc(var(--mark-bar) * 100%));
   transition: transform 0.12s ease;
+}
+
+/* 선택 슬롯: 마디보다 강한 위계 (면 + 링) */
+.ind-sel {
+  position: absolute;
+  top: 1px;
+  bottom: 5px;
+  left: 0;
+  width: calc(100% / 16);
+  z-index: 1;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.65),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+  transform: translateX(calc(var(--sel-slot) * 100%));
+  transition: transform 0.1s ease;
 }
 
 /* 재생: 일반적인 프로그레스 바 */
@@ -128,6 +147,7 @@ button {
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 2;
   height: 3px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.1);
@@ -337,18 +357,22 @@ button {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
-/* 현재 마디 = 한 행 (선택 또는 재생) */
+/* 현재 마디 = 한 행 (약한 위계) */
 .pad-ind-bar {
   grid-column: 1 / -1;
   grid-row: calc(var(--mark-bar) + 1);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
 }
 
-/* 선택 칸 */
+/* 선택 칸 (마디보다 강한 위계) */
 .pad-ind-sel {
   grid-column: calc(var(--sel-col) + 1);
   grid-row: calc(var(--sel-row) + 1);
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.7),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
 .pad-grid {

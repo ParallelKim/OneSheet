@@ -306,8 +306,13 @@ export function toStrudel(sheet: SheetState): string {
   }
 
   if (parts.metro) {
+    // 4분마다 클릭. 마디 첫 박은 높은 음(강세), 나머지는 낮은 음.
+    // square + 짧은 clip = 코드 레이어 위에서도 들리는 메트로 클릭.
+    const clicks = Array.from({ length: SLOTS }, (_, i) =>
+      i % BEATS === 0 ? "c6" : "a5",
+    ).join(" ");
     layers.push(
-      `note("g5").s("triangle").struct("x*${SLOTS}").gain(0.07).clip(0.08)`,
+      `note("${clicks}").s("square").gain(0.3).clip(0.04).cutoff(10000)`,
     );
   }
 
