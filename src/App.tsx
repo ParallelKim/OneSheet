@@ -64,27 +64,30 @@ export default function App() {
       if (phase !== null) {
         const slot = Math.min(SLOTS - 1, Math.floor(phase * SLOTS));
         const slotF = phase * SLOTS;
-        const barIdx = Math.min(BARS - 1, Math.floor(slotF / BEATS));
-        const colF = slotF - barIdx * BEATS; // 0..4
+        const col = slotF % BEATS; // [0, 4) — 4에 가까워질수록 오른쪽
+        const row = Math.floor(slotF / BEATS) % BARS;
         const stepF = (phase * TOTAL_STEPS) % BAR_STEPS;
-        const rhyRow = Math.min(BEATS - 1, Math.floor(stepF / SUBDIV));
-        const subF = stepF - rhyRow * SUBDIV;
+        const rhyCol = stepF % SUBDIV;
+        const rhyRow = Math.floor(stepF / SUBDIV) % BEATS;
 
         setPlaySlot((prev) => (prev === slot ? prev : slot));
         const staff = staffRef.current;
         if (staff) {
           staff.style.setProperty("--play-phase", phase.toFixed(5));
-          staff.style.setProperty("--mark-bar", String(barIdx));
+          staff.style.setProperty("--mark-bar", String(row));
         }
         const pad = padStageRef.current;
         if (pad) {
           pad.style.setProperty("--play-on", "1");
-          pad.style.setProperty("--mark-bar", String(barIdx));
-          // 그리드 좌표(갭 포함): 열 0..4, 행 0..3
-          pad.style.setProperty("--play-col-f", Math.min(colF, BEATS - 0.0001).toFixed(5));
-          pad.style.setProperty("--play-row-f", String(barIdx));
-          pad.style.setProperty("--rhy-col-f", Math.min(subF, SUBDIV - 0.0001).toFixed(5));
+          pad.style.setProperty("--mark-bar", String(row));
+          pad.style.setProperty("--play-col-f", col.toFixed(5));
+          pad.style.setProperty("--play-row-f", String(row));
+          pad.style.setProperty("--play-row-next", String((row + 1) % BARS));
+          pad.style.setProperty("--play-row-prev", String((row - 1 + BARS) % BARS));
+          pad.style.setProperty("--rhy-col-f", rhyCol.toFixed(5));
           pad.style.setProperty("--rhy-row-f", String(rhyRow));
+          pad.style.setProperty("--rhy-row-next", String((rhyRow + 1) % BEATS));
+          pad.style.setProperty("--rhy-row-prev", String((rhyRow - 1 + BEATS) % BEATS));
         }
       }
       raf = requestAnimationFrame(tick);
@@ -356,15 +359,19 @@ export default function App() {
         <div className="pad-back" aria-hidden>
           {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
         </div>
-        {/* 재생: 원형 링 — 선택(반전)과 분리, 패드 궤적을 스무스 추적 */}
+        {/* 재생 링: main + 행 wrap(prev/next)로 오른쪽↔왼쪽 이어짐 */}
         {mode === "chart" && (
           <div className="pad-play" aria-hidden>
-            <div className="pad-play-orb pad-play-orb-chart" />
+            <div className="pad-play-orb pad-play-orb-chart pad-play-orb-prev" />
+            <div className="pad-play-orb pad-play-orb-chart pad-play-orb-main" />
+            <div className="pad-play-orb pad-play-orb-chart pad-play-orb-next" />
           </div>
         )}
         {mode === "rhythm" && playBar === bar && (
           <div className="pad-play pad-play-rhythm" aria-hidden>
-            <div className="pad-play-orb pad-play-orb-rhythm" />
+            <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-prev" />
+            <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-main" />
+            <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-next" />
           </div>
         )}
         <section className="pad-grid" aria-label={modeLabel(mode)}>

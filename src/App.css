@@ -22,7 +22,9 @@ html,
 body,
 #root {
   margin: 0;
-  min-height: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 body {
@@ -30,6 +32,7 @@ body {
   color: var(--fg);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 
 /* 본문·긴 한글 등 가독성이 필요할 때 */
@@ -52,23 +55,26 @@ button {
 
 .app {
   width: min(100%, 390px);
+  height: 100dvh;
+  max-height: 100dvh;
   margin: 0 auto;
-  padding: 14px 12px calc(12px + env(safe-area-inset-bottom));
-  min-height: 100dvh;
+  padding: 10px 12px calc(8px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  overflow: hidden;
 }
 
 .lcd {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px;
   border-radius: var(--radius-box);
   border: 1px solid var(--line);
   background: var(--fill);
   box-shadow: var(--shadow);
+  flex-shrink: 0;
 }
 
 .lcd-meta {
@@ -266,6 +272,7 @@ button {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .tr-btn,
@@ -274,13 +281,14 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  min-height: 52px;
-  padding: 8px 2px;
+  gap: 2px;
+  min-height: 44px;
+  padding: 6px 2px;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--fill);
   box-shadow: var(--shadow);
+  flex-shrink: 0;
 }
 
 .tr-btn:active,
@@ -322,13 +330,21 @@ button {
   --play-on: 0;
   --play-col-f: 0;
   --play-row-f: 0;
+  --play-row-next: 1;
+  --play-row-prev: 3;
   --rhy-col-f: 0;
   --rhy-row-f: 0;
-  /* 4칸 + gap 8px×3 */
-  --pad-cell: calc((100% - 24px) / 4);
-  --pad-stride: calc(var(--pad-cell) + 8px);
+  --rhy-row-next: 1;
+  --rhy-row-prev: 3;
+  --pad-gap: 8px;
+  --pad-cell-w: calc((100% - 3 * var(--pad-gap)) / 4);
+  --pad-cell-h: calc((100% - 3 * var(--pad-gap)) / 4);
+  --pad-stride-x: calc(var(--pad-cell-w) + var(--pad-gap));
+  --pad-stride-y: calc(var(--pad-cell-h) + var(--pad-gap));
   position: relative;
   isolation: isolate;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .pad-back {
@@ -338,7 +354,7 @@ button {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(4, 1fr);
-  gap: 8px;
+  gap: var(--pad-gap);
   pointer-events: none;
 }
 
@@ -356,19 +372,20 @@ button {
   box-shadow: none;
 }
 
-/* 재생 원형 링 — 패드 중심을 따라 스무스 이동 */
+/* 재생 원형 링 — 행 끝↔다음 행 왼쪽 동시 노출 */
 .pad-play {
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
   opacity: var(--play-on);
+  overflow: hidden;
 }
 
 .pad-play-orb {
   position: absolute;
-  width: var(--pad-cell);
-  height: var(--pad-cell);
+  width: var(--pad-cell-w);
+  height: var(--pad-cell-h);
   border-radius: 50%;
   border: 2px solid var(--fg);
   background: rgba(255, 255, 255, 0.06);
@@ -379,14 +396,34 @@ button {
   will-change: left, top;
 }
 
-.pad-play-orb-chart {
-  left: calc(var(--play-col-f) * var(--pad-stride) + var(--pad-cell) / 2);
-  top: calc(var(--play-row-f) * var(--pad-stride) + var(--pad-cell) / 2);
+.pad-play-orb-chart.pad-play-orb-main {
+  left: calc(var(--play-col-f) * var(--pad-stride-x) + var(--pad-cell-w) / 2);
+  top: calc(var(--play-row-f) * var(--pad-stride-y) + var(--pad-cell-h) / 2);
 }
 
-.pad-play-orb-rhythm {
-  left: calc(var(--rhy-col-f) * var(--pad-stride) + var(--pad-cell) / 2);
-  top: calc(var(--rhy-row-f) * var(--pad-stride) + var(--pad-cell) / 2);
+.pad-play-orb-chart.pad-play-orb-next {
+  left: calc((var(--play-col-f) - 4) * var(--pad-stride-x) + var(--pad-cell-w) / 2);
+  top: calc(var(--play-row-next) * var(--pad-stride-y) + var(--pad-cell-h) / 2);
+}
+
+.pad-play-orb-chart.pad-play-orb-prev {
+  left: calc((var(--play-col-f) + 4) * var(--pad-stride-x) + var(--pad-cell-w) / 2);
+  top: calc(var(--play-row-prev) * var(--pad-stride-y) + var(--pad-cell-h) / 2);
+}
+
+.pad-play-orb-rhythm.pad-play-orb-main {
+  left: calc(var(--rhy-col-f) * var(--pad-stride-x) + var(--pad-cell-w) / 2);
+  top: calc(var(--rhy-row-f) * var(--pad-stride-y) + var(--pad-cell-h) / 2);
+}
+
+.pad-play-orb-rhythm.pad-play-orb-next {
+  left: calc((var(--rhy-col-f) - 4) * var(--pad-stride-x) + var(--pad-cell-w) / 2);
+  top: calc(var(--rhy-row-next) * var(--pad-stride-y) + var(--pad-cell-h) / 2);
+}
+
+.pad-play-orb-rhythm.pad-play-orb-prev {
+  left: calc((var(--rhy-col-f) + 4) * var(--pad-stride-x) + var(--pad-cell-w) / 2);
+  top: calc(var(--rhy-row-prev) * var(--pad-stride-y) + var(--pad-cell-h) / 2);
 }
 
 .pad-grid {
@@ -394,11 +431,12 @@ button {
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-rows: repeat(4, 1fr);
+  gap: var(--pad-gap);
+  height: 100%;
 }
 
 .pad {
-  aspect-ratio: 1;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: transparent;
@@ -409,6 +447,9 @@ button {
   justify-content: center;
   gap: 2px;
   min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .pad.on {
@@ -460,8 +501,9 @@ button {
 }
 
 .status {
-  margin: auto 0 0;
-  font-size: 0.72rem;
+  margin: 0;
+  font-size: 0.68rem;
   color: var(--muted);
   text-align: center;
+  flex-shrink: 0;
 }
