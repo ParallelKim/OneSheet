@@ -32,6 +32,17 @@ type EngineState = "idle" | "ready" | "playing" | "error";
 /** 렌즈: 같은 4×4 패드의 의미를 바꾼다 */
 type Mode = "chart" | "degree" | "rhythm";
 
+/**
+ * 재생 링 열 좌표: 셀 공격~대부분 구간은 칸 중심(정수)에 머물고,
+ * 끝부분에서만 다음 칸으로 슬라이드 — 소리와 칸이 같이 느껴지도록.
+ */
+function playColHold(posInRow: number, hold = 0.7): number {
+  const i = Math.floor(posInRow);
+  const frac = posInRow - i;
+  if (frac <= hold) return i;
+  return i + (frac - hold) / (1 - hold);
+}
+
 export default function App() {
   const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
   const [selected, setSelected] = useState(0);
@@ -64,11 +75,11 @@ export default function App() {
       if (phase !== null) {
         const slot = Math.min(SLOTS - 1, Math.floor(phase * SLOTS));
         const slotF = phase * SLOTS;
-        const col = slotF % BEATS; // [0, 4) — 4에 가까워질수록 오른쪽
         const row = Math.floor(slotF / BEATS) % BARS;
+        const col = playColHold(slotF % BEATS);
         const stepF = (phase * TOTAL_STEPS) % BAR_STEPS;
-        const rhyCol = stepF % SUBDIV;
         const rhyRow = Math.floor(stepF / SUBDIV) % BEATS;
+        const rhyCol = playColHold(stepF % SUBDIV);
 
         setPlaySlot((prev) => (prev === slot ? prev : slot));
         const staff = staffRef.current;
