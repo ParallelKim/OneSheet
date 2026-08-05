@@ -9,7 +9,9 @@
   --shadow-on: 0 0 0 1px var(--fg), 0 4px 14px rgba(0, 0, 0, 0.55);
   --radius: 999px;
   --radius-box: 16px;
-  --font: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+  /* 기본: Geist Pixel / 한글·폴백: Pretendard */
+  --font: "Geist Pixel", "Pretendard", system-ui, sans-serif;
+  --font-ui: "Pretendard", system-ui, sans-serif;
 }
 
 * {
@@ -20,7 +22,14 @@ html,
 body,
 #root {
   margin: 0;
-  min-height: 100%;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  position: relative;
 }
 
 body {
@@ -28,6 +37,13 @@ body {
   color: var(--fg);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+/* 본문·긴 한글 등 가독성이 필요할 때 */
+.font-ui {
+  font-family: var(--font-ui);
 }
 
 button,
@@ -44,45 +60,36 @@ button {
 }
 
 .app {
-  width: min(100%, 390px);
+  width: 100%;
+  max-width: 390px;
+  height: 100dvh;
+  max-height: 100dvh;
   margin: 0 auto;
-  padding: 14px 12px calc(12px + env(safe-area-inset-bottom));
-  min-height: 100dvh;
+  /* 상하: safe-area + 손가락/베젤 여유(~24). 가로는 그리드 풀폭 */
+  padding:
+    calc(24px + env(safe-area-inset-top, 0px))
+    0
+    calc(24px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 4px;
-}
-
-.brand {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.pos {
-  margin: 0;
-  font-size: 0.7rem;
-  color: var(--muted);
+  gap: 8px;
+  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  position: relative;
 }
 
 .lcd {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 6px;
+  margin: 0 12px;
+  padding: 8px 10px;
   border-radius: var(--radius-box);
   border: 1px solid var(--line);
   background: var(--fill);
   box-shadow: var(--shadow);
+  flex-shrink: 0;
 }
 
 .lcd-meta {
@@ -91,67 +98,141 @@ button {
   align-items: center;
 }
 
-/* 얇은 한 줄 차트 */
-.staff {
+.pos {
+  margin: 0 0 0 auto;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--muted);
   display: flex;
-  gap: 0;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.pos.playing {
+  color: var(--fg);
+}
+
+.pos-bar {
+  font-weight: 700;
+}
+
+.pos-beat {
+  opacity: 0.85;
+}
+
+/* 얇은 한 줄 차트 — 16등분 그리드에 마디/커서/선택 정렬 */
+.staff {
+  --play-phase: -1;
+  --mark-bar: 0;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.staff-back {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 마디: 약한 밴드 (4등분 = measure) */
+.ind-measure {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 25%;
+  z-index: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateX(calc(var(--mark-bar) * 100%));
+  transition: transform 0.12s ease;
+}
+
+/* 재생 헤드: Guitar Pro식 세로 커서 */
+.ind-cursor {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: calc(max(0, var(--play-phase)) * 100%);
+  z-index: 2;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--fg);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.45),
+    0 0 6px rgba(255, 255, 255, 0.35);
+  opacity: 0;
+  transform: translateX(-50%);
+  will-change: left;
+}
+
+.staff.is-playing .ind-cursor {
+  opacity: 1;
+}
+
+.staff-front {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   align-items: stretch;
 }
 
 .measure {
-  flex: 1 1 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: stretch;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   padding: 2px 0;
   cursor: pointer;
-}
-
-.measure + .measure {
+  background: transparent;
   border-left: 1px solid var(--fg);
-  padding-left: 4px;
-  margin-left: 2px;
 }
 
 .measure:first-child {
   border-left: 2px solid var(--fg);
-  padding-left: 4px;
 }
 
 .measure:last-child {
   border-right: 2px solid var(--fg);
-  padding-right: 4px;
-}
-
-.measure.focus {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
-}
-
-.measure-chords {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0;
-  align-items: end;
-  min-height: 1.6rem;
 }
 
 .chord-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
+  width: 100%;
   min-width: 0;
-  padding: 0;
+  min-height: 2.2rem;
+  padding: 4px 2px;
+  border-radius: 6px;
+  background: transparent;
 }
 
-.chord-cell.on .chord-name {
-  color: var(--fg);
+.chord-cell.on {
+  background: var(--fg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
-.chord-cell.empty .chord-name {
+.chord-cell.on .chord-name,
+.chord-cell.on .chord-deg {
+  color: var(--bg);
+}
+
+.chord-cell.empty .chord-name,
+.chord-cell.empty .chord-deg {
   opacity: 0.3;
+}
+
+.chord-cell.on.empty .chord-name,
+.chord-cell.on.empty .chord-deg {
+  opacity: 0.7;
 }
 
 .chord-name {
@@ -159,29 +240,16 @@ button {
   font-weight: 700;
   line-height: 1;
   color: var(--muted);
+  text-align: center;
 }
 
-.measure.focus .chord-name {
-  color: var(--fg);
-}
-
-.degree-dot {
-  width: 0.95rem;
-  height: 0.95rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--fg);
-  display: grid;
-  place-items: center;
-  font-size: 0.45rem;
+.chord-deg {
+  font-size: 0.5rem;
   font-weight: 700;
-  background: var(--fg);
-  color: var(--bg);
-}
-
-.measure-rail {
-  height: 1px;
-  background: var(--fg);
-  opacity: 0.9;
+  line-height: 1;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  text-align: center;
 }
 
 .chip {
@@ -220,6 +288,8 @@ button {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
+  flex-shrink: 0;
+  margin: 0 12px;
 }
 
 .tr-btn,
@@ -228,13 +298,14 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  min-height: 52px;
-  padding: 8px 2px;
+  gap: 2px;
+  min-height: 40px;
+  padding: 5px 2px;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--fill);
   box-shadow: var(--shadow);
+  flex-shrink: 0;
 }
 
 .tr-btn:active,
@@ -271,31 +342,160 @@ button {
   color: var(--muted);
 }
 
-.pad-grid {
+.pad-stage {
+  --mark-bar: 0;
+  --play-on: 0;
+  --play-col-f: 0;
+  --play-row-f: 0;
+  --play-row-next: 1;
+  --play-row-prev: 3;
+  --rhy-col-f: 0;
+  --rhy-row-f: 0;
+  --rhy-row-next: 1;
+  --rhy-row-prev: 3;
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* overflow/패딩 없음 — 풀폭 이동 */
+}
+
+/* 페이지 폭에 맞춘 정사각 보드 */
+.pad-board {
+  --pad-gap: 8px;
+  --pad-cell: calc((100% - 3 * var(--pad-gap)) / 4);
+  --pad-stride: calc(var(--pad-cell) + var(--pad-gap));
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  aspect-ratio: 1;
+  flex-shrink: 0;
+}
+
+.pad-back {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-rows: repeat(4, 1fr);
+  gap: var(--pad-gap);
+  pointer-events: none;
+}
+
+.pad-ind {
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+/* 현재 마디 = 한 행 (약한 위계) */
+.pad-ind-bar {
+  grid-column: 1 / -1;
+  grid-row: calc(var(--mark-bar) + 1);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+}
+
+/* 재생 링 — overflow 없음, 보드 풀폭을 따라 이동 */
+.pad-play {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: var(--play-on);
+}
+
+.pad-play-orb {
+  position: absolute;
+  width: var(--pad-cell);
+  height: var(--pad-cell);
+  border-radius: 50%;
+  border: 2px solid var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+    0 0 10px rgba(255, 255, 255, 0.25);
+  transform: translate(-50%, -50%);
+  will-change: left, top;
+}
+
+.pad-play-orb-chart.pad-play-orb-main {
+  left: calc(var(--play-col-f) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--play-row-f) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-play-orb-chart.pad-play-orb-next {
+  left: calc((var(--play-col-f) - 4) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--play-row-next) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-play-orb-chart.pad-play-orb-prev {
+  left: calc((var(--play-col-f) + 4) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--play-row-prev) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-play-orb-rhythm.pad-play-orb-main {
+  left: calc(var(--rhy-col-f) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--rhy-row-f) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-play-orb-rhythm.pad-play-orb-next {
+  left: calc((var(--rhy-col-f) - 4) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--rhy-row-next) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-play-orb-rhythm.pad-play-orb-prev {
+  left: calc((var(--rhy-col-f) + 4) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--rhy-row-prev) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--pad-gap);
+  width: 100%;
+  height: 100%;
 }
 
 .pad {
   aspect-ratio: 1;
+  width: 100%;
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: var(--fill);
-  box-shadow: var(--shadow);
+  background: transparent;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
   min-width: 0;
+  min-height: 0;
 }
 
-.pad.on,
-.pad.hit {
-  background: var(--fill-2);
+.pad.on {
+  background: var(--fg);
+  color: var(--bg);
   border-color: var(--fg);
   box-shadow: var(--shadow-on);
+}
+
+.pad.on .pad-sub,
+.pad.on .pad-roman {
+  color: var(--bg);
+  opacity: 0.75;
+}
+
+.pad.hit:not(.on) {
+  border-color: var(--fg);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .pad.used:not(.on) {
@@ -329,8 +529,9 @@ button {
 }
 
 .status {
-  margin: auto 0 0;
-  font-size: 0.72rem;
+  margin: 0 12px;
+  font-size: 0.68rem;
   color: var(--muted);
   text-align: center;
+  flex-shrink: 0;
 }

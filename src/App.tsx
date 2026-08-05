@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   ARTICULATIONS,
   artLabel,
@@ -14,16 +14,34 @@ import {
   slotLabel,
   slotRoman,
   SUBDIV,
+  TOTAL_STEPS,
   toStrudel,
   type Articulation,
   type SheetState,
 } from "./sheet";
-import { evaluateStrudel, hushStrudel, initStrudelEngine } from "./engine";
+import {
+  evaluateStrudel,
+  getCyclePhase,
+  getLastStrudelCode,
+  hushStrudel,
+  initStrudelEngine,
+} from "./engine";
 import "./App.css";
 
 type EngineState = "idle" | "ready" | "playing" | "error";
 /** 렌즈: 같은 4×4 패드의 의미를 바꾼다 */
 type Mode = "chart" | "degree" | "rhythm";
+
+/**
+ * 재생 링 열 좌표: 셀 공격~대부분 구간은 칸 중심(정수)에 머물고,
+ * 끝부분에서만 다음 칸으로 슬라이드 — 소리와 칸이 같이 느껴지도록.
+ */
+function playColHold(posInRow: number, hold = 0.7): number {
+  const i = Math.floor(posInRow);
+  const frac = posInRow - i;
+  if (frac <= hold) return i;
+  return i + (frac - hold) / (1 - hold);
+}
 
 export default function App() {
   const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
@@ -31,22 +49,78 @@ export default function App() {
   const [mode, setMode] = useState<Mode>("chart");
   const [brush, setBrush] = useState<Articulation>("D");
   const [engine, setEngine] = useState<EngineState>("idle");
-  const [status, setStatus] = useState("차트 준비됨");
+  const [status, setStatus] = useState("");
+  /** 재생 헤드: 4분 슬롯 0–15 (null = 정지) — 텍스트용 */
+  const [playSlot, setPlaySlot] = useState<number | null>(null);
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
+  const staffRef = useRef<HTMLDivElement>(null);
+  const padStageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     sheetRef.current = sheet;
   }, [sheet]);
 
+  // Strudel 사이클 → LCD/그리드 재생 커서 CSS 변수
+  useEffect(() => {
+    if (engine !== "playing") {
+      setPlaySlot(null);
+      staffRef.current?.style.setProperty("--play-phase", "-1");
+      padStageRef.current?.style.setProperty("--play-on", "0");
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const phase = getCyclePhase();
+      if (phase !== null) {
+        const slot = Math.min(SLOTS - 1, Math.floor(phase * SLOTS));
+        const slotF = phase * SLOTS;
+        const row = Math.floor(slotF / BEATS) % BARS;
+        const col = playColHold(slotF % BEATS);
+        const stepF = (phase * TOTAL_STEPS) % BAR_STEPS;
+        const rhyRow = Math.floor(stepF / SUBDIV) % BEATS;
+        const rhyCol = playColHold(stepF % SUBDIV);
+
+        setPlaySlot((prev) => (prev === slot ? prev : slot));
+        const staff = staffRef.current;
+        if (staff) {
+          staff.style.setProperty("--play-phase", phase.toFixed(5));
+          staff.style.setProperty("--mark-bar", String(row));
+        }
+        const pad = padStageRef.current;
+        if (pad) {
+          pad.style.setProperty("--play-on", "1");
+          pad.style.setProperty("--mark-bar", String(row));
+          pad.style.setProperty("--play-col-f", col.toFixed(5));
+          pad.style.setProperty("--play-row-f", String(row));
+          pad.style.setProperty("--play-row-next", String((row + 1) % BARS));
+          pad.style.setProperty("--play-row-prev", String((row - 1 + BARS) % BARS));
+          pad.style.setProperty("--rhy-col-f", rhyCol.toFixed(5));
+          pad.style.setProperty("--rhy-row-f", String(rhyRow));
+          pad.style.setProperty("--rhy-row-next", String((rhyRow + 1) % BEATS));
+          pad.style.setProperty("--rhy-row-prev", String((rhyRow - 1 + BEATS) % BEATS));
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [engine]);
+
   const pushPattern = useCallback(async (next: SheetState) => {
     if (!playingRef.current) return;
     try {
-      await evaluateStrudel(toStrudel(next));
+      const ok = await evaluateStrudel(toStrudel(next));
+      if (!ok && playingRef.current) {
+        // 정지 레이스로 무효화된 평가
+        playingRef.current = false;
+        setEngine((e) => (e === "error" ? e : "ready"));
+        setStatus("");
+      }
     } catch (err) {
-      console.error(err);
+      console.error(err, getLastStrudelCode());
       setEngine("error");
-      setStatus("재생할 수 없는 진행입니다");
+      setStatus("pattern error");
     }
   }, []);
 
@@ -63,32 +137,41 @@ export default function App() {
 
   const ensureReady = useCallback(async () => {
     if (engine === "ready" || engine === "playing") return true;
-    setStatus("소리 장치 연결 중…");
+    setStatus("audio…");
     try {
       await initStrudelEngine();
       setEngine("ready");
+      setStatus("");
       return true;
     } catch (err) {
       console.error(err);
       setEngine("error");
-      setStatus("소리 장치를 열 수 없습니다");
+      setStatus("audio error");
       return false;
     }
   }, [engine]);
 
   const onPlay = useCallback(async () => {
-    const ok = await ensureReady();
-    if (!ok) return;
+    const okReady = await ensureReady();
+    if (!okReady) return;
     try {
-      await evaluateStrudel(toStrudel(sheetRef.current));
+      const code = toStrudel(sheetRef.current);
+      const ok = await evaluateStrudel(code);
+      if (!ok) {
+        // 평가 중 정지된 경우
+        playingRef.current = false;
+        setEngine("ready");
+        setStatus("");
+        return;
+      }
       playingRef.current = true;
       setEngine("playing");
-      setStatus("재생 중");
+      setStatus("");
     } catch (err) {
-      console.error(err);
+      console.error(err, getLastStrudelCode());
       playingRef.current = false;
       setEngine("error");
-      setStatus("재생에 실패했습니다");
+      setStatus("play error");
     }
   }, [ensureReady]);
 
@@ -96,7 +179,7 @@ export default function App() {
     hushStrudel();
     playingRef.current = false;
     setEngine((e) => (e === "error" ? e : "ready"));
-    setStatus("정지");
+    setStatus("");
   }, []);
 
   const paintDegree = (degree: number | null) => {
@@ -132,24 +215,23 @@ export default function App() {
   const bar = barIndex(selected);
   const beat = (selected % BEATS) + 1;
   const barRhythm = sheet.rhythm[bar] ?? [];
+  const playBar = playSlot !== null ? barIndex(playSlot) : null;
+  const playBeat = playSlot !== null ? (playSlot % BEATS) + 1 : null;
+  /** 하이라이트할 마디: 재생 중이면 재생 마디, 아니면 선택 마디 */
+  const markBar = playBar ?? bar;
+  const posBar = playBar ?? bar;
+  const posBeat = playBeat ?? beat;
 
   return (
     <div className="app">
-      <header className="top">
-        <p className="brand">OneSheet</p>
-        <p className="pos">
-          {bar + 1}마디 · {beat}박
-        </p>
-      </header>
-
-      <section className="lcd" aria-label="상태">
+      <section className="lcd" aria-label="lcd">
         <div className="lcd-meta">
           <button
             type="button"
             className="chip"
             onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
           >
-            <span className="chip-k">조성</span>
+            <span className="chip-k">KEY</span>
             <span className="chip-v">{sheet.key}</span>
           </button>
           <label className="chip tempo-chip">
@@ -164,19 +246,31 @@ export default function App() {
             />
             <span className="chip-v">{sheet.bpm}</span>
           </label>
+          <p className={`pos ${playing ? "playing" : ""}`} aria-label="position">
+            <span className="pos-bar">|{posBar + 1}|</span>
+            <span className="pos-beat">{posBeat}</span>
+          </p>
         </div>
 
-        {/* 얇은 한 줄 차트 — 코드만, 도수는 선택 칸에만 */}
-        <div className="staff" aria-label="차트">
-          {Array.from({ length: BARS }, (_, bi) => (
-            <div
-              key={bi}
-              className={`measure ${bar === bi ? "focus" : ""}`}
-              role="group"
-              aria-label={`${bi + 1}마디`}
-              onClick={() => selectBar(bi)}
-            >
-              <div className="measure-chords">
+        <div
+          ref={staffRef}
+          className={`staff ${playing ? "is-playing" : ""}`}
+          aria-label="chart"
+          style={{ "--mark-bar": markBar } as CSSProperties}
+        >
+          <div className="staff-back" aria-hidden>
+            <div className="ind-measure" />
+            <div className="ind-cursor" />
+          </div>
+          <div className="staff-front">
+            {Array.from({ length: BARS }, (_, bi) => (
+              <div
+                key={bi}
+                className="measure"
+                role="group"
+                aria-label={`bar ${bi + 1}`}
+                onClick={() => selectBar(bi)}
+              >
                 {Array.from({ length: BEATS }, (_, qi) => {
                   const i = bi * BEATS + qi;
                   const d = sheet.degrees[i] ?? null;
@@ -190,67 +284,70 @@ export default function App() {
                         e.stopPropagation();
                         setSelected(i);
                       }}
-                      aria-label={`${bi + 1}마디 ${qi + 1}박`}
+                      aria-label={`bar ${bi + 1} beat ${qi + 1}`}
                     >
                       <span className="chord-name">{slotLabel(sheet.key, d)}</span>
-                      {on && d !== null ? <span className="degree-dot">{slotRoman(d)}</span> : null}
+                      <span className="chord-deg">{d !== null ? slotRoman(d) : "·"}</span>
                     </button>
                   );
                 })}
               </div>
-              <div className="measure-rail" aria-hidden />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
-      <nav className="transport" aria-label="공통 조작">
+      <nav className="transport" aria-label="transport">
         <button
           type="button"
           className={`tr-btn play ${playing ? "on" : ""}`}
           onClick={() => void (playing ? onStop() : onPlay())}
-          aria-label={playing ? "일시정지" : "재생"}
+          aria-label={playing ? "stop" : "play"}
         >
           <span className="tr-icon">{playing ? "■" : "▶"}</span>
-          <span className="tr-label">{playing ? "정지" : "재생"}</span>
+          <span className="tr-label">{playing ? "STOP" : "PLAY"}</span>
         </button>
         <button
           type="button"
           className={`tr-btn ${sheet.metro ? "on" : ""}`}
           onClick={() => update((prev) => ({ ...prev, metro: !prev.metro }))}
           aria-pressed={sheet.metro}
+          aria-label="metronome"
         >
           <span className="tr-icon">♩</span>
-          <span className="tr-label">메트로</span>
+          <span className="tr-label">CLICK</span>
         </button>
         <button
           type="button"
           className={`tr-btn ${mode === "chart" ? "on" : ""}`}
           onClick={() => setMode("chart")}
+          aria-label="chart"
         >
           <span className="tr-icon">▦</span>
-          <span className="tr-label">차트</span>
+          <span className="tr-label">GRID</span>
         </button>
         <button
           type="button"
           className={`tr-btn ${mode === "degree" ? "on" : ""}`}
           onClick={() => setMode("degree")}
+          aria-label="degree"
         >
           <span className="tr-icon">I</span>
-          <span className="tr-label">도수</span>
+          <span className="tr-label">DEG</span>
         </button>
         <button
           type="button"
           className={`tr-btn ${mode === "rhythm" ? "on" : ""}`}
           onClick={() => setMode("rhythm")}
+          aria-label="rhythm"
         >
           <span className="tr-icon">♩♪</span>
-          <span className="tr-label">리듬</span>
+          <span className="tr-label">RHY</span>
         </button>
       </nav>
 
       {mode === "rhythm" && (
-        <div className="brush-row" aria-label="주법">
+        <div className="brush-row" aria-label="articulation">
           {ARTICULATIONS.map((a) => (
             <button
               key={a.id}
@@ -265,95 +362,117 @@ export default function App() {
         </div>
       )}
 
-      <section className="pad-grid" aria-label={modeLabel(mode)}>
-        {mode === "chart" &&
-          Array.from({ length: SLOTS }, (_, i) => {
-            const degree = sheet.degrees[i] ?? null;
-            return (
-              <button
-                key={i}
-                type="button"
-                className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
-                onClick={() => setSelected(i)}
-              >
-                <span className="pad-sub">{(i % BEATS) + 1}</span>
-                <span className="pad-label">{slotLabel(sheet.key, degree)}</span>
-                <span className="pad-roman">{slotRoman(degree)}</span>
-              </button>
-            );
-          })}
+      <div
+        ref={padStageRef}
+        className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode}`}
+        style={{ "--mark-bar": markBar } as CSSProperties}
+      >
+        <div className="pad-board">
+          <div className="pad-back" aria-hidden>
+            {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
+          </div>
+          {/* 재생 링: main + 행 wrap(prev/next)로 오른쪽↔왼쪽 이어짐 */}
+          {mode === "chart" && (
+            <div className="pad-play" aria-hidden>
+              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-prev" />
+              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-main" />
+              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-next" />
+            </div>
+          )}
+          {mode === "rhythm" && playBar === bar && (
+            <div className="pad-play pad-play-rhythm" aria-hidden>
+              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-prev" />
+              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-main" />
+              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-next" />
+            </div>
+          )}
+          <section className="pad-grid" aria-label={modeLabel(mode)}>
+            {mode === "chart" &&
+              Array.from({ length: SLOTS }, (_, i) => {
+                const degree = sheet.degrees[i] ?? null;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
+                    onClick={() => setSelected(i)}
+                  >
+                    <span className="pad-sub">{(i % BEATS) + 1}</span>
+                    <span className="pad-label">{slotLabel(sheet.key, degree)}</span>
+                    <span className="pad-roman">{slotRoman(degree)}</span>
+                  </button>
+                );
+              })}
 
-        {mode === "degree" &&
-          Array.from({ length: SLOTS }, (_, i) => {
-            if (i < 7) {
-              const meta = DEGREE_META[i]!;
-              return (
-                <button
-                  key={meta.roman}
-                  type="button"
-                  className={`pad tool ${currentDegree === i ? "on" : ""} ${sheet.degrees.includes(i) ? "used" : ""}`}
-                  onClick={() => paintDegree(i)}
-                >
-                  <span className="pad-label">{meta.roman}</span>
-                  <span className="pad-roman">{slotLabel(sheet.key, i)}</span>
-                </button>
-              );
-            }
-            if (i === 7) {
-              return (
-                <button
-                  key="rest"
-                  type="button"
-                  className={`pad tool ${currentDegree === null ? "on" : ""}`}
-                  onClick={() => paintDegree(null)}
-                >
-                  <span className="pad-label">rest</span>
-                  <span className="pad-roman">—</span>
-                </button>
-              );
-            }
-            return <div key={`ghost-${i}`} className="pad ghost" aria-hidden />;
-          })}
+            {mode === "degree" &&
+              Array.from({ length: SLOTS }, (_, i) => {
+                if (i < 7) {
+                  const meta = DEGREE_META[i]!;
+                  return (
+                    <button
+                      key={meta.roman}
+                      type="button"
+                      className={`pad tool ${currentDegree === i ? "on" : ""} ${sheet.degrees.includes(i) ? "used" : ""}`}
+                      onClick={() => paintDegree(i)}
+                    >
+                      <span className="pad-label">{meta.roman}</span>
+                      <span className="pad-roman">{slotLabel(sheet.key, i)}</span>
+                    </button>
+                  );
+                }
+                if (i === 7) {
+                  return (
+                    <button
+                      key="rest"
+                      type="button"
+                      className={`pad tool ${currentDegree === null ? "on" : ""}`}
+                      onClick={() => paintDegree(null)}
+                    >
+                      <span className="pad-label">rest</span>
+                      <span className="pad-roman">—</span>
+                    </button>
+                  );
+                }
+                return <div key={`ghost-${i}`} className="pad ghost" aria-hidden />;
+              })}
 
-        {mode === "rhythm" &&
-          Array.from({ length: BAR_STEPS }, (_, step) => {
-            const art = barRhythm[step] ?? "rest";
-            const beatNo = Math.floor(step / SUBDIV) + 1;
-            const sub = step % SUBDIV;
-            const subMark = ["1", "e", "&", "a"][sub]!;
-            return (
-              <button
-                key={step}
-                type="button"
-                className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""}`}
-                onClick={() => paintRhythm(step)}
-              >
-                <span className="pad-sub">
-                  {beatNo}
-                  {subMark}
-                </span>
-                <span className="pad-label">{artLabel(art)}</span>
-                <span className="pad-roman">
-                  {art === "hold" ? "링" : art === "rest" ? "쉼" : art === "X" ? "뮤트" : art === "D" ? "다운" : "업"}
-                </span>
-              </button>
-            );
-          })}
-      </section>
+            {mode === "rhythm" &&
+              Array.from({ length: BAR_STEPS }, (_, step) => {
+                const art = barRhythm[step] ?? "rest";
+                const beatNo = Math.floor(step / SUBDIV) + 1;
+                const sub = step % SUBDIV;
+                const subMark = ["1", "e", "&", "a"][sub]!;
+                return (
+                  <button
+                    key={step}
+                    type="button"
+                    className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""}`}
+                    onClick={() => paintRhythm(step)}
+                  >
+                    <span className="pad-sub">
+                      {beatNo}
+                      {subMark}
+                    </span>
+                    <span className="pad-label">{artLabel(art)}</span>
+                    <span className="pad-roman">{artHint(art)}</span>
+                  </button>
+                );
+              })}
+          </section>
+        </div>
+      </div>
 
-      <p className="status">
-        {mode === "rhythm" ? `${bar + 1}마디 리듬 · 탭으로 ${brushLabel(brush)}` : status}
-      </p>
+      {status ? <p className="status">{status}</p> : null}
     </div>
   );
 }
 
 function modeLabel(mode: Mode): string {
-  if (mode === "chart") return "차트";
-  if (mode === "degree") return "도수";
-  return "리듬";
+  if (mode === "chart") return "grid";
+  if (mode === "degree") return "degree";
+  return "rhythm";
 }
 
-function brushLabel(art: Articulation): string {
+function artHint(art: Articulation): string {
   return ARTICULATIONS.find((a) => a.id === art)?.hint ?? art;
 }

@@ -1,87 +1,48 @@
 # OneSheet 핸드오프
 
-다음 세션 에이전트/인간을 위한 인수인계.  
-작성 시점: 2026-08-05 · 브랜치 `cursor/launchpad-grid-4663`  
-base `main` · PR https://github.com/ParallelKim/OneSheet/pull/2
+작성 시점: 2026-08-05 · 브랜치 `cursor/strudel-playback-4663`  
+base `main` · PR3 (재생 파이프라인)
 
 ---
 
-## 1. 제품
+## 제품
 
-**OneSheet** = Teenage Engineering에 영감받은 **기타 악보 편집/재생기**.  
-장난감처럼 만지고 바로 들어보는 한 장 차트. 소리는 Strudel.
-
-필수: `.cursor/rules/onesheet-paradigm.mdc`
+기타 차트 편집/재생기. UI는 런치패드 렌즈, 소리는 Strudel.
 
 ---
 
-## 2. 현재 UI (런치패드 + 리듬)
+## 재생 파이프라인 (핵심)
 
-- **LCD**: 얇은 한 줄 차트(마디선 · 코드명, 도수는 선택 칸만) · 조성/BPM
-  — 스트럼·음색·모드 라벨은 LCD에 두지 않음 (렌즈/그리드가 담당)
-- **transport** (LCD ↔ 그리드 사이): 재생 · 메트로 · 차트 · 도수 · 리듬  
-  (진행 프리셋 제거 — 조성 안 도수는 유저가 채움)
-- 리듬 브러시(D/U/X/·/∅)도 그리드 바로 위
-- **4×4 렌즈**
-  - 차트: 16 타임슬롯
-  - 도수: I–vii° + rest
-  - 리듬: 선택 마디 16분 그리드
-
-### 리듬 셀 어휘
-| 값 | UI | 의미 |
-|----|-----|------|
-| `D` | D | 다운 공격 |
-| `U` | U | 업 공격 |
-| `X` | X | 뮤트(척) — 공격 있음 |
-| `hold` | · | 링 — 앞 소리 유지 |
-| `rest` | ∅ | 쉼 — 무음 |
-
-길이(1/4 vs 두 1/8)는 타입으로 두지 않고 **공격 위치**로 구분.  
-예: `D · · ·` = 4분, `D · U ·` = 두 8분.
-
----
-
-## 3. 데이터 (`src/sheet.ts`)
-
-```ts
-SheetState = {
-  bpm, key,
-  degrees: (number|null)[16],     // 칸 = 4분
-  rhythm: Articulation[4][16],    // 마디 × 16분
-  voice, gain, metro
-}
+```
+SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
+  degrees[]      64스텝 시퀀스      setcps+chord      @strudel/web
+  rhythm[][]     clip/gain          .dict.triads
+  bpm/metro                         .voicing()
 ```
 
-`toStrudel`: 64스텝(16분)으로 펼쳐 공격에만 chord 트리거, hold 길이만큼 `.clip`, rest는 `~`.
+| 파일 | 역할 |
+|------|------|
+| `src/sheet.ts` | 모델 · `compileSheet` · `toStrudel` |
+| `src/engine.ts` | init / evaluate 큐 / hush |
+| `src/sheet.test.ts` | 변환 단위 테스트 |
 
----
-
-## 4. 버려진 길
-
-- 차트 + 아래 팔레트 두 겹
-- 진행 프리셋 모드 (나열)
-- 셀 타입으로 1/4·1/8을 나누기 (16분 그리드와 축 중복)
-- 드럼 머신 / PO 실크 복제
-
----
-
-## 5. 다음 후보
-
-1. 아르페지오(코드톤 슬롯) — 리듬 다음 렌즈
-2. 재생 플레이헤드 (비드/패드)
-3. 조성 UX (카포/오도원)
-4. 사운드 품질 (뮤트·링 설득력)
-5. 음색 → 주법으로 해체
-
----
-
-## 6. 명령
+- dim 코드 심볼은 `Bo` (`dim` 아님) — triads 딕셔너리
+- 음색은 WebAudio 신스만 (soundfont 없음)
+- 재생 중 편집 → `evaluateStrudel` 재평가 (직렬 큐)
+- **플레이헤드**: Guitar Pro식 세로 커서(`--play-phase`) + 마디 밴드(`--mark-bar`). 선택은 셀 배경·글자 반전.
 
 ```bash
-npm ci && npm run dev   # :5173
-npm run build
+npm test
+npm run dev
 ```
 
-## 7. 한 줄
+---
 
-> 하나의 4×4. 차트·도수·리듬은 렌즈. 리듬은 선택 마디의 16분 그리드이고, 길이는 공격 간격이 말한다.
+## UI (요약)
+
+LCD: 얇은 한 줄 차트 · transport · 4×4(차트/도수/리듬)  
+리듬 셀: D/U/X/hold/rest
+
+## 다음
+
+- 플레이헤드 · 아르페지오 · 사운드 설득력 · 조성 UX
