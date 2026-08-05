@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  applyPreset,
+  BEATS,
   createInitialSheet,
   DEGREE_META,
   nextKey,
   PRESETS,
-  RHYTHM_PRESETS,
+  SLOTS,
   slotLabel,
   slotRoman,
-  toggleBeat,
   toStrudel,
   VOICES,
   type SheetState,
@@ -17,29 +18,12 @@ import { evaluateStrudel, hushStrudel, initStrudelEngine } from "./engine";
 import "./App.css";
 
 type EngineState = "idle" | "ready" | "playing" | "error";
-/** 차트는 항상 보임. 그리드 문맥만 렌즈. */
-type Context = "degree" | "chordPreset" | "rhythm" | "rhythmPreset";
-
-const CONTEXTS: readonly { id: Context; label: string }[] = [
-  { id: "degree", label: "도수" },
-  { id: "chordPreset", label: "진행" },
-  { id: "rhythm", label: "리듬" },
-  { id: "rhythmPreset", label: "그루브" },
-];
-
-type Pad = {
-  key: string;
-  label: string;
-  sub?: string;
-  state: "idle" | "on" | "dim" | "hit" | "empty";
-  disabled?: boolean;
-  onPress?: () => void;
-};
+type Mode = "degree" | "preset";
 
 export default function App() {
   const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
   const [selected, setSelected] = useState(0);
-  const [context, setContext] = useState<Context>("degree");
+  const [mode, setMode] = useState<Mode>("degree");
   const [engine, setEngine] = useState<EngineState>("idle");
   const [status, setStatus] = useState("차트 준비됨");
   const sheetRef = useRef(sheet);
@@ -109,129 +93,23 @@ export default function App() {
     setStatus("정지");
   }, []);
 
+  const playing = engine === "playing";
   const voice = VOICES.find((v) => v.id === sheet.voice) ?? VOICES[0]!;
   const currentDegree = sheet.degrees[selected] ?? null;
+  const bar = Math.floor(selected / BEATS) + 1;
+  const beat = (selected % BEATS) + 1;
 
-  const toggleDegree = (degree: number) => {
+  const paintDegree = (degree: number | null) => {
     update((prev) => {
       const degrees = [...prev.degrees];
-      degrees[selected] = degrees[selected] === degree ? null : degree;
+      if (degree !== null && degrees[selected] === degree) {
+        degrees[selected] = null;
+      } else {
+        degrees[selected] = degree;
+      }
       return { ...prev, degrees };
     });
   };
-
-  const pads: Pad[] = (() => {
-    if (context === "degree") {
-      return Array.from({ length: 16 }, (_, i) => {
-        if (i < DEGREE_META.length) {
-          const meta = DEGREE_META[i]!;
-          const used = sheet.degrees.includes(i);
-          const on = currentDegree === i;
-          return {
-            key: `deg-${i}`,
-            label: meta.roman,
-            sub: slotLabel(sheet.key, i),
-            state: (on ? "on" : used ? "hit" : "idle") as Pad["state"],
-            onPress: () => toggleDegree(i),
-          };
-        }
-        if (i === 7) {
-          return {
-            key: "deg-rest",
-            label: "rest",
-            state: (currentDegree === null ? "on" : "idle") as Pad["state"],
-            onPress: () => {
-              update((prev) => {
-                const degrees = [...prev.degrees];
-                degrees[selected] = null;
-                return { ...prev, degrees };
-              });
-            },
-          };
-        }
-        return {
-          key: `deg-x-${i}`,
-          label: "",
-          state: "dim" as const,
-          disabled: true,
-        };
-      });
-    }
-
-    if (context === "chordPreset") {
-      return Array.from({ length: 16 }, (_, i) => {
-        if (i < PRESETS.length) {
-          const preset = PRESETS[i]!;
-          const active =
-            preset.degrees.length === sheet.degrees.length &&
-            preset.degrees.every((d, idx) => d === sheet.degrees[idx]);
-          return {
-            key: `pre-${preset.id}`,
-            label: preset.name,
-            sub: preset.label,
-            state: (active ? "on" : "idle") as Pad["state"],
-            onPress: () => {
-              update((prev) => ({ ...prev, degrees: [...preset.degrees] }));
-              setSelected(0);
-            },
-          };
-        }
-        return {
-          key: `pre-x-${i}`,
-          label: "",
-          state: "dim" as const,
-          disabled: true,
-        };
-      });
-    }
-
-    if (context === "rhythmPreset") {
-      return Array.from({ length: 16 }, (_, i) => {
-        if (i < RHYTHM_PRESETS.length) {
-          const preset = RHYTHM_PRESETS[i]!;
-          const active = preset.beats.every((b, idx) => b === sheet.beats[idx]);
-          return {
-            key: `rpre-${preset.id}`,
-            label: preset.name,
-            state: (active ? "on" : "idle") as Pad["state"],
-            onPress: () => {
-              update((prev) => ({ ...prev, beats: [...preset.beats] }));
-              setContext("rhythm");
-            },
-          };
-        }
-        return {
-          key: `rpre-x-${i}`,
-          label: "",
-          state: "dim" as const,
-          disabled: true,
-        };
-      });
-    }
-
-    // rhythm: 존재 토글 (샘플명 사이클 아님)
-    return sheet.beats.map((hit, i) => {
-      const empty = hit === "~";
-      return {
-        key: `beat-${i}`,
-        label: empty ? "·" : "●",
-        sub: `${i + 1}`,
-        state: (empty ? "empty" : "hit") as Pad["state"],
-        onPress: () => {
-          update((prev) => ({ ...prev, beats: toggleBeat(prev.beats, i) }));
-        },
-      };
-    });
-  })();
-
-  const contextHint =
-    context === "degree"
-      ? `${selected + 1}번 칸 · ${sheet.key} 다이아토닉`
-      : context === "chordPreset"
-        ? "진행 프리셋"
-        : context === "rhythm"
-          ? "스텝 on/off"
-          : "리듬 프리셋";
 
   return (
     <div className="app">
@@ -240,14 +118,9 @@ export default function App() {
           <p className="brand">OneSheet</p>
           <p className="tag">기타 차트 한 장</p>
         </div>
-        <button
-          type="button"
-          className={`play ${engine === "playing" ? "on" : ""}`}
-          onClick={() => void (engine === "playing" ? onStop() : onPlay())}
-          aria-label={engine === "playing" ? "정지" : "재생"}
-        >
-          {engine === "playing" ? "■" : "▶"}
-        </button>
+        <p className="pos">
+          {bar}마디 · {beat}박
+        </p>
       </header>
 
       <div className="meta">
@@ -285,56 +158,108 @@ export default function App() {
         </label>
       </div>
 
-      <section className="chart" aria-label="차트">
-        {sheet.degrees.map((degree, i) => (
-          <button
-            key={i}
-            type="button"
-            className={`chart-slot ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
-            onClick={() => {
-              setSelected(i);
-              setContext("degree");
-            }}
-          >
-            <span className="chart-roman">{slotRoman(degree)}</span>
-            <span className="chart-chord">{slotLabel(sheet.key, degree)}</span>
-          </button>
-        ))}
+      <section className="pad-grid" aria-label="차트">
+        {Array.from({ length: SLOTS }, (_, i) => {
+          const degree = sheet.degrees[i] ?? null;
+          const rowBeat = (i % BEATS) + 1;
+          return (
+            <button
+              key={i}
+              type="button"
+              className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : "idle"}`}
+              onClick={() => {
+                setSelected(i);
+                setMode("degree");
+              }}
+            >
+              <span className="pad-sub">{rowBeat}</span>
+              <span className="pad-label">{slotLabel(sheet.key, degree)}</span>
+              <span className="pad-roman">{slotRoman(degree)}</span>
+            </button>
+          );
+        })}
       </section>
 
-      <nav className="contexts" aria-label="문맥">
-        {CONTEXTS.map((c) => (
+      {mode === "degree" ? (
+        <section className="palette-row" aria-label="도수">
+          {DEGREE_META.map((meta, i) => (
+            <button
+              key={meta.roman}
+              type="button"
+              className={`swatch ${currentDegree === i ? "on" : ""} ${sheet.degrees.includes(i) ? "used" : ""}`}
+              onClick={() => paintDegree(i)}
+            >
+              <span className="swatch-top">{meta.roman}</span>
+              <span className="swatch-bot">{slotLabel(sheet.key, i)}</span>
+            </button>
+          ))}
           <button
-            key={c.id}
             type="button"
-            className={`ctx ${context === c.id ? "on" : ""}`}
-            onClick={() => setContext(c.id)}
+            className={`swatch ${currentDegree === null ? "on" : ""}`}
+            onClick={() => paintDegree(null)}
           >
-            {c.label}
+            <span className="swatch-top">rest</span>
+            <span className="swatch-bot">—</span>
           </button>
-        ))}
+        </section>
+      ) : (
+        <section className="palette-row presets" aria-label="진행 프리셋">
+          {PRESETS.map((preset) => {
+            const applied = applyPreset(preset.bar);
+            const active = applied.every((d, idx) => d === sheet.degrees[idx]);
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                className={`swatch preset ${active ? "on" : ""}`}
+                onClick={() => update((prev) => ({ ...prev, degrees: applyPreset(preset.bar) }))}
+              >
+                <span className="swatch-top">{preset.name}</span>
+                <span className="swatch-bot">{preset.label}</span>
+              </button>
+            );
+          })}
+        </section>
+      )}
+
+      <p className="status">{status}</p>
+
+      <nav className="transport" aria-label="공통 조작">
+        <button
+          type="button"
+          className={`tr-btn play ${playing ? "on" : ""}`}
+          onClick={() => void (playing ? onStop() : onPlay())}
+          aria-label={playing ? "일시정지" : "재생"}
+        >
+          <span className="tr-icon">{playing ? "■" : "▶"}</span>
+          <span className="tr-label">{playing ? "정지" : "재생"}</span>
+        </button>
+        <button
+          type="button"
+          className={`tr-btn ${sheet.metro ? "on" : ""}`}
+          onClick={() => update((prev) => ({ ...prev, metro: !prev.metro }))}
+          aria-pressed={sheet.metro}
+        >
+          <span className="tr-icon">♩</span>
+          <span className="tr-label">메트로놈</span>
+        </button>
+        <button
+          type="button"
+          className={`tr-btn ${mode === "degree" ? "on" : ""}`}
+          onClick={() => setMode("degree")}
+        >
+          <span className="tr-icon">I</span>
+          <span className="tr-label">도수</span>
+        </button>
+        <button
+          type="button"
+          className={`tr-btn ${mode === "preset" ? "on" : ""}`}
+          onClick={() => setMode("preset")}
+        >
+          <span className="tr-icon">⌘</span>
+          <span className="tr-label">진행</span>
+        </button>
       </nav>
-
-      <p className="context-hint">{contextHint}</p>
-
-      <section className="pad-grid" aria-label="패드">
-        {pads.map((pad) => (
-          <button
-            key={pad.key}
-            type="button"
-            className={`pad ${pad.state}`}
-            disabled={pad.disabled}
-            onClick={() => pad.onPress?.()}
-          >
-            {pad.sub ? <span className="pad-sub">{pad.sub}</span> : null}
-            <span className="pad-label">{pad.label}</span>
-          </button>
-        ))}
-      </section>
-
-      <footer className="foot">
-        <p className="status">{status}</p>
-      </footer>
     </div>
   );
 }
