@@ -29,6 +29,64 @@ export const VOICES: readonly {
 
 export const HITS = ["~", "bd", "sd", "hh", "cp"] as const;
 
+/** 리듬: 샘플 사이클이 아니라 패턴 프리셋 + 스텝 존재(on/off) */
+export type RhythmPreset = {
+  id: string;
+  name: string;
+  beats: string[];
+};
+
+export const RHYTHM_PRESETS: readonly RhythmPreset[] = [
+  {
+    id: "rock",
+    name: "Rock",
+    beats: ["bd", "~", "sd", "hh", "bd", "~", "sd", "hh", "bd", "bd", "sd", "hh", "bd", "~", "cp", "hh"],
+  },
+  {
+    id: "four",
+    name: "Four",
+    beats: ["bd", "~", "~", "~", "bd", "~", "~", "~", "bd", "~", "~", "~", "bd", "~", "~", "~"],
+  },
+  {
+    id: "off",
+    name: "Off",
+    beats: ["~", "~", "sd", "~", "~", "~", "sd", "~", "~", "~", "sd", "~", "~", "~", "sd", "~"],
+  },
+  {
+    id: "hat",
+    name: "Hats",
+    beats: ["hh", "hh", "hh", "hh", "hh", "hh", "hh", "hh", "hh", "hh", "hh", "hh", "hh", "hh", "hh", "hh"],
+  },
+  {
+    id: "sparse",
+    name: "Thin",
+    beats: ["bd", "~", "~", "~", "~", "~", "sd", "~", "bd", "~", "~", "~", "~", "~", "cp", "~"],
+  },
+  {
+    id: "disco",
+    name: "Disco",
+    beats: ["bd", "hh", "sd", "hh", "bd", "hh", "sd", "hh", "bd", "hh", "sd", "hh", "bd", "hh", "sd", "hh"],
+  },
+  {
+    id: "quiet",
+    name: "Mute",
+    beats: Array.from({ length: 16 }, () => "~"),
+  },
+] as const;
+
+/** 스텝 토글: 꺼진 칸을 켤 때 자리 기본 히트 */
+export function defaultHitForStep(i: number): string {
+  if (i % 4 === 0) return "bd";
+  if (i % 4 === 2) return "sd";
+  return "hh";
+}
+
+export function toggleBeat(beats: string[], index: number): string[] {
+  const next = [...beats];
+  next[index] = next[index] === "~" ? defaultHitForStep(index) : "~";
+  return next;
+}
+
 /** 메이저 조 → 스케일 근음 7개 */
 export const MAJOR_KEYS: Record<string, readonly string[]> = {
   C: ["C", "D", "E", "F", "G", "A", "B"],
@@ -124,11 +182,6 @@ export function slotRoman(degree: number | null): string {
 export function nextKey(current: string): string {
   const i = KEY_LIST.indexOf(current);
   return KEY_LIST[((i < 0 ? 0 : i) + 1) % KEY_LIST.length]!;
-}
-
-export function nextHit(current: string): string {
-  const i = HITS.indexOf(current as (typeof HITS)[number]);
-  return HITS[((i < 0 ? 0 : i) + 1) % HITS.length]!;
 }
 
 export function voiceById(id: VoiceId) {
