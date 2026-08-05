@@ -6,7 +6,6 @@ import {
   nextKey,
   QUALITIES,
   ROOTS,
-  slotHint,
   slotLabel,
   toStrudel,
   VOICES,
@@ -19,10 +18,28 @@ import { evaluateStrudel, hushStrudel, initStrudelEngine } from "./engine";
 import "./App.css";
 
 type EngineState = "idle" | "ready" | "playing" | "error";
+type Context = "chart" | "root" | "quality" | "rhythm";
+
+const CONTEXTS: readonly { id: Context; label: string }[] = [
+  { id: "chart", label: "진행" },
+  { id: "root", label: "근음" },
+  { id: "quality", label: "화음" },
+  { id: "rhythm", label: "리듬" },
+];
+
+type Pad = {
+  key: string;
+  label: string;
+  sub?: string;
+  state: "idle" | "on" | "dim" | "hit" | "empty";
+  disabled?: boolean;
+  onPress?: () => void;
+};
 
 export default function App() {
   const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
   const [selected, setSelected] = useState(0);
+  const [context, setContext] = useState<Context>("chart");
   const [engine, setEngine] = useState<EngineState>("idle");
   const [status, setStatus] = useState("차트 준비됨");
   const sheetRef = useRef(sheet);
@@ -94,6 +111,7 @@ export default function App() {
 
   const current = sheet.chords[selected] ?? null;
   const keyRoots = KEY_ROOTS[sheet.key] ?? KEY_ROOTS.C!;
+  const voice = VOICES.find((v) => v.id === sheet.voice) ?? VOICES[0]!;
 
   const patchSlot = (recipe: (prev: ChordSlot | null) => ChordSlot | null) => {
     update((prev) => {
@@ -103,23 +121,144 @@ export default function App() {
     });
   };
 
-  const setRoot = (root: string) => {
-    patchSlot((prev) => ({
-      root,
-      quality: prev?.quality ?? "maj",
-    }));
-  };
+  const pads: Pad[] = (() => {
+    if (context === "chart") {
+      return Array.from({ length: 16 }, (_, i) => {
+        if (i < 4) {
+          const chord = sheet.chords[i] ?? null;
+          return {
+            key: `chart-${i}`,
+            label: slotLabel(chord),
+            sub: `${i + 1}`,
+            state: (selected === i ? "on" : chord ? "idle" : "empty") as Pad["state"],
+            onPress: () => {
+              setSelected(i);
+              setContext("root");
+            },
+          };
+        }
+        return {
+          key: `chart-x-${i}`,
+          label: "",
+          state: "dim" as const,
+          disabled: true,
+        };
+      });
+    }
 
-  const setQuality = (quality: Quality) => {
-    patchSlot((prev) => {
-      if (!prev) return { root: "C", quality };
-      return { ...prev, quality };
+    if (context === "root") {
+      return Array.from({ length: 16 }, (_, i) => {
+        if (i < ROOTS.length) {
+          const root = ROOTS[i]!;
+          const inKey = keyRoots.includes(root);
+          const on = current?.root === root;
+          return {
+            key: `root-${root}`,
+            label: root,
+            state: (on ? "on" : inKey ? "idle" : "dim") as Pad["state"],
+            onPress: () => {
+              patchSlot((prev) => ({
+                root,
+                quality: prev?.quality ?? "maj",
+              }));
+            },
+          };
+        }
+        if (i === 15) {
+          return {
+            key: "root-back",
+            label: "←",
+            sub: "진행",
+            state: "idle" as const,
+            onPress: () => setContext("chart"),
+          };
+        }
+        return {
+          key: `root-x-${i}`,
+          label: "",
+          state: "dim" as const,
+          disabled: true,
+        };
+      });
+    }
+
+    if (context === "quality") {
+      const items: Array<{ id: string; label: string; run: () => void; on: boolean }> = [
+        ...QUALITIES.map((q) => ({
+          id: q.id,
+          label: q.label,
+          on: current?.quality === q.id,
+          run: () => {
+            const quality = q.id as Quality;
+            patchSlot((prev) => {
+              if (!prev) return { root: "C", quality };
+              return { ...prev, quality };
+            });
+          },
+        })),
+        {
+          id: "rest",
+          label: "rest",
+          on: current === null,
+          run: () => patchSlot(() => null),
+        },
+      ];
+
+      return Array.from({ length: 16 }, (_, i) => {
+        if (i < items.length) {
+          const item = items[i]!;
+          return {
+            key: `qual-${item.id}`,
+            label: item.label,
+            state: (item.on ? "on" : "idle") as Pad["state"],
+            onPress: item.run,
+          };
+        }
+        if (i === 15) {
+          return {
+            key: "qual-back",
+            label: "←",
+            sub: "진행",
+            state: "idle" as const,
+            onPress: () => setContext("chart"),
+          };
+        }
+        return {
+          key: `qual-x-${i}`,
+          label: "",
+          state: "dim" as const,
+          disabled: true,
+        };
+      });
+    }
+
+    // rhythm
+    return sheet.beats.map((hit, i) => {
+      const empty = hit === "~";
+      return {
+        key: `beat-${i}`,
+        label: empty ? "·" : hit,
+        sub: `${i + 1}`,
+        state: (empty ? "empty" : "hit") as Pad["state"],
+        onPress: () => {
+          update((prev) => {
+            const beats = [...prev.beats];
+            beats[i] = nextHit(beats[i]!);
+            return { ...prev, beats };
+          });
+        },
+      };
     });
-  };
+  })();
 
-  const clearSlot = () => {
-    patchSlot(() => null);
-  };
+  const contextHint =
+    context === "chart"
+      ? `${selected + 1}번 칸 · ${slotLabel(current)}`
+      : context === "root"
+        ? `${selected + 1}번 근음`
+        : context === "quality"
+          ? `${selected + 1}번 화음`
+          : "16분 리듬";
 
   return (
     <div className="app">
@@ -138,127 +277,29 @@ export default function App() {
         </button>
       </header>
 
-      <div className="key-row">
+      <div className="meta">
         <button
           type="button"
-          className="key-chip"
+          className="chip"
           onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
         >
-          <span className="ctrl-label">조성</span>
-          <span className="ctrl-value">{sheet.key}</span>
+          <span className="chip-k">조성</span>
+          <span className="chip-v">{sheet.key}</span>
         </button>
-        <p className="key-hint">스케일 근음을 밝게 표시합니다</p>
-      </div>
-
-      <section className="chords" aria-label="코드 진행">
-        {sheet.chords.map((chord, i) => (
-          <button
-            key={i}
-            type="button"
-            className={`chord ${chord ? "" : "empty"} ${selected === i ? "on" : ""}`}
-            onClick={() => setSelected(i)}
-          >
-            <span className="chord-i">
-              {i + 1}
-              {chord ? ` · ${slotHint(chord)}` : " · rest"}
-            </span>
-            <span className="chord-v">{slotLabel(chord)}</span>
-          </button>
-        ))}
-      </section>
-
-      <section className="editor" aria-label="코드 편집">
-        <div className="edit-block">
-          <p className="edit-label">근음</p>
-          <div className="root-row">
-            {ROOTS.map((root) => {
-              const inKey = keyRoots.includes(root);
-              const on = current?.root === root;
-              return (
-                <button
-                  key={root}
-                  type="button"
-                  className={`root ${on ? "on" : ""} ${inKey ? "in-key" : "out"}`}
-                  onClick={() => setRoot(root)}
-                >
-                  {root}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="edit-block">
-          <p className="edit-label">화음</p>
-          <div className="qual-row">
-            {QUALITIES.map((q) => (
-              <button
-                key={q.id}
-                type="button"
-                className={`qual ${current?.quality === q.id ? "on" : ""}`}
-                onClick={() => setQuality(q.id)}
-                title={q.hint}
-              >
-                {q.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              className={`qual rest ${current === null ? "on" : ""}`}
-              onClick={clearSlot}
-              title="쉼표"
-            >
-              rest
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="beats" aria-label="리듬">
-        <p className="beats-label">리듬</p>
-        <div className="beat-row">
-          {sheet.beats.map((hit, i) => {
-            const empty = hit === "~";
-            return (
-              <button
-                key={i}
-                type="button"
-                className={`dot ${empty ? "empty" : "hit"}`}
-                onClick={() =>
-                  update((prev) => {
-                    const beats = [...prev.beats];
-                    beats[i] = nextHit(beats[i]!);
-                    return { ...prev, beats };
-                  })
-                }
-                aria-label={`${i + 1}박 ${empty ? "쉼" : hit}`}
-              >
-                <span>{empty ? "" : hit}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="controls" aria-label="음색과 템포">
-        <div className="voice-row">
-          <span className="ctrl-label">음색</span>
-          <div className="voices">
-            {VOICES.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                className={`voice ${sheet.voice === v.id ? "on" : ""}`}
-                onClick={() => update((prev) => ({ ...prev, voice: v.id as VoiceId }))}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <label className="tempo">
-          <span className="ctrl-label">BPM</span>
+        <button
+          type="button"
+          className="chip"
+          onClick={() => {
+            const i = VOICES.findIndex((v) => v.id === sheet.voice);
+            const next = VOICES[(i + 1) % VOICES.length]!;
+            update((prev) => ({ ...prev, voice: next.id as VoiceId }));
+          }}
+        >
+          <span className="chip-k">음색</span>
+          <span className="chip-v">{voice.label}</span>
+        </button>
+        <label className="chip tempo-chip">
+          <span className="chip-k">BPM</span>
           <input
             type="range"
             min={70}
@@ -267,8 +308,38 @@ export default function App() {
             value={sheet.bpm}
             onChange={(e) => update((prev) => ({ ...prev, bpm: Number(e.target.value) }))}
           />
-          <span className="ctrl-value">{sheet.bpm}</span>
+          <span className="chip-v">{sheet.bpm}</span>
         </label>
+      </div>
+
+      <nav className="contexts" aria-label="문맥">
+        {CONTEXTS.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={`ctx ${context === c.id ? "on" : ""}`}
+            onClick={() => setContext(c.id)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </nav>
+
+      <p className="context-hint">{contextHint}</p>
+
+      <section className="pad-grid" aria-label="패드">
+        {pads.map((pad) => (
+          <button
+            key={pad.key}
+            type="button"
+            className={`pad ${pad.state}`}
+            disabled={pad.disabled}
+            onClick={() => pad.onPress?.()}
+          >
+            {pad.sub ? <span className="pad-sub">{pad.sub}</span> : null}
+            <span className="pad-label">{pad.label}</span>
+          </button>
+        ))}
       </section>
 
       <footer className="foot">
