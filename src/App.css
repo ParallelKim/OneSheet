@@ -354,7 +354,9 @@ button {
   width: 100%;
   overflow: hidden;
   display: grid;
-  place-items: center;
+  place-items: end center;
+  padding-bottom: 8px;
+  box-sizing: border-box;
   container-type: size;
 }
 
