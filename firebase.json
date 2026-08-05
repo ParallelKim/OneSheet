@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "onesheet-app",
+    "site": "onesheetplay",
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
