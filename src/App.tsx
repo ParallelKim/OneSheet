@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createInitialSheet,
-  degreeOf,
-  DEGREES,
+  KEY_ROOTS,
   nextHit,
   nextKey,
-  nextSound,
-  paletteFor,
-  remapChordsToKey,
+  QUALITIES,
+  ROOTS,
+  slotHint,
+  slotLabel,
   toStrudel,
+  VOICES,
+  type ChordSlot,
+  type Quality,
   type SheetState,
+  type VoiceId,
 } from "./sheet";
 import { evaluateStrudel, hushStrudel, initStrudelEngine } from "./engine";
 import "./App.css";
@@ -20,7 +24,7 @@ export default function App() {
   const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
   const [selected, setSelected] = useState(0);
   const [engine, setEngine] = useState<EngineState>("idle");
-  const [status, setStatus] = useState("칸을 고르고, 도수를 칠하세요");
+  const [status, setStatus] = useState("근음을 고르고, 퀄리티를 바꾸세요");
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
 
@@ -72,7 +76,7 @@ export default function App() {
       await evaluateStrudel(toStrudel(sheetRef.current));
       playingRef.current = true;
       setEngine("playing");
-      setStatus("재생 중 · 칠하면 바로 바뀝니다");
+      setStatus("재생 중 · 바꾸면 바로 들립니다");
     } catch (err) {
       console.error(err);
       playingRef.current = false;
@@ -88,27 +92,33 @@ export default function App() {
     setStatus("정지");
   }, []);
 
-  const palette = paletteFor(sheet.key);
+  const current = sheet.chords[selected] ?? null;
+  const keyRoots = KEY_ROOTS[sheet.key] ?? KEY_ROOTS.C!;
 
-  const paint = (chord: string) => {
+  const patchSlot = (recipe: (prev: ChordSlot | null) => ChordSlot | null) => {
     update((prev) => {
       const chords = [...prev.chords];
-      chords[selected] = chord;
+      chords[selected] = recipe(chords[selected] ?? null);
       return { ...prev, chords };
     });
-    // 다음 칸으로 자연스럽게 이동
-    setSelected((s) => (s + 1) % sheet.chords.length);
   };
 
-  const changeKey = () => {
-    update((prev) => {
-      const key = nextKey(prev.key);
-      return {
-        ...prev,
-        key,
-        chords: remapChordsToKey(prev.chords, prev.key, key),
-      };
+  const setRoot = (root: string) => {
+    patchSlot((prev) => ({
+      root,
+      quality: prev?.quality ?? "maj",
+    }));
+  };
+
+  const setQuality = (quality: Quality) => {
+    patchSlot((prev) => {
+      if (!prev) return { root: "C", quality };
+      return { ...prev, quality };
     });
+  };
+
+  const clearSlot = () => {
+    patchSlot(() => null);
   };
 
   return (
@@ -129,49 +139,73 @@ export default function App() {
       </header>
 
       <div className="key-row">
-        <button type="button" className="key-chip" onClick={changeKey}>
+        <button
+          type="button"
+          className="key-chip"
+          onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
+        >
           <span className="ctrl-label">조</span>
           <span className="ctrl-value">{sheet.key}</span>
         </button>
-        <p className="key-hint">이 조 도수만 쓸 수 있어요</p>
+        <p className="key-hint">근음 힌트 · 퀄리티는 자유</p>
       </div>
 
       <section className="chords" aria-label="코드 슬롯">
-        {sheet.chords.map((chord, i) => {
-          const empty = chord === "-";
-          const deg = degreeOf(sheet.key, chord);
-          return (
-            <button
-              key={i}
-              type="button"
-              className={`chord ${empty ? "empty" : ""} ${selected === i ? "on" : ""}`}
-              onClick={() => setSelected(i)}
-            >
-              <span className="chord-i">{i + 1}{deg ? ` · ${deg}` : ""}</span>
-              <span className="chord-v">{empty ? "—" : chord}</span>
-            </button>
-          );
-        })}
+        {sheet.chords.map((chord, i) => (
+          <button
+            key={i}
+            type="button"
+            className={`chord ${chord ? "" : "empty"} ${selected === i ? "on" : ""}`}
+            onClick={() => setSelected(i)}
+          >
+            <span className="chord-i">
+              {i + 1}
+              {chord ? ` · ${slotHint(chord)}` : ""}
+            </span>
+            <span className="chord-v">{slotLabel(chord)}</span>
+          </button>
+        ))}
       </section>
 
-      <section className="palette" aria-label="도수 팔레트">
-        <p className="palette-label">도수</p>
-        <div className="palette-row">
-          {palette.map((chord, i) => (
-            <button
-              key={chord}
-              type="button"
-              className={`swatch deg-${i}`}
-              onClick={() => paint(chord)}
-            >
-              <span className="swatch-deg">{DEGREES[i]}</span>
-              <span className="swatch-chord">{chord}</span>
+      <section className="editor" aria-label="근음과 퀄리티">
+        <div className="edit-block">
+          <p className="edit-label">근음</p>
+          <div className="root-row">
+            {ROOTS.map((root) => {
+              const inKey = keyRoots.includes(root);
+              const on = current?.root === root;
+              return (
+                <button
+                  key={root}
+                  type="button"
+                  className={`root ${on ? "on" : ""} ${inKey ? "in-key" : "out"}`}
+                  onClick={() => setRoot(root)}
+                >
+                  {root}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="edit-block">
+          <p className="edit-label">퀄리티 · 같은 근음</p>
+          <div className="qual-row">
+            {QUALITIES.map((q) => (
+              <button
+                key={q.id}
+                type="button"
+                className={`qual ${current?.quality === q.id ? "on" : ""}`}
+                onClick={() => setQuality(q.id)}
+                title={q.hint}
+              >
+                {q.label}
+              </button>
+            ))}
+            <button type="button" className={`qual rest ${current === null ? "on" : ""}`} onClick={clearSlot}>
+              —
             </button>
-          ))}
-          <button type="button" className="swatch rest" onClick={() => paint("-")}>
-            <span className="swatch-deg">—</span>
-            <span className="swatch-chord">쉼</span>
-          </button>
+          </div>
         </div>
       </section>
 
@@ -202,14 +236,21 @@ export default function App() {
       </section>
 
       <section className="controls" aria-label="소리">
-        <button
-          type="button"
-          className="sound"
-          onClick={() => update((prev) => ({ ...prev, sound: nextSound(prev.sound) }))}
-        >
-          <span className="ctrl-label">소리</span>
-          <span className="ctrl-value">{sheet.sound}</span>
-        </button>
+        <div className="voice-row">
+          <span className="ctrl-label">배음</span>
+          <div className="voices">
+            {VOICES.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                className={`voice ${sheet.voice === v.id ? "on" : ""}`}
+                onClick={() => update((prev) => ({ ...prev, voice: v.id as VoiceId }))}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <label className="tempo">
           <span className="ctrl-label">템포</span>
@@ -227,7 +268,7 @@ export default function App() {
 
       <footer className="foot">
         <p className="status">{status}</p>
-        <p className="hint">슬롯 선택 → 도수 탭 · 조 바꾸면 도수 유지</p>
+        <p className="hint">슬롯 → 근음 → 퀄리티 (단 M m 7 m7 dim aug 5)</p>
       </footer>
     </div>
   );

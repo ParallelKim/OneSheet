@@ -9,12 +9,6 @@
   --chord: #5ec8ff;
   --beat: #ff8f6b;
   --surface: #2c3a33;
-  --deg0: #5ec8ff;
-  --deg1: #7eb8a8;
-  --deg2: #9aa88a;
-  --deg3: #e0c35a;
-  --deg4: #ff8f6b;
-  --deg5: #c89bff;
   --font-display: "Fraunces", "Georgia", serif;
   --font-ui: "Pretendard", "Apple SD Gothic Neo", sans-serif;
   --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
@@ -57,11 +51,11 @@ button {
 .app {
   width: min(100%, 430px);
   margin: 0 auto;
-  padding: 20px 16px 28px;
+  padding: 18px 14px 24px;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .top {
@@ -74,29 +68,28 @@ button {
 .brand {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2rem, 9vw, 2.6rem);
+  font-size: clamp(1.9rem, 8vw, 2.4rem);
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 0.95;
 }
 
 .tag {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--ink-dim);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
 }
 
 .play {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   flex-shrink: 0;
   box-shadow: 0 8px 24px rgba(200, 245, 74, 0.25);
-  transition: transform 0.15s ease, background 0.15s ease;
 }
 
 .play:active {
@@ -112,46 +105,42 @@ button {
 .key-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .key-chip {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 8px 12px;
-  border-radius: 12px;
+  padding: 7px 11px;
+  border-radius: 11px;
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid var(--line);
 }
 
 .key-hint {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--ink-dim);
 }
 
 .chords {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
 }
 
 .chord {
-  aspect-ratio: 1.15;
-  border-radius: 16px;
+  aspect-ratio: 0.9;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--chord) 14%, var(--surface));
   border: 1px solid color-mix(in srgb, var(--chord) 28%, transparent);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
-}
-
-.chord:active {
-  transform: scale(0.97);
+  gap: 2px;
+  min-width: 0;
 }
 
 .chord.on {
@@ -160,98 +149,97 @@ button {
 }
 
 .chord.empty {
-  opacity: 0.5;
+  opacity: 0.45;
   background: var(--surface);
   border-color: var(--line);
 }
 
 .chord-i {
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   color: var(--ink-dim);
+  white-space: nowrap;
 }
 
 .chord-v {
   font-family: var(--font-display);
-  font-size: clamp(1.45rem, 7vw, 1.9rem);
+  font-size: clamp(1rem, 4.6vw, 1.35rem);
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
-.palette-label,
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--line);
+}
+
+.edit-label,
 .beats-label {
   margin: 0 0 8px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--ink-dim);
   letter-spacing: 0.04em;
 }
 
-.palette-row {
+.root-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
 }
 
-.swatch {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 10px 8px;
-  border-radius: 12px;
+.root {
+  padding: 8px 0;
+  border-radius: 9px;
   background: var(--surface);
   border: 1px solid var(--line);
-  text-align: left;
-  transition: transform 0.1s ease, border-color 0.12s ease;
-}
-
-.swatch:active {
-  transform: scale(0.96);
-}
-
-.swatch-deg {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--ink-dim);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
-.swatch-chord {
-  font-size: 0.95rem;
+.root.in-key {
+  border-color: color-mix(in srgb, var(--chord) 35%, transparent);
+}
+
+.root.out {
+  opacity: 0.45;
+}
+
+.root.on {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
+}
+
+.qual-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+
+.qual {
+  padding: 10px 4px;
+  border-radius: 9px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
   font-weight: 650;
 }
 
-.swatch.deg-0 {
-  border-color: color-mix(in srgb, var(--deg0) 45%, transparent);
-}
-.swatch.deg-0 .swatch-chord {
-  color: var(--deg0);
-}
-.swatch.deg-1 {
-  border-color: color-mix(in srgb, var(--deg1) 45%, transparent);
-}
-.swatch.deg-2 {
-  border-color: color-mix(in srgb, var(--deg2) 45%, transparent);
-}
-.swatch.deg-3 {
-  border-color: color-mix(in srgb, var(--deg3) 45%, transparent);
-}
-.swatch.deg-3 .swatch-chord {
-  color: var(--deg3);
-}
-.swatch.deg-4 {
-  border-color: color-mix(in srgb, var(--deg4) 45%, transparent);
-}
-.swatch.deg-4 .swatch-chord {
-  color: var(--deg4);
-}
-.swatch.deg-5 {
-  border-color: color-mix(in srgb, var(--deg5) 45%, transparent);
-}
-.swatch.deg-5 .swatch-chord {
-  color: var(--deg5);
+.qual.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--accent);
 }
 
-.swatch.rest {
-  opacity: 0.7;
+.qual.rest {
+  opacity: 0.75;
 }
 
 .beat-row {
@@ -262,20 +250,15 @@ button {
 
 .dot {
   aspect-ratio: 1;
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--surface);
   border: 1px solid var(--line);
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: 0.52rem;
   font-weight: 600;
   color: transparent;
-  transition: transform 0.1s ease, background 0.12s ease, color 0.12s ease;
-}
-
-.dot:active {
-  transform: scale(0.94);
 }
 
 .dot.hit {
@@ -292,20 +275,38 @@ button {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 12px;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--line);
 }
 
-.sound {
+.voice-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  text-align: left;
-  padding: 2px 0;
+  gap: 10px;
+}
+
+.voices {
+  display: flex;
+  flex: 1;
+  gap: 5px;
+}
+
+.voice {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 9px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.voice.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
 
 .tempo {
@@ -321,13 +322,13 @@ button {
 }
 
 .ctrl-label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--ink-dim);
 }
 
 .ctrl-value {
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 .foot {
@@ -336,26 +337,22 @@ button {
 
 .status {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 600;
 }
 
 .hint {
   margin: 4px 0 0;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--ink-dim);
 }
 
-@media (min-width: 420px) {
+@media (max-width: 379px) {
   .chords {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .chord {
-    aspect-ratio: 0.95;
-  }
-
-  .palette-row {
-    grid-template-columns: repeat(7, 1fr);
+    aspect-ratio: 1.4;
   }
 }
