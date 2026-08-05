@@ -225,16 +225,10 @@ export default function App() {
           ref={staffRef}
           className={`staff ${playing ? "is-playing" : ""}`}
           aria-label="chart"
-          style={
-            {
-              "--mark-bar": markBar,
-              "--sel-slot": selected,
-            } as CSSProperties
-          }
+          style={{ "--mark-bar": markBar } as CSSProperties}
         >
           <div className="staff-back" aria-hidden>
             <div className="ind-measure" />
-            <div className="ind-sel" />
             <div className="ind-playbar">
               <div className="ind-playbar-fill" />
             </div>
@@ -344,21 +338,10 @@ export default function App() {
       <div
         ref={padStageRef}
         className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode}`}
-        style={
-          {
-            "--sel-col": selected % BEATS,
-            "--sel-row": Math.floor(selected / BEATS),
-            "--mark-bar": markBar,
-          } as CSSProperties
-        }
+        style={{ "--mark-bar": markBar } as CSSProperties}
       >
         <div className="pad-back" aria-hidden>
-          {mode === "chart" && (
-            <>
-              <div className="pad-ind pad-ind-bar" />
-              <div className="pad-ind pad-ind-sel" />
-            </>
-          )}
+          {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
         </div>
         <section className="pad-grid" aria-label={modeLabel(mode)}>
           {mode === "chart" &&

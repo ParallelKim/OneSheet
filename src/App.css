@@ -97,7 +97,6 @@ button {
 .staff {
   --play-phase: -1;
   --mark-bar: 0;
-  --sel-slot: 0;
   position: relative;
   isolation: isolate;
 }
@@ -122,23 +121,6 @@ button {
   background: rgba(255, 255, 255, 0.05);
   transform: translateX(calc(var(--mark-bar) * 100%));
   transition: transform 0.12s ease;
-}
-
-/* 선택 슬롯: 마디보다 강한 위계 (면 + 링) */
-.ind-sel {
-  position: absolute;
-  top: 1px;
-  bottom: 5px;
-  left: 0;
-  width: calc(100% / 16);
-  z-index: 1;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.2);
-  box-shadow:
-    inset 0 0 0 1.5px rgba(255, 255, 255, 0.65),
-    0 0 0 1px rgba(0, 0, 0, 0.35);
-  transform: translateX(calc(var(--sel-slot) * 100%));
-  transition: transform 0.1s ease;
 }
 
 /* 재생: 일반적인 프로그레스 바 */
@@ -216,18 +198,29 @@ button {
   align-items: center;
   gap: 2px;
   min-width: 0;
-  padding: 0;
+  padding: 3px 1px;
+  border-radius: 6px;
   background: transparent;
+}
+
+.chord-cell.on {
+  background: var(--fg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
 .chord-cell.on .chord-name,
 .chord-cell.on .chord-deg {
-  color: var(--fg);
+  color: var(--bg);
 }
 
 .chord-cell.empty .chord-name,
 .chord-cell.empty .chord-deg {
   opacity: 0.3;
+}
+
+.chord-cell.on.empty .chord-name,
+.chord-cell.on.empty .chord-deg {
+  opacity: 0.7;
 }
 
 .chord-name {
@@ -333,8 +326,6 @@ button {
 }
 
 .pad-stage {
-  --sel-col: 0;
-  --sel-row: 0;
   --mark-bar: 0;
   position: relative;
   isolation: isolate;
@@ -361,18 +352,8 @@ button {
 .pad-ind-bar {
   grid-column: 1 / -1;
   grid-row: calc(var(--mark-bar) + 1);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
   box-shadow: none;
-}
-
-/* 선택 칸 (마디보다 강한 위계) */
-.pad-ind-sel {
-  grid-column: calc(var(--sel-col) + 1);
-  grid-row: calc(var(--sel-row) + 1);
-  background: rgba(255, 255, 255, 0.2);
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 255, 255, 0.7),
-    0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
 .pad-grid {
@@ -397,11 +378,22 @@ button {
   min-width: 0;
 }
 
-.pad.on,
-.pad.hit {
+.pad.on {
+  background: var(--fg);
+  color: var(--bg);
   border-color: var(--fg);
-  background: transparent;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+  box-shadow: var(--shadow-on);
+}
+
+.pad.on .pad-sub,
+.pad.on .pad-roman {
+  color: var(--bg);
+  opacity: 0.75;
+}
+
+.pad.hit:not(.on) {
+  border-color: var(--fg);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .pad.used:not(.on) {
