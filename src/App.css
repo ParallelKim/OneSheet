@@ -192,9 +192,7 @@ button {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 7px;
-  flex: 1;
-  align-content: center;
-  min-height: 0;
+  flex: 0 0 auto;
 }
 
 .pad {
@@ -231,10 +229,9 @@ button {
 }
 
 .pad.ghost {
-  background: transparent;
-  border-color: transparent;
   pointer-events: none;
-  opacity: 0.2;
+  opacity: 0.28;
+  background: color-mix(in srgb, var(--pad) 55%, transparent);
 }
 
 .pad-sub {
