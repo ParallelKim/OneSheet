@@ -16,6 +16,33 @@ import "./App.css";
 
 type EngineState = "idle" | "ready" | "playing" | "error";
 
+function useLongPress(onLong: () => void, ms = 420) {
+  const timer = useRef<number | null>(null);
+  const fired = useRef(false);
+
+  const clear = () => {
+    if (timer.current != null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+
+  return {
+    onPointerDown: () => {
+      fired.current = false;
+      clear();
+      timer.current = window.setTimeout(() => {
+        fired.current = true;
+        onLong();
+      }, ms);
+    },
+    onPointerUp: clear,
+    onPointerLeave: clear,
+    onPointerCancel: clear,
+    didLongPress: () => fired.current,
+  };
+}
+
 function MiniBar({ layer }: { layer: Layer }) {
   const compact = layer.steps
     .map((s) => (s === "~" || s === "-" ? "·" : s.length > 3 ? s.slice(0, 2) : s))
@@ -29,9 +56,47 @@ function MiniBar({ layer }: { layer: Layer }) {
   );
 }
 
+function PadButton({
+  step,
+  index,
+  kind,
+  onCycle,
+  onClear,
+}: {
+  step: string;
+  index: number;
+  kind: Layer["kind"];
+  onCycle: () => void;
+  onClear: () => void;
+}) {
+  const empty = step === "~" || step === "-";
+  const lp = useLongPress(onClear);
+  return (
+    <button
+      type="button"
+      className={`pad ${empty ? "empty" : "hit"} ${kind}`}
+      onPointerDown={lp.onPointerDown}
+      onPointerUp={lp.onPointerUp}
+      onPointerLeave={lp.onPointerLeave}
+      onPointerCancel={lp.onPointerCancel}
+      onClick={() => {
+        if (lp.didLongPress()) return;
+        onCycle();
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onClear();
+      }}
+    >
+      <span className="pad-i">{index + 1}</span>
+      <span className="pad-v">{empty ? "·" : step}</span>
+    </button>
+  );
+}
+
 export default function App() {
   const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
-  const [activeLayerId, setActiveLayerId] = useState(() => createInitialSheet().layers[0].id);
+  const [activeLayerId, setActiveLayerId] = useState(() => "");
   const [lens, setLens] = useState<Lens>("steps");
   const [engine, setEngine] = useState<EngineState>("idle");
   const [status, setStatus] = useState("탭해서 시작");
@@ -41,6 +106,12 @@ export default function App() {
   useEffect(() => {
     sheetRef.current = sheet;
   }, [sheet]);
+
+  useEffect(() => {
+    if (!activeLayerId || !sheet.layers.some((l) => l.id === activeLayerId)) {
+      setActiveLayerId(sheet.layers[0]?.id ?? "");
+    }
+  }, [sheet.layers, activeLayerId]);
 
   const layer = useMemo(
     () => sheet.layers.find((l) => l.id === activeLayerId) ?? sheet.layers[0],
@@ -223,7 +294,7 @@ export default function App() {
             {(
               [
                 ["steps", "스텝", isHarmonyLayer(layer) ? "코드 토큰" : "히트"],
-                ["sound", "사운드", "샘플·웨이브"],
+                ["sound", "사운드", isHarmonyLayer(layer) ? "웨이브" : "페인트"],
                 ["fx", "텍스처", "게인·스파이스"],
               ] as const
             ).map(([id, label, hint]) => (
@@ -242,24 +313,16 @@ export default function App() {
           <section className="surface" aria-label="편집 표면">
             {lens === "steps" && (
               <div className={`pads ${isHarmonyLayer(layer) ? "h4" : "b16"}`}>
-                {layer.steps.map((step, i) => {
-                  const empty = step === "~" || step === "-";
-                  return (
-                    <button
-                      key={`${layer.id}-${i}`}
-                      type="button"
-                      className={`pad ${empty ? "empty" : "hit"} ${layer.kind}`}
-                      onClick={() => cycleStep(i)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        clearStep(i);
-                      }}
-                    >
-                      <span className="pad-i">{i + 1}</span>
-                      <span className="pad-v">{empty ? "·" : step}</span>
-                    </button>
-                  );
-                })}
+                {layer.steps.map((step, i) => (
+                  <PadButton
+                    key={`${layer.id}-${i}`}
+                    step={step}
+                    index={i}
+                    kind={layer.kind}
+                    onCycle={() => cycleStep(i)}
+                    onClear={() => clearStep(i)}
+                  />
+                ))}
               </div>
             )}
 
