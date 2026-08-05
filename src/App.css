@@ -319,6 +319,11 @@ button {
 
 .pad-stage {
   --mark-bar: 0;
+  --play-on: 0;
+  --play-row: 0;
+  --play-x: 0;
+  --rhy-row: 0;
+  --rhy-x: 0;
   position: relative;
   isolation: isolate;
 }
@@ -346,6 +351,41 @@ button {
   grid-row: calc(var(--mark-bar) + 1);
   background: rgba(255, 255, 255, 0.05);
   box-shadow: none;
+}
+
+/* 재생 커서 레이어 (선택 반전과 별개) */
+.pad-play {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: var(--play-on);
+}
+
+.pad-play-cursor {
+  position: absolute;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--fg);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 0 8px rgba(255, 255, 255, 0.45);
+  transform: translateX(-50%);
+  will-change: left, top;
+}
+
+/* 차트: 행=마디, 가로로 스무스 */
+.pad-play-cursor-chart {
+  left: calc(var(--play-x) * 100%);
+  top: calc(var(--play-row) * (100% - 24px) / 4 + var(--play-row) * 8px + 6px);
+  height: calc((100% - 24px) / 4 - 12px);
+}
+
+/* 리듬: 행=박, 가로=16분 */
+.pad-play-cursor-rhythm {
+  left: calc(var(--rhy-x) * 100%);
+  top: calc(var(--rhy-row) * (100% - 24px) / 4 + var(--rhy-row) * 8px + 6px);
+  height: calc((100% - 24px) / 4 - 12px);
 }
 
 .pad-grid {

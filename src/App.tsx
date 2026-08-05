@@ -14,6 +14,7 @@ import {
   slotLabel,
   slotRoman,
   SUBDIV,
+  TOTAL_STEPS,
   toStrudel,
   type Articulation,
   type SheetState,
@@ -49,11 +50,12 @@ export default function App() {
     sheetRef.current = sheet;
   }, [sheet]);
 
-  // Strudel 사이클 → 백레이어 CSS 변수 (셀 클래스 하이라이트 없음)
+  // Strudel 사이클 → LCD/그리드 재생 커서 CSS 변수
   useEffect(() => {
     if (engine !== "playing") {
       setPlaySlot(null);
       staffRef.current?.style.setProperty("--play-phase", "-1");
+      padStageRef.current?.style.setProperty("--play-on", "0");
       return;
     }
     let raf = 0;
@@ -61,14 +63,29 @@ export default function App() {
       const phase = getCyclePhase();
       if (phase !== null) {
         const slot = Math.min(SLOTS - 1, Math.floor(phase * SLOTS));
-        const barIdx = Math.floor(slot / BEATS);
+        const barF = phase * BARS;
+        const barIdx = Math.min(BARS - 1, Math.floor(barF));
+        const barLocal = barF - barIdx;
+        // 리듬 그리드: 현재 마디 안 16분 진행 (행=박, 가로=분박)
+        const stepF = (phase * TOTAL_STEPS) % BAR_STEPS;
+        const rhyRow = Math.min(BEATS - 1, Math.floor(stepF / SUBDIV));
+        const rhyLocal = (stepF % SUBDIV) / SUBDIV;
+
         setPlaySlot((prev) => (prev === slot ? prev : slot));
         const staff = staffRef.current;
         if (staff) {
           staff.style.setProperty("--play-phase", phase.toFixed(5));
           staff.style.setProperty("--mark-bar", String(barIdx));
         }
-        padStageRef.current?.style.setProperty("--mark-bar", String(barIdx));
+        const pad = padStageRef.current;
+        if (pad) {
+          pad.style.setProperty("--play-on", "1");
+          pad.style.setProperty("--mark-bar", String(barIdx));
+          pad.style.setProperty("--play-row", String(barIdx));
+          pad.style.setProperty("--play-x", barLocal.toFixed(5));
+          pad.style.setProperty("--rhy-row", String(rhyRow));
+          pad.style.setProperty("--rhy-x", rhyLocal.toFixed(5));
+        }
       }
       raf = requestAnimationFrame(tick);
     };
@@ -339,6 +356,17 @@ export default function App() {
         <div className="pad-back" aria-hidden>
           {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
         </div>
+        {/* 재생 커서: 선택(반전)과 분리된 세로줄, 행 안에서 스무스 이동 */}
+        {mode === "chart" && (
+          <div className="pad-play" aria-hidden>
+            <div className="pad-play-cursor pad-play-cursor-chart" />
+          </div>
+        )}
+        {mode === "rhythm" && playBar === bar && (
+          <div className="pad-play pad-play-rhythm" aria-hidden>
+            <div className="pad-play-cursor pad-play-cursor-rhythm" />
+          </div>
+        )}
         <section className="pad-grid" aria-label={modeLabel(mode)}>
           {mode === "chart" &&
             Array.from({ length: SLOTS }, (_, i) => {
