@@ -65,7 +65,8 @@ button {
   height: 100dvh;
   max-height: 100dvh;
   margin: 0 auto;
-  padding: 16px 12px calc(16px + env(safe-area-inset-bottom));
+  /* 상하만 페이지 여백 — 가로는 그리드가 풀폭 */
+  padding: 16px 0 calc(16px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -79,6 +80,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin: 0 12px;
   padding: 8px 10px;
   border-radius: var(--radius-box);
   border: 1px solid var(--line);
@@ -284,6 +286,7 @@ button {
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
   flex-shrink: 0;
+  margin: 0 12px;
 }
 
 .tr-btn,
@@ -352,21 +355,22 @@ button {
   min-height: 0;
   min-width: 0;
   width: 100%;
-  display: grid;
-  place-items: end center;
-  container-type: size;
-  /* 패딩·overflow 없음 — 여백은 .app, 클립은 pad-play(랩 전용)만 */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* overflow/패딩 없음 — 풀폭 이동 */
 }
 
-/* 정사각 보드 — 패드는 항상 정원, 남는 높이는 스테이지가 흡수 */
+/* 페이지 폭에 맞춘 정사각 보드 */
 .pad-board {
   --pad-gap: 8px;
   --pad-cell: calc((100% - 3 * var(--pad-gap)) / 4);
   --pad-stride: calc(var(--pad-cell) + var(--pad-gap));
   position: relative;
   isolation: isolate;
-  width: min(100cqw, 100cqh);
+  width: 100%;
   aspect-ratio: 1;
+  flex-shrink: 0;
 }
 
 .pad-back {
@@ -394,14 +398,13 @@ button {
   box-shadow: none;
 }
 
-/* 재생 링 랩 전용 클립 — 그리드 패드는 이 레이어 밖이라 잘리지 않음 */
+/* 재생 링 — overflow 없음, 보드 풀폭을 따라 이동 */
 .pad-play {
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
   opacity: var(--play-on);
-  overflow: hidden;
 }
 
 .pad-play-orb {
@@ -523,7 +526,7 @@ button {
 }
 
 .status {
-  margin: 0;
+  margin: 0 12px;
   font-size: 0.68rem;
   color: var(--muted);
   text-align: center;
