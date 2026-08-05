@@ -169,40 +169,38 @@ export default function App() {
               const color = partColor(i)
               const selected = part.id === activePart.id
               return (
-                <button
-                  key={part.id}
-                  type="button"
-                  className={`chip${selected ? ' selected' : ''}`}
-                  style={{ '--chip': color } as CSSProperties}
-                  onClick={() => setActivePartId(part.id)}
-                  aria-pressed={selected}
-                >
-                  {part.label}
-                </button>
+                <div key={part.id} className={`chip-wrap${selected ? ' selected' : ''}`}>
+                  <button
+                    type="button"
+                    className={`chip${selected ? ' selected' : ''}`}
+                    style={{ '--chip': color } as CSSProperties}
+                    onClick={() => {
+                      if (selected) stampToForm(part.id)
+                      else setActivePartId(part.id)
+                    }}
+                    aria-pressed={selected}
+                    title={selected ? '다시 눌러 FORM에 찍기' : '파트 선택'}
+                  >
+                    {part.label}
+                  </button>
+                  {selected && sheet.parts.length > 1 ? (
+                    <button
+                      type="button"
+                      className="chip-x"
+                      onClick={removeActivePart}
+                      aria-label="파트 제거"
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
               )
             })}
             <button type="button" className="chip add" onClick={addPart} aria-label="파트 추가">
               +
             </button>
           </div>
-          <div className="lens-actions">
-            <button
-              type="button"
-              className="stamp"
-              style={{ '--chip': activeColor } as CSSProperties}
-              onClick={() => stampToForm(activePart.id)}
-            >
-              FORM에 찍기
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={sheet.parts.length <= 1}
-              onClick={removeActivePart}
-            >
-              빼기
-            </button>
-          </div>
+          <p className="lens-hint">선택 중 같은 키를 다시 누르면 FORM에 찍힙니다</p>
         </section>
 
         <section
@@ -242,7 +240,7 @@ export default function App() {
             </button>
           </div>
           {sheet.form.length === 0 ? (
-            <p className="tape-empty">색 블록을 찍어 순서를 만드세요</p>
+            <p className="tape-empty">색 키를 두 번 눌러 순서를 만드세요</p>
           ) : (
             <ol className="tape-row">
               {sheet.form.map((step, index) => {
