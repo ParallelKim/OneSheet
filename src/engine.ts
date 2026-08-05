@@ -1,6 +1,8 @@
 import { evaluate, hush, initStrudel } from "@strudel/web";
 
-type Repl = Awaited<ReturnType<typeof initStrudel>>;
+type Repl = Awaited<ReturnType<typeof initStrudel>> & {
+  scheduler?: { now?: () => number; started?: boolean };
+};
 
 let boot: Promise<Repl> | null = null;
 let replRef: Repl | null = null;
@@ -26,16 +28,12 @@ export function getPlaybackEpoch(): number {
  * 엔진 미준비·정지 직후면 null.
  */
 export function getCyclePhase(): number | null {
-  const scheduler = replRef?.scheduler as
-    | { now?: () => number; started?: boolean }
-    | undefined;
-  if (!scheduler?.now) return null;
+  const now = replRef?.scheduler?.now;
+  if (typeof now !== "function") return null;
   try {
-    const t = scheduler.now();
+    const t = now.call(replRef!.scheduler);
     if (!Number.isFinite(t)) return null;
-    // 음수·정지 후 0 고착 대비
-    const phase = ((t % 1) + 1) % 1;
-    return phase;
+    return ((t % 1) + 1) % 1;
   } catch {
     return null;
   }
