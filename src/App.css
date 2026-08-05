@@ -320,10 +320,13 @@ button {
 .pad-stage {
   --mark-bar: 0;
   --play-on: 0;
-  --play-row: 0;
-  --play-x: 0;
-  --rhy-row: 0;
-  --rhy-x: 0;
+  --play-col-f: 0;
+  --play-row-f: 0;
+  --rhy-col-f: 0;
+  --rhy-row-f: 0;
+  /* 4칸 + gap 8px×3 */
+  --pad-cell: calc((100% - 24px) / 4);
+  --pad-stride: calc(var(--pad-cell) + 8px);
   position: relative;
   isolation: isolate;
 }
@@ -353,7 +356,7 @@ button {
   box-shadow: none;
 }
 
-/* 재생 커서 레이어 (선택 반전과 별개) */
+/* 재생 원형 링 — 패드 중심을 따라 스무스 이동 */
 .pad-play {
   position: absolute;
   inset: 0;
@@ -362,30 +365,28 @@ button {
   opacity: var(--play-on);
 }
 
-.pad-play-cursor {
+.pad-play-orb {
   position: absolute;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--fg);
+  width: var(--pad-cell);
+  height: var(--pad-cell);
+  border-radius: 50%;
+  border: 2px solid var(--fg);
+  background: rgba(255, 255, 255, 0.06);
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.5),
-    0 0 8px rgba(255, 255, 255, 0.45);
-  transform: translateX(-50%);
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 0 12px rgba(255, 255, 255, 0.35);
+  transform: translate(-50%, -50%);
   will-change: left, top;
 }
 
-/* 차트: 행=마디, 가로로 스무스 */
-.pad-play-cursor-chart {
-  left: calc(var(--play-x) * 100%);
-  top: calc(var(--play-row) * (100% - 24px) / 4 + var(--play-row) * 8px + 6px);
-  height: calc((100% - 24px) / 4 - 12px);
+.pad-play-orb-chart {
+  left: calc(var(--play-col-f) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--play-row-f) * var(--pad-stride) + var(--pad-cell) / 2);
 }
 
-/* 리듬: 행=박, 가로=16분 */
-.pad-play-cursor-rhythm {
-  left: calc(var(--rhy-x) * 100%);
-  top: calc(var(--rhy-row) * (100% - 24px) / 4 + var(--rhy-row) * 8px + 6px);
-  height: calc((100% - 24px) / 4 - 12px);
+.pad-play-orb-rhythm {
+  left: calc(var(--rhy-col-f) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--rhy-row-f) * var(--pad-stride) + var(--pad-cell) / 2);
 }
 
 .pad-grid {

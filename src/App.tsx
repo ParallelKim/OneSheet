@@ -63,13 +63,12 @@ export default function App() {
       const phase = getCyclePhase();
       if (phase !== null) {
         const slot = Math.min(SLOTS - 1, Math.floor(phase * SLOTS));
-        const barF = phase * BARS;
-        const barIdx = Math.min(BARS - 1, Math.floor(barF));
-        const barLocal = barF - barIdx;
-        // 리듬 그리드: 현재 마디 안 16분 진행 (행=박, 가로=분박)
+        const slotF = phase * SLOTS;
+        const barIdx = Math.min(BARS - 1, Math.floor(slotF / BEATS));
+        const colF = slotF - barIdx * BEATS; // 0..4
         const stepF = (phase * TOTAL_STEPS) % BAR_STEPS;
         const rhyRow = Math.min(BEATS - 1, Math.floor(stepF / SUBDIV));
-        const rhyLocal = (stepF % SUBDIV) / SUBDIV;
+        const subF = stepF - rhyRow * SUBDIV;
 
         setPlaySlot((prev) => (prev === slot ? prev : slot));
         const staff = staffRef.current;
@@ -81,10 +80,11 @@ export default function App() {
         if (pad) {
           pad.style.setProperty("--play-on", "1");
           pad.style.setProperty("--mark-bar", String(barIdx));
-          pad.style.setProperty("--play-row", String(barIdx));
-          pad.style.setProperty("--play-x", barLocal.toFixed(5));
-          pad.style.setProperty("--rhy-row", String(rhyRow));
-          pad.style.setProperty("--rhy-x", rhyLocal.toFixed(5));
+          // 그리드 좌표(갭 포함): 열 0..4, 행 0..3
+          pad.style.setProperty("--play-col-f", Math.min(colF, BEATS - 0.0001).toFixed(5));
+          pad.style.setProperty("--play-row-f", String(barIdx));
+          pad.style.setProperty("--rhy-col-f", Math.min(subF, SUBDIV - 0.0001).toFixed(5));
+          pad.style.setProperty("--rhy-row-f", String(rhyRow));
         }
       }
       raf = requestAnimationFrame(tick);
@@ -356,15 +356,15 @@ export default function App() {
         <div className="pad-back" aria-hidden>
           {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
         </div>
-        {/* 재생 커서: 선택(반전)과 분리된 세로줄, 행 안에서 스무스 이동 */}
+        {/* 재생: 원형 링 — 선택(반전)과 분리, 패드 궤적을 스무스 추적 */}
         {mode === "chart" && (
           <div className="pad-play" aria-hidden>
-            <div className="pad-play-cursor pad-play-cursor-chart" />
+            <div className="pad-play-orb pad-play-orb-chart" />
           </div>
         )}
         {mode === "rhythm" && playBar === bar && (
           <div className="pad-play pad-play-rhythm" aria-hidden>
-            <div className="pad-play-cursor pad-play-cursor-rhythm" />
+            <div className="pad-play-orb pad-play-orb-rhythm" />
           </div>
         )}
         <section className="pad-grid" aria-label={modeLabel(mode)}>
