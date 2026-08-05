@@ -12,6 +12,7 @@ Current UI: single 4×4 launchpad (chart / degree / rhythm lenses), LCD bar bead
 
 - Install / refresh deps: `npm ci`
 - Dev server: `npm run dev -- --host 0.0.0.0 --port 5173`
+- Unit tests (toStrudel): `npm test`
 - Production build check: `npm run build`
 - Preview build: `npm run preview -- --host 0.0.0.0 --port 4173`
 - Hosting live deploy (local): `npm run deploy`
@@ -23,6 +24,7 @@ Current UI: single 4×4 launchpad (chart / degree / rhythm lenses), LCD bar bead
 2. Confirm 4×4 launchpad, LCD bar beads, degree/rhythm lenses, and transport (play / metronome / modes).
 3. Click Play (browser gesture required for audio). Editing while playing should re-evaluate via Strudel.
 4. Rhythm mode: select a bar in LCD, paint D/U/X/hold/rest on the 16th grid.
+5. `npm test` — SheetState → Strudel 변환 테스트.
 
 ## Firebase Hosting
 
