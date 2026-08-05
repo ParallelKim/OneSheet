@@ -65,10 +65,10 @@ button {
   height: 100dvh;
   max-height: 100dvh;
   margin: 0 auto;
-  padding: 8px 12px calc(6px + env(safe-area-inset-bottom));
+  padding: 16px 12px calc(16px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   overflow: hidden;
   overflow-x: hidden;
   overflow-y: hidden;
@@ -352,12 +352,10 @@ button {
   min-height: 0;
   min-width: 0;
   width: 100%;
-  overflow: hidden;
   display: grid;
   place-items: end center;
-  padding-bottom: 8px;
-  box-sizing: border-box;
   container-type: size;
+  /* 패딩·overflow 없음 — 여백은 .app, 클립은 pad-play(랩 전용)만 */
 }
 
 /* 정사각 보드 — 패드는 항상 정원, 남는 높이는 스테이지가 흡수 */
@@ -369,8 +367,6 @@ button {
   isolation: isolate;
   width: min(100cqw, 100cqh);
   aspect-ratio: 1;
-  overflow: hidden;
-  contain: paint;
 }
 
 .pad-back {
@@ -398,7 +394,7 @@ button {
   box-shadow: none;
 }
 
-/* 재생 원형 링 — 행 끝↔다음 행 왼쪽 동시 노출 */
+/* 재생 링 랩 전용 클립 — 그리드 패드는 이 레이어 밖이라 잘리지 않음 */
 .pad-play {
   position: absolute;
   inset: 0;
@@ -406,7 +402,6 @@ button {
   pointer-events: none;
   opacity: var(--play-on);
   overflow: hidden;
-  contain: paint;
 }
 
 .pad-play-orb {
