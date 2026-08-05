@@ -23,14 +23,14 @@ export type SheetState = {
 export const ROOTS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
 
 export const QUALITIES: readonly { id: Quality; label: string; hint: string }[] = [
-  { id: "tone", label: "단", hint: "단음" },
-  { id: "maj", label: "M", hint: "메이저" },
-  { id: "min", label: "m", hint: "마이너" },
-  { id: "dom7", label: "7", hint: "도미넌트7" },
-  { id: "m7", label: "m7", hint: "마이너7" },
+  { id: "tone", label: "단음", hint: "근음만" },
+  { id: "maj", label: "maj", hint: "메이저 트라이어드" },
+  { id: "min", label: "min", hint: "마이너 트라이어드" },
+  { id: "dom7", label: "7", hint: "도미넌트 세븐스" },
+  { id: "m7", label: "m7", hint: "마이너 세븐스" },
   { id: "dim", label: "dim", hint: "디미니시드" },
   { id: "aug", label: "aug", hint: "어그멘티드" },
-  { id: "pow", label: "5", hint: "파워" },
+  { id: "pow", label: "5", hint: "파워 코드 (근음·5도)" },
 ] as const;
 
 /** 조 → 근음 강조(이 조 스케일 음) */
@@ -56,10 +56,10 @@ export const VOICES: readonly {
   sound: string;
   cutoff: number;
 }[] = [
-  { id: "warm", label: "따뜻", sound: "sawtooth", cutoff: 1400 },
-  { id: "bright", label: "날카", sound: "square", cutoff: 3200 },
-  { id: "soft", label: "둥글", sound: "triangle", cutoff: 1800 },
-  { id: "keys", label: "건반", sound: "gm_epiano1", cutoff: 2400 },
+  { id: "warm", label: "웜", sound: "sawtooth", cutoff: 1400 },
+  { id: "bright", label: "샤프", sound: "square", cutoff: 3200 },
+  { id: "soft", label: "소프트", sound: "triangle", cutoff: 1800 },
+  { id: "keys", label: "피아노", sound: "gm_epiano1", cutoff: 2400 },
 ] as const;
 
 export const HITS = ["~", "bd", "sd", "hh", "cp"] as const;
@@ -102,7 +102,7 @@ export function slotLabel(slot: ChordSlot | null): string {
   const { root, quality } = slot;
   switch (quality) {
     case "tone":
-      return root;
+      return `${root}·`;
     case "maj":
       return root;
     case "min":
@@ -121,9 +121,7 @@ export function slotLabel(slot: ChordSlot | null): string {
 }
 
 export function slotHint(slot: ChordSlot | null): string {
-  if (!slot) return "쉼";
-  if (slot.quality === "tone") return "단음";
-  if (slot.quality === "maj") return "M";
+  if (!slot) return "rest";
   return QUALITIES.find((q) => q.id === slot.quality)?.label ?? "";
 }
 

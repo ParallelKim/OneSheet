@@ -24,7 +24,7 @@ export default function App() {
   const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
   const [selected, setSelected] = useState(0);
   const [engine, setEngine] = useState<EngineState>("idle");
-  const [status, setStatus] = useState("근음을 고르고, 퀄리티를 바꾸세요");
+  const [status, setStatus] = useState("차트 준비됨");
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
 
@@ -39,7 +39,7 @@ export default function App() {
     } catch (err) {
       console.error(err);
       setEngine("error");
-      setStatus("패턴 오류");
+      setStatus("재생할 수 없는 진행입니다");
     }
   }, []);
 
@@ -56,7 +56,7 @@ export default function App() {
 
   const ensureReady = useCallback(async () => {
     if (engine === "ready" || engine === "playing") return true;
-    setStatus("엔진 준비…");
+    setStatus("소리 장치 연결 중…");
     try {
       await initStrudelEngine();
       setEngine("ready");
@@ -64,7 +64,7 @@ export default function App() {
     } catch (err) {
       console.error(err);
       setEngine("error");
-      setStatus("엔진 실패");
+      setStatus("소리 장치를 열 수 없습니다");
       return false;
     }
   }, [engine]);
@@ -76,12 +76,12 @@ export default function App() {
       await evaluateStrudel(toStrudel(sheetRef.current));
       playingRef.current = true;
       setEngine("playing");
-      setStatus("재생 중 · 바꾸면 바로 들립니다");
+      setStatus("재생 중");
     } catch (err) {
       console.error(err);
       playingRef.current = false;
       setEngine("error");
-      setStatus("재생 실패");
+      setStatus("재생에 실패했습니다");
     }
   }, [ensureReady]);
 
@@ -126,7 +126,7 @@ export default function App() {
       <header className="top">
         <div>
           <p className="brand">OneSheet</p>
-          <p className="tag">만지고, 바로 듣는 한 장</p>
+          <p className="tag">기타 차트 한 장</p>
         </div>
         <button
           type="button"
@@ -144,13 +144,13 @@ export default function App() {
           className="key-chip"
           onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
         >
-          <span className="ctrl-label">조</span>
+          <span className="ctrl-label">조성</span>
           <span className="ctrl-value">{sheet.key}</span>
         </button>
-        <p className="key-hint">근음 힌트 · 퀄리티는 자유</p>
+        <p className="key-hint">스케일 근음을 밝게 표시합니다</p>
       </div>
 
-      <section className="chords" aria-label="코드 슬롯">
+      <section className="chords" aria-label="코드 진행">
         {sheet.chords.map((chord, i) => (
           <button
             key={i}
@@ -160,14 +160,14 @@ export default function App() {
           >
             <span className="chord-i">
               {i + 1}
-              {chord ? ` · ${slotHint(chord)}` : ""}
+              {chord ? ` · ${slotHint(chord)}` : " · rest"}
             </span>
             <span className="chord-v">{slotLabel(chord)}</span>
           </button>
         ))}
       </section>
 
-      <section className="editor" aria-label="근음과 퀄리티">
+      <section className="editor" aria-label="코드 편집">
         <div className="edit-block">
           <p className="edit-label">근음</p>
           <div className="root-row">
@@ -189,7 +189,7 @@ export default function App() {
         </div>
 
         <div className="edit-block">
-          <p className="edit-label">퀄리티 · 같은 근음</p>
+          <p className="edit-label">화음</p>
           <div className="qual-row">
             {QUALITIES.map((q) => (
               <button
@@ -202,15 +202,20 @@ export default function App() {
                 {q.label}
               </button>
             ))}
-            <button type="button" className={`qual rest ${current === null ? "on" : ""}`} onClick={clearSlot}>
-              —
+            <button
+              type="button"
+              className={`qual rest ${current === null ? "on" : ""}`}
+              onClick={clearSlot}
+              title="쉼표"
+            >
+              rest
             </button>
           </div>
         </div>
       </section>
 
-      <section className="beats" aria-label="비트">
-        <p className="beats-label">비트</p>
+      <section className="beats" aria-label="리듬">
+        <p className="beats-label">리듬</p>
         <div className="beat-row">
           {sheet.beats.map((hit, i) => {
             const empty = hit === "~";
@@ -226,7 +231,7 @@ export default function App() {
                     return { ...prev, beats };
                   })
                 }
-                aria-label={`비트 ${i + 1} ${empty ? "쉼" : hit}`}
+                aria-label={`${i + 1}박 ${empty ? "쉼" : hit}`}
               >
                 <span>{empty ? "" : hit}</span>
               </button>
@@ -235,9 +240,9 @@ export default function App() {
         </div>
       </section>
 
-      <section className="controls" aria-label="소리">
+      <section className="controls" aria-label="음색과 템포">
         <div className="voice-row">
-          <span className="ctrl-label">배음</span>
+          <span className="ctrl-label">음색</span>
           <div className="voices">
             {VOICES.map((v) => (
               <button
@@ -253,7 +258,7 @@ export default function App() {
         </div>
 
         <label className="tempo">
-          <span className="ctrl-label">템포</span>
+          <span className="ctrl-label">BPM</span>
           <input
             type="range"
             min={70}
@@ -268,7 +273,6 @@ export default function App() {
 
       <footer className="foot">
         <p className="status">{status}</p>
-        <p className="hint">슬롯 → 근음 → 퀄리티 (단 M m 7 m7 dim aug 5)</p>
       </footer>
     </div>
   );
