@@ -9,7 +9,9 @@
   --shadow-on: 0 0 0 1px var(--fg), 0 4px 14px rgba(0, 0, 0, 0.55);
   --radius: 999px;
   --radius-box: 16px;
-  --font: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+  /* 기본: Geist Pixel / 한글·폴백: Pretendard */
+  --font: "Geist Pixel", "Pretendard", system-ui, sans-serif;
+  --font-ui: "Pretendard", system-ui, sans-serif;
 }
 
 * {
@@ -28,6 +30,11 @@ body {
   color: var(--fg);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+}
+
+/* 본문·긴 한글 등 가독성이 필요할 때 */
+.font-ui {
+  font-family: var(--font-ui);
 }
 
 button,
