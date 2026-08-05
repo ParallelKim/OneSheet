@@ -274,8 +274,10 @@ export function toStrudel(sheet: SheetState): string {
   }
 
   if (parts.metro) {
-    // 16분 64스텝 사이클 안에서 4분마다 클릭
-    layers.push(`s("woodblock").struct("x*${SLOTS}").gain(0.08)`);
+    // 샘플 없이 신스 클릭 (woodblock은 번들에 없음)
+    layers.push(
+      `note("g5").s("triangle").struct("x*${SLOTS}").gain(0.07).clip(0.08)`,
+    );
   }
 
   if (layers.length === 0) return "silence";

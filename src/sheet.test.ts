@@ -69,7 +69,7 @@ describe("compileSheet / toStrudel", () => {
     expect(toStrudel(sheet)).toBe("silence");
   });
 
-  it("메트로만 켜도 woodblock 레이어가 나온다", () => {
+  it("메트로만 켜도 클릭 레이어가 나온다", () => {
     const sheet: SheetState = {
       ...createInitialSheet(),
       degrees: Array(16).fill(null),
@@ -77,7 +77,8 @@ describe("compileSheet / toStrudel", () => {
     };
     const code = toStrudel(sheet);
     expect(code).toContain("setcps(");
-    expect(code).toContain("woodblock");
+    expect(code).toContain("triangle");
+    expect(code).toContain("struct(");
     expect(code).not.toContain("chord(");
   });
 
@@ -87,8 +88,8 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain('chord("<');
     expect(code).toContain('.dict("triads")');
     expect(code).toContain(".voicing()");
-    expect(code).toContain(".s(\"sawtooth\")");
-    expect(code).toContain("woodblock");
+    expect(code).toContain('.s("sawtooth")');
+    expect(code).toContain("struct(");
   });
 
   it("rest 구간은 공격이 없다", () => {
