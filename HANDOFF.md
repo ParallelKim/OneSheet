@@ -21,6 +21,10 @@ base `main` · PR https://github.com/ParallelKim/OneSheet/pull/2
 - **transport** (LCD ↔ 그리드 사이): 재생 · 메트로 · 차트 · 도수 · 리듬  
   (진행 프리셋 제거 — 조성 안 도수는 유저가 채움)
 - 리듬 브러시(D/U/X/·/∅)도 그리드 바로 위
+- **4×4 렌즈**
+  - 차트: 16 타임슬롯
+  - 도수: I–vii° + rest
+  - 리듬: 선택 마디 16분 그리드
 
 ### 리듬 셀 어휘
 | 값 | UI | 의미 |
