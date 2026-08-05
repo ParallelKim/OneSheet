@@ -53,31 +53,6 @@ button {
   gap: 10px;
 }
 
-.top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 4px;
-}
-
-.brand {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.pos {
-  margin: 0;
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-
-.pos.playing {
-  color: var(--fg);
-}
-
 .lcd {
   display: flex;
   flex-direction: column;
@@ -93,6 +68,29 @@ button {
   display: flex;
   gap: 5px;
   align-items: center;
+}
+
+.pos {
+  margin: 0 0 0 auto;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.pos.playing {
+  color: var(--fg);
+}
+
+.pos-bar {
+  font-weight: 700;
+}
+
+.pos-beat {
+  opacity: 0.85;
 }
 
 /* 얇은 한 줄 차트 — 뒤: 인디케이터 / 앞: 투명 코드 */

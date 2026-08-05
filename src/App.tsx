@@ -38,7 +38,7 @@ export default function App() {
   const [mode, setMode] = useState<Mode>("chart");
   const [brush, setBrush] = useState<Articulation>("D");
   const [engine, setEngine] = useState<EngineState>("idle");
-  const [status, setStatus] = useState("차트 준비됨");
+  const [status, setStatus] = useState("");
   /** 재생 헤드: 4분 슬롯 0–15 (null = 정지) — 텍스트용 */
   const [playSlot, setPlaySlot] = useState<number | null>(null);
   const sheetRef = useRef(sheet);
@@ -103,12 +103,12 @@ export default function App() {
         // 정지 레이스로 무효화된 평가
         playingRef.current = false;
         setEngine((e) => (e === "error" ? e : "ready"));
-        setStatus("정지");
+        setStatus("");
       }
     } catch (err) {
       console.error(err, getLastStrudelCode());
       setEngine("error");
-      setStatus("재생할 수 없는 진행입니다");
+      setStatus("pattern error");
     }
   }, []);
 
@@ -125,15 +125,16 @@ export default function App() {
 
   const ensureReady = useCallback(async () => {
     if (engine === "ready" || engine === "playing") return true;
-    setStatus("소리 장치 연결 중…");
+    setStatus("audio…");
     try {
       await initStrudelEngine();
       setEngine("ready");
+      setStatus("");
       return true;
     } catch (err) {
       console.error(err);
       setEngine("error");
-      setStatus("소리 장치를 열 수 없습니다");
+      setStatus("audio error");
       return false;
     }
   }, [engine]);
@@ -148,17 +149,17 @@ export default function App() {
         // 평가 중 정지된 경우
         playingRef.current = false;
         setEngine("ready");
-        setStatus("정지");
+        setStatus("");
         return;
       }
       playingRef.current = true;
       setEngine("playing");
-      setStatus("재생 중");
+      setStatus("");
     } catch (err) {
       console.error(err, getLastStrudelCode());
       playingRef.current = false;
       setEngine("error");
-      setStatus("재생에 실패했습니다");
+      setStatus("play error");
     }
   }, [ensureReady]);
 
@@ -166,7 +167,7 @@ export default function App() {
     hushStrudel();
     playingRef.current = false;
     setEngine((e) => (e === "error" ? e : "ready"));
-    setStatus("정지");
+    setStatus("");
   }, []);
 
   const paintDegree = (degree: number | null) => {
@@ -206,26 +207,19 @@ export default function App() {
   const playBeat = playSlot !== null ? (playSlot % BEATS) + 1 : null;
   /** 하이라이트할 마디: 재생 중이면 재생 마디, 아니면 선택 마디 */
   const markBar = playBar ?? bar;
+  const posBar = playBar ?? bar;
+  const posBeat = playBeat ?? beat;
 
   return (
     <div className="app">
-      <header className="top">
-        <p className="brand">OneSheet</p>
-        <p className={`pos ${playing ? "playing" : ""}`}>
-          {playing && playBar !== null && playBeat !== null
-            ? `▶ ${playBar + 1}마디 · ${playBeat}박`
-            : `${bar + 1}마디 · ${beat}박`}
-        </p>
-      </header>
-
-      <section className="lcd" aria-label="상태">
+      <section className="lcd" aria-label="lcd">
         <div className="lcd-meta">
           <button
             type="button"
             className="chip"
             onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
           >
-            <span className="chip-k">조성</span>
+            <span className="chip-k">KEY</span>
             <span className="chip-v">{sheet.key}</span>
           </button>
           <label className="chip tempo-chip">
@@ -240,12 +234,16 @@ export default function App() {
             />
             <span className="chip-v">{sheet.bpm}</span>
           </label>
+          <p className={`pos ${playing ? "playing" : ""}`} aria-label="position">
+            <span className="pos-bar">|{posBar + 1}|</span>
+            <span className="pos-beat">{posBeat}</span>
+          </p>
         </div>
 
         <div
           ref={staffRef}
           className={`staff ${playing ? "is-playing" : ""}`}
-          aria-label="차트"
+          aria-label="chart"
           style={{ "--mark-bar": markBar } as CSSProperties}
         >
           <div className="staff-back" aria-hidden>
@@ -258,7 +256,7 @@ export default function App() {
                 key={bi}
                 className="measure"
                 role="group"
-                aria-label={`${bi + 1}마디`}
+                aria-label={`bar ${bi + 1}`}
                 onClick={() => selectBar(bi)}
               >
                 <div className="measure-chords">
@@ -275,7 +273,7 @@ export default function App() {
                           e.stopPropagation();
                           setSelected(i);
                         }}
-                        aria-label={`${bi + 1}마디 ${qi + 1}박`}
+                        aria-label={`bar ${bi + 1} beat ${qi + 1}`}
                       >
                         <span className="chord-name">{slotLabel(sheet.key, d)}</span>
                         {on && d !== null ? <span className="degree-dot">{slotRoman(d)}</span> : null}
@@ -290,53 +288,57 @@ export default function App() {
         </div>
       </section>
 
-      <nav className="transport" aria-label="공통 조작">
+      <nav className="transport" aria-label="transport">
         <button
           type="button"
           className={`tr-btn play ${playing ? "on" : ""}`}
           onClick={() => void (playing ? onStop() : onPlay())}
-          aria-label={playing ? "일시정지" : "재생"}
+          aria-label={playing ? "stop" : "play"}
         >
           <span className="tr-icon">{playing ? "■" : "▶"}</span>
-          <span className="tr-label">{playing ? "정지" : "재생"}</span>
+          <span className="tr-label">{playing ? "STOP" : "PLAY"}</span>
         </button>
         <button
           type="button"
           className={`tr-btn ${sheet.metro ? "on" : ""}`}
           onClick={() => update((prev) => ({ ...prev, metro: !prev.metro }))}
           aria-pressed={sheet.metro}
+          aria-label="metronome"
         >
           <span className="tr-icon">♩</span>
-          <span className="tr-label">메트로</span>
+          <span className="tr-label">CLICK</span>
         </button>
         <button
           type="button"
           className={`tr-btn ${mode === "chart" ? "on" : ""}`}
           onClick={() => setMode("chart")}
+          aria-label="chart"
         >
           <span className="tr-icon">▦</span>
-          <span className="tr-label">차트</span>
+          <span className="tr-label">GRID</span>
         </button>
         <button
           type="button"
           className={`tr-btn ${mode === "degree" ? "on" : ""}`}
           onClick={() => setMode("degree")}
+          aria-label="degree"
         >
           <span className="tr-icon">I</span>
-          <span className="tr-label">도수</span>
+          <span className="tr-label">DEG</span>
         </button>
         <button
           type="button"
           className={`tr-btn ${mode === "rhythm" ? "on" : ""}`}
           onClick={() => setMode("rhythm")}
+          aria-label="rhythm"
         >
           <span className="tr-icon">♩♪</span>
-          <span className="tr-label">리듬</span>
+          <span className="tr-label">RHY</span>
         </button>
       </nav>
 
       {mode === "rhythm" && (
-        <div className="brush-row" aria-label="주법">
+        <div className="brush-row" aria-label="articulation">
           {ARTICULATIONS.map((a) => (
             <button
               key={a.id}
@@ -440,32 +442,24 @@ export default function App() {
                     {subMark}
                   </span>
                   <span className="pad-label">{artLabel(art)}</span>
-                  <span className="pad-roman">
-                    {art === "hold" ? "링" : art === "rest" ? "쉼" : art === "X" ? "뮤트" : art === "D" ? "다운" : "업"}
-                  </span>
+                  <span className="pad-roman">{artHint(art)}</span>
                 </button>
               );
             })}
         </section>
       </div>
 
-      <p className="status">
-        {playing && playBar !== null && playBeat !== null
-          ? `재생 중 · ${playBar + 1}마디 ${playBeat}박`
-          : mode === "rhythm"
-            ? `${bar + 1}마디 리듬 · 탭으로 ${brushLabel(brush)}`
-            : status}
-      </p>
+      {status ? <p className="status">{status}</p> : null}
     </div>
   );
 }
 
 function modeLabel(mode: Mode): string {
-  if (mode === "chart") return "차트";
-  if (mode === "degree") return "도수";
-  return "리듬";
+  if (mode === "chart") return "grid";
+  if (mode === "degree") return "degree";
+  return "rhythm";
 }
 
-function brushLabel(art: Articulation): string {
+function artHint(art: Articulation): string {
   return ARTICULATIONS.find((a) => a.id === art)?.hint ?? art;
 }

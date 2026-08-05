@@ -30,10 +30,10 @@ export const VOICES: readonly {
   sound: string;
   cutoff: number;
 }[] = [
-  { id: "warm", label: "웜", sound: "sawtooth", cutoff: 1400 },
-  { id: "bright", label: "샤프", sound: "square", cutoff: 3200 },
-  { id: "soft", label: "소프트", sound: "triangle", cutoff: 1800 },
-  { id: "keys", label: "피아노", sound: "triangle", cutoff: 2400 },
+  { id: "warm", label: "warm", sound: "sawtooth", cutoff: 1400 },
+  { id: "bright", label: "bright", sound: "square", cutoff: 3200 },
+  { id: "soft", label: "soft", sound: "triangle", cutoff: 1800 },
+  { id: "keys", label: "keys", sound: "triangle", cutoff: 2400 },
 ] as const;
 
 export const BARS = 4;
@@ -48,11 +48,11 @@ export const ARTICULATIONS: readonly {
   label: string;
   hint: string;
 }[] = [
-  { id: "D", label: "D", hint: "다운" },
-  { id: "U", label: "U", hint: "업" },
-  { id: "X", label: "X", hint: "뮤트" },
-  { id: "hold", label: "·", hint: "링" },
-  { id: "rest", label: "∅", hint: "쉼" },
+  { id: "D", label: "D", hint: "↓" },
+  { id: "U", label: "U", hint: "↑" },
+  { id: "X", label: "X", hint: "✕" },
+  { id: "hold", label: "·", hint: "—" },
+  { id: "rest", label: "∅", hint: "ø" },
 ] as const;
 
 export const MAJOR_KEYS: Record<string, readonly string[]> = {
