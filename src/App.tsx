@@ -1,347 +1,351 @@
-import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  createId,
-  createPart,
-  createSheet,
-  type Part,
-  type Sheet,
-} from './sheet'
-import { isPlaying, playSheet, stopSheet, updateSheet } from './engine'
-import { track } from './firebase'
-import './App.css'
+  createEmptyLayer,
+  createInitialSheet,
+  HARMONY_CHORDS,
+  HARMONY_SOUNDS,
+  BEAT_SOUNDS,
+  isHarmonyLayer,
+  toStrudel,
+  type Layer,
+  type Lens,
+  type SheetState,
+} from "./sheet";
+import { evaluateStrudel, hushStrudel, initStrudelEngine } from "./engine";
+import "./App.css";
 
-const PART_COLORS = ['#ff5a1f', '#3ddc97', '#4cc9f0', '#f4d35e', '#b388ff', '#ff8fab']
+type EngineState = "idle" | "ready" | "playing" | "error";
 
-function partColor(index: number): string {
-  return PART_COLORS[index % PART_COLORS.length]!
-}
-
-function boot(): { sheet: Sheet; activePartId: string } {
-  const sheet = createSheet()
-  return { sheet, activePartId: sheet.parts[0]!.id }
+function MiniBar({ layer }: { layer: Layer }) {
+  const compact = layer.steps
+    .map((s) => (s === "~" || s === "-" ? "·" : s.length > 3 ? s.slice(0, 2) : s))
+    .join(" ");
+  return (
+    <div className={`mini ${layer.kind} ${layer.muted ? "is-muted" : ""}`}>
+      <span className="mini-tag">{layer.kind === "harmony" ? "H" : "B"}</span>
+      <code className="mini-code">{compact}</code>
+      <span className="mini-snd">{layer.sound}</span>
+    </div>
+  );
 }
 
 export default function App() {
-  const [bootState] = useState(boot)
-  const [sheet, setSheet] = useState<Sheet>(bootState.sheet)
-  const [activePartId, setActivePartId] = useState(bootState.activePartId)
-  const [playing, setPlaying] = useState(false)
-  const [status, setStatus] = useState('')
-  const [selectedBar, setSelectedBar] = useState(0)
-  const [writeMode, setWriteMode] = useState(false)
-  const chordInputRef = useRef<HTMLInputElement>(null)
+  const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
+  const [activeLayerId, setActiveLayerId] = useState(() => createInitialSheet().layers[0].id);
+  const [lens, setLens] = useState<Lens>("steps");
+  const [engine, setEngine] = useState<EngineState>("idle");
+  const [status, setStatus] = useState("탭해서 시작");
+  const sheetRef = useRef(sheet);
+  const playingRef = useRef(false);
 
-  const parts = sheet.parts
-  const activePart =
-    parts.find((p) => p.id === activePartId) ?? parts[0] ?? null
+  useEffect(() => {
+    sheetRef.current = sheet;
+  }, [sheet]);
 
-  const colorById = useMemo(() => {
-    const map = new Map<string, string>()
-    parts.forEach((p, i) => map.set(p.id, partColor(i)))
-    return map
-  }, [parts])
+  const layer = useMemo(
+    () => sheet.layers.find((l) => l.id === activeLayerId) ?? sheet.layers[0],
+    [sheet.layers, activeLayerId],
+  );
 
-  const commit = useCallback((next: Sheet) => {
-    setSheet(next)
-    if (isPlaying()) {
-      void updateSheet(next).catch((err: unknown) => {
-        setStatus(err instanceof Error ? err.message : String(err))
-      })
-    }
-  }, [])
-
-  async function togglePlay() {
-    setStatus('')
+  const pushPattern = useCallback(async (next: SheetState) => {
+    if (!playingRef.current) return;
     try {
-      if (playing) {
-        stopSheet()
-        setPlaying(false)
-        void track('play_stop', { bpm: sheet.bpm })
-        return
-      }
-      await playSheet(sheet)
-      setPlaying(true)
-      void track('play_start', {
-        bpm: sheet.bpm,
-        parts: sheet.parts.length,
-        form_steps: sheet.form.length,
-      })
+      await evaluateStrudel(toStrudel(next));
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : String(err))
-      setPlaying(false)
+      console.error(err);
+      setEngine("error");
+      setStatus("패턴 오류");
     }
-  }
+  }, []);
 
-  function updatePart(partId: string, patch: Partial<Part>) {
-    commit({
-      ...sheet,
-      parts: sheet.parts.map((p) =>
-        p.id === partId ? { ...p, ...patch } : p,
-      ),
-    })
-  }
+  const updateSheet = useCallback(
+    (recipe: (prev: SheetState) => SheetState) => {
+      setSheet((prev) => {
+        const next = recipe(prev);
+        void pushPattern(next);
+        return next;
+      });
+    },
+    [pushPattern],
+  );
 
-  function setChord(index: number, chord: string) {
-    if (!activePart) return
-    const chords = [...activePart.chords] as Part['chords']
-    chords[index] = chord
-    updatePart(activePart.id, { chords })
-  }
+  const patchLayer = useCallback(
+    (id: string, patch: Partial<Layer> | ((l: Layer) => Layer)) => {
+      updateSheet((prev) => ({
+        ...prev,
+        layers: prev.layers.map((l) => {
+          if (l.id !== id) return l;
+          return typeof patch === "function" ? patch(l) : { ...l, ...patch };
+        }),
+      }));
+    },
+    [updateSheet],
+  );
 
-  function selectBar(index: number) {
-    setSelectedBar(index)
-    // focus hidden/parameter input for typing (LCD itself is display-only)
-    requestAnimationFrame(() => chordInputRef.current?.focus())
-  }
+  const ensureReady = useCallback(async () => {
+    if (engine === "ready" || engine === "playing") return true;
+    setStatus("엔진 준비…");
+    try {
+      await initStrudelEngine();
+      setEngine("ready");
+      setStatus("준비됨");
+      return true;
+    } catch (err) {
+      console.error(err);
+      setEngine("error");
+      setStatus("엔진 실패");
+      return false;
+    }
+  }, [engine]);
 
-  function addPart() {
-    const part = createPart(String.fromCharCode(65 + sheet.parts.length))
-    commit({ ...sheet, parts: [...sheet.parts, part] })
-    setActivePartId(part.id)
-  }
+  const onPlay = useCallback(async () => {
+    const ok = await ensureReady();
+    if (!ok) return;
+    try {
+      await evaluateStrudel(toStrudel(sheetRef.current));
+      playingRef.current = true;
+      setEngine("playing");
+      setStatus("재생 중");
+    } catch (err) {
+      console.error(err);
+      playingRef.current = false;
+      setEngine("error");
+      setStatus("재생 실패");
+    }
+  }, [ensureReady]);
 
-  function stampToForm() {
-    if (!activePart) return
-    commit({
-      ...sheet,
-      form: [...sheet.form, { id: createId(), partId: activePart.id }],
-    })
-  }
+  const onStop = useCallback(() => {
+    hushStrudel();
+    playingRef.current = false;
+    setEngine((e) => (e === "error" ? e : "ready"));
+    setStatus("정지");
+  }, []);
 
-  function removeFromForm(index: number) {
-    commit({
-      ...sheet,
-      form: sheet.form.filter((_, i) => i !== index),
-    })
-  }
+  const addLayer = (kind: Layer["kind"]) => {
+    const next = createEmptyLayer(kind);
+    updateSheet((prev) => ({ ...prev, layers: [...prev.layers, next] }));
+    setActiveLayerId(next.id);
+    setLens("steps");
+  };
 
-  function clearForm() {
-    commit({ ...sheet, form: [] })
-  }
+  const removeLayer = (id: string) => {
+    if (sheet.layers.length <= 1) return;
+    updateSheet((prev) => ({
+      ...prev,
+      layers: prev.layers.filter((l) => l.id !== id),
+    }));
+    if (activeLayerId === id) {
+      const rest = sheet.layers.filter((l) => l.id !== id);
+      setActiveLayerId(rest[0]?.id ?? "");
+    }
+  };
 
-  function removeActivePart() {
-    if (!activePart || sheet.parts.length <= 1) return
-    const nextParts = sheet.parts.filter((p) => p.id !== activePart.id)
-    commit({
-      ...sheet,
-      parts: nextParts,
-      form: sheet.form.filter((step) => step.partId !== activePart.id),
-    })
-    setActivePartId(nextParts[0]!.id)
-  }
+  const cycleStep = (index: number) => {
+    if (!layer) return;
+    patchLayer(layer.id, (l) => {
+      const steps = [...l.steps];
+      if (isHarmonyLayer(l)) {
+        const i = HARMONY_CHORDS.indexOf(steps[index] as (typeof HARMONY_CHORDS)[number]);
+        const next = i < 0 ? 0 : (i + 1) % HARMONY_CHORDS.length;
+        steps[index] = HARMONY_CHORDS[next];
+      } else {
+        const palette = ["~", l.sound, "bd", "sd", "hh", "oh", "cp"] as const;
+        const cur = steps[index];
+        const i = palette.indexOf(cur as (typeof palette)[number]);
+        steps[index] = palette[(i < 0 ? 0 : i + 1) % palette.length];
+      }
+      return { ...l, steps };
+    });
+  };
 
-  function nudgeBpm(delta: number) {
-    commit({
-      ...sheet,
-      bpm: Math.max(40, Math.min(240, sheet.bpm + delta)),
-    })
-  }
+  const clearStep = (index: number) => {
+    if (!layer) return;
+    patchLayer(layer.id, (l) => {
+      const steps = [...l.steps];
+      steps[index] = isHarmonyLayer(l) ? "-" : "~";
+      return { ...l, steps };
+    });
+  };
 
-  if (!activePart) return null
-
-  const activeColor = colorById.get(activePart.id) ?? PART_COLORS[0]!
-  const formPreview = sheet.form
-    .map((step) => sheet.parts.find((p) => p.id === step.partId)?.label ?? '?')
-    .join('')
+  const sounds = layer && isHarmonyLayer(layer) ? HARMONY_SOUNDS : BEAT_SOUNDS;
 
   return (
-    <div className={`device${playing ? ' is-playing' : ''}`}>
-      <div className="po" style={{ '--accent': activeColor } as CSSProperties}>
-        <div className="hang" aria-hidden />
+    <div className="app">
+      <header className="top">
+        <div className="brand-block">
+          <p className="brand">OneSheet</p>
+          <p className="tag">스트루델을 한 장으로</p>
+        </div>
+        <button
+          type="button"
+          className={`play ${engine === "playing" ? "on" : ""}`}
+          onClick={() => void (engine === "playing" ? onStop() : onPlay())}
+        >
+          {engine === "playing" ? "■" : "▶"}
+        </button>
+      </header>
 
-        {/* PART — topmost lens */}
-        <section className="part-row" aria-label="파트">
-          <span className="silk">part</span>
-          {sheet.parts.map((part, i) => (
+      <section className="stack-read" aria-label="패턴 미리보기">
+        {sheet.layers.map((l) => (
+          <MiniBar key={l.id} layer={l} />
+        ))}
+      </section>
+
+      <section className="layers" aria-label="레이어">
+        <div className="layer-row">
+          {sheet.layers.map((l) => (
             <button
-              key={part.id}
+              key={l.id}
               type="button"
-              className={`part-dot${part.id === activePart.id ? ' on' : ''}`}
-              style={{ '--dot': partColor(i) } as CSSProperties}
-              onClick={() => setActivePartId(part.id)}
-              aria-pressed={part.id === activePart.id}
+              className={`layer-chip ${l.id === activeLayerId ? "on" : ""} ${l.kind} ${l.muted ? "muted" : ""}`}
+              onClick={() => setActiveLayerId(l.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                removeLayer(l.id);
+              }}
             >
-              {part.label}
+              <span className="lc-kind">{l.kind === "harmony" ? "화음" : "비트"}</span>
+              <span className="lc-snd">{l.sound}</span>
             </button>
           ))}
-          <button type="button" className="part-dot add" onClick={addPart} aria-label="파트 추가">
-            +
+          <button type="button" className="layer-add" onClick={() => addLayer("harmony")} title="화음 레이어">
+            +H
           </button>
-        </section>
-
-        {status ? <p className="status">{status}</p> : null}
-
-        {/* DISPLAY — read-only LCD */}
-        <section className="lcd" aria-label="디스플레이">
-          <div className="lcd-top">
-            <span className="lcd-brand">onesheet</span>
-            <span>{playing ? 'play' : 'stop'}</span>
-            <span>{writeMode ? 'rec' : '——'}</span>
-          </div>
-          <div className="lcd-main">
-            <div className="lcd-left">
-              <p className="lcd-part">{activePart.label}</p>
-              <p className="lcd-bpm">{sheet.bpm}<small>bpm</small></p>
-            </div>
-            <div className="lcd-glyph" aria-hidden>
-              <span className="glyph-box" />
-              <span className="glyph-box" />
-              <span className="glyph-line" />
-            </div>
-          </div>
-          <div className="lcd-chords">
-            {activePart.chords.map((chord, i) => (
-              <div
-                key={i}
-                className={`lcd-chord${selectedBar === i ? ' sel' : ''}`}
-              >
-                <span className="lcd-n">{i + 1}</span>
-                <span className="lcd-c">{chord || '—'}</span>
-              </div>
-            ))}
-          </div>
-          <div className="lcd-form">
-            <span>form</span>
-            <span className="lcd-form-seq">{formPreview || '········'}</span>
-          </div>
-        </section>
-
-        {/* parameter entry (not on LCD) */}
-        <div className="param-row">
-          <label className="param">
-            <span className="silk">bar {selectedBar + 1}</span>
-            <input
-              ref={chordInputRef}
-              value={activePart.chords[selectedBar] ?? ''}
-              onChange={(e) => setChord(selectedBar, e.target.value)}
-              spellCheck={false}
-              placeholder="chord"
-              aria-label={`${selectedBar + 1}마디 코드`}
-            />
-          </label>
-          <div className="knobs" aria-label="노브">
-            <button type="button" className="knob" onClick={() => nudgeBpm(-2)} aria-label="템포 감소">
-              <span className="knob-cap a" />
-              <span className="silk">A</span>
-            </button>
-            <button type="button" className="knob" onClick={() => nudgeBpm(2)} aria-label="템포 증가">
-              <span className="knob-cap b" />
-              <span className="silk">B</span>
-            </button>
-          </div>
+          <button type="button" className="layer-add" onClick={() => addLayer("beat")} title="비트 레이어">
+            +B
+          </button>
         </div>
+      </section>
 
-        {/* CONTROLS — PO matrix */}
-        <section className="board" aria-label="컨트롤">
-          <div className="func-row">
-            <button
-              type="button"
-              className="key"
-              onClick={() => {
-                const idx = sheet.parts.findIndex((p) => p.id === activePart.id)
-                const next = sheet.parts[(idx + 1) % sheet.parts.length]
-                if (next) setActivePartId(next.id)
-              }}
-            >
-              <span className="led" />
-              <span className="key-label">sound</span>
-            </button>
-            <button type="button" className="key" onClick={stampToForm}>
-              <span className="led" />
-              <span className="key-label">pattern</span>
-            </button>
-            <button
-              type="button"
-              className="key"
-              onClick={() => {
-                const steps = [80, 96, 120, 140]
-                const i = steps.findIndex((v) => v >= sheet.bpm)
-                const next = steps[(i + 1) % steps.length] ?? 120
-                commit({ ...sheet, bpm: next })
-              }}
-            >
-              <span className="led" />
-              <span className="key-label">bpm</span>
-            </button>
-            <button
-              type="button"
-              className="key"
-              disabled={sheet.parts.length <= 1}
-              onClick={removeActivePart}
-            >
-              <span className="led" />
-              <span className="key-label">fx</span>
-            </button>
-          </div>
+      {layer && (
+        <>
+          <nav className="lenses" aria-label="편집 렌즈">
+            {(
+              [
+                ["steps", "스텝", isHarmonyLayer(layer) ? "코드 토큰" : "히트"],
+                ["sound", "사운드", "샘플·웨이브"],
+                ["fx", "텍스처", "게인·스파이스"],
+              ] as const
+            ).map(([id, label, hint]) => (
+              <button
+                key={id}
+                type="button"
+                className={`lens ${lens === id ? "on" : ""}`}
+                onClick={() => setLens(id)}
+              >
+                <span className="lens-label">{label}</span>
+                <span className="lens-hint">{hint}</span>
+              </button>
+            ))}
+          </nav>
 
-          <div className="matrix">
-            <div className="pads" role="group" aria-label="16 패드">
-              {Array.from({ length: 16 }, (_, i) => {
-                const n = i + 1
-                const isBar = n <= 4
-                const formStep = sheet.form[n - 1]
-                const lit =
-                  (isBar && selectedBar === i) ||
-                  (!!formStep && n <= sheet.form.length)
-                return (
+          <section className="surface" aria-label="편집 표면">
+            {lens === "steps" && (
+              <div className={`pads ${isHarmonyLayer(layer) ? "h4" : "b16"}`}>
+                {layer.steps.map((step, i) => {
+                  const empty = step === "~" || step === "-";
+                  return (
+                    <button
+                      key={`${layer.id}-${i}`}
+                      type="button"
+                      className={`pad ${empty ? "empty" : "hit"} ${layer.kind}`}
+                      onClick={() => cycleStep(i)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        clearStep(i);
+                      }}
+                    >
+                      <span className="pad-i">{i + 1}</span>
+                      <span className="pad-v">{empty ? "·" : step}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {lens === "sound" && (
+              <div className="sound-grid">
+                {sounds.map((s) => (
                   <button
-                    key={n}
+                    key={s}
                     type="button"
-                    className={`pad${lit ? ' lit' : ''}${isBar ? ' bar' : ''}`}
-                    onClick={() => {
-                      if (n <= 4) {
-                        selectBar(i)
-                        return
-                      }
-                      if (n <= 8) {
-                        // 5-8: stamp / clear helpers
-                        if (n === 5) stampToForm()
-                        if (n === 6) clearForm()
-                        if (n === 7 && sheet.form.length) removeFromForm(sheet.form.length - 1)
-                        return
-                      }
-                    }}
+                    className={`snd ${layer.sound === s ? "on" : ""}`}
+                    onClick={() => patchLayer(layer.id, { sound: s })}
                   >
-                    <span className={`pad-led${lit ? ' on' : ''}`} />
-                    <span className="pad-n">{n}</span>
+                    {s}
                   </button>
-                )
-              })}
-            </div>
+                ))}
+                <button
+                  type="button"
+                  className={`snd mute ${layer.muted ? "on" : ""}`}
+                  onClick={() => patchLayer(layer.id, { muted: !layer.muted })}
+                >
+                  {layer.muted ? "뮤트 해제" : "뮤트"}
+                </button>
+                {sheet.layers.length > 1 && (
+                  <button type="button" className="snd danger" onClick={() => removeLayer(layer.id)}>
+                    레이어 삭제
+                  </button>
+                )}
+              </div>
+            )}
 
-            <div className="side">
-              <button
-                type="button"
-                className={`side-key play${playing ? ' on' : ''}`}
-                onClick={() => void togglePlay()}
-                aria-pressed={playing}
-              >
-                <span className={`led${playing ? ' on' : ''}`} />
-                <span className="key-label">play</span>
-              </button>
-              <button
-                type="button"
-                className={`side-key write${writeMode ? ' on' : ''}`}
-                onClick={() => {
-                  setWriteMode((v) => !v)
-                  stampToForm()
-                }}
-              >
-                <span className={`led red${writeMode ? ' on' : ''}`} />
-                <span className="key-label">write</span>
-              </button>
-              <button type="button" className="side-key" onClick={clearForm} disabled={sheet.form.length === 0}>
-                <span className="led" />
-                <span className="key-label">clear</span>
-              </button>
-            </div>
-          </div>
+            {lens === "fx" && (
+              <div className="fx">
+                <label className="slider">
+                  <span>게인</span>
+                  <input
+                    type="range"
+                    min={0.05}
+                    max={1}
+                    step={0.01}
+                    value={layer.gain}
+                    onChange={(e) => patchLayer(layer.id, { gain: Number(e.target.value) })}
+                  />
+                  <em>{layer.gain.toFixed(2)}</em>
+                </label>
+                <label className="slider">
+                  <span>{isHarmonyLayer(layer) ? "컷오프" : "룸"}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={layer.spice}
+                    onChange={(e) => patchLayer(layer.id, { spice: Number(e.target.value) })}
+                  />
+                  <em>{layer.spice.toFixed(2)}</em>
+                </label>
+                <label className="slider">
+                  <span>템포</span>
+                  <input
+                    type="range"
+                    min={60}
+                    max={160}
+                    step={1}
+                    value={sheet.bpm}
+                    onChange={(e) =>
+                      updateSheet((prev) => ({ ...prev, bpm: Number(e.target.value) }))
+                    }
+                  />
+                  <em>{sheet.bpm}</em>
+                </label>
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
-          <p className="legend">
-            1–4 bar · 5 write form · 6 clear · 7 undo · write stamps part
-          </p>
-        </section>
-      </div>
+      <footer className="foot">
+        <p className="status">{status}</p>
+        <p className="hint">
+          {lens === "steps"
+            ? "탭=사이클 · 길게/우클릭=비우기"
+            : lens === "sound"
+              ? "레이어 칩 길게=삭제"
+              : "재생 중에도 바로 반영"}
+        </p>
+      </footer>
     </div>
-  )
+  );
 }

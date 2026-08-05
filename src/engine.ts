@@ -1,40 +1,18 @@
-import { evaluate, hush, initStrudel } from '@strudel/web'
-import { toStrudel, type Sheet } from './sheet'
+import { evaluate, hush, initStrudel } from "@strudel/web";
 
-let ready: Promise<unknown> | null = null
-let playing = false
-let lastCode = ''
+let ready: Promise<unknown> | null = null;
 
-export function isPlaying(): boolean {
-  return playing
-}
-
-export async function ensureEngine(): Promise<void> {
+export async function initStrudelEngine(): Promise<void> {
   if (!ready) {
-    ready = initStrudel()
+    ready = initStrudel();
   }
-  await ready
+  await ready;
 }
 
-export async function playSheet(sheet: Sheet): Promise<void> {
-  await ensureEngine()
-  const code = toStrudel(sheet)
-  lastCode = code
-  await evaluate(code)
-  playing = true
+export async function evaluateStrudel(code: string): Promise<void> {
+  await evaluate(code);
 }
 
-/** Live update while playing — Strudel-style re-eval. */
-export async function updateSheet(sheet: Sheet): Promise<void> {
-  if (!playing) return
-  const code = toStrudel(sheet)
-  if (code === lastCode) return
-  lastCode = code
-  await evaluate(code)
-}
-
-export function stopSheet(): void {
-  hush()
-  playing = false
-  lastCode = ''
+export function hushStrudel(): void {
+  hush();
 }
