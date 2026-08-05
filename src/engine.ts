@@ -1,8 +1,8 @@
 import { evaluate, hush, initStrudel } from "@strudel/web";
 
-type Repl = Awaited<ReturnType<typeof initStrudel>> & {
-  scheduler?: { now?: () => number; started?: boolean };
-};
+/** initStrudel 반환 타입이 느슨해서 scheduler만 느슨히 잡는다 */
+// deno-lint-ignore no-explicit-any
+type Repl = any;
 
 let boot: Promise<Repl> | null = null;
 let replRef: Repl | null = null;
@@ -31,7 +31,7 @@ export function getCyclePhase(): number | null {
   const now = replRef?.scheduler?.now;
   if (typeof now !== "function") return null;
   try {
-    const t = now.call(replRef!.scheduler);
+    const t = now.call(replRef.scheduler) as number;
     if (!Number.isFinite(t)) return null;
     return ((t % 1) + 1) % 1;
   } catch {
@@ -42,11 +42,11 @@ export function getCyclePhase(): number | null {
 export async function initStrudelEngine(): Promise<Repl> {
   if (!boot) {
     boot = initStrudel()
-      .then((repl) => {
+      .then((repl: Repl) => {
         replRef = repl;
         return repl;
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         boot = null;
         replRef = null;
         throw err;
