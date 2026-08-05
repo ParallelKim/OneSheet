@@ -141,6 +141,15 @@ export function artLabel(art: Articulation): string {
   return art;
 }
 
+/** 손악보용 스트럼 기호 (대략) */
+export function strumGlyph(art: Articulation): string {
+  if (art === "D") return "↓";
+  if (art === "U") return "↑";
+  if (art === "X") return "x";
+  if (art === "hold") return "·";
+  return " ";
+}
+
 export function setBarArticulation(
   rhythm: Articulation[][],
   bar: number,

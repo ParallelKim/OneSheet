@@ -13,6 +13,7 @@ import {
   SLOTS,
   slotLabel,
   slotRoman,
+  strumGlyph,
   SUBDIV,
   toStrudel,
   VOICES,
@@ -146,47 +147,6 @@ export default function App() {
       </header>
 
       <section className="lcd" aria-label="상태">
-        <div className="lcd-row">
-          <span className="lcd-chord">{slotLabel(sheet.key, currentDegree)}</span>
-          <span className="lcd-roman">{slotRoman(currentDegree) || "rest"}</span>
-          <span className="lcd-mode">{modeLabel(mode)}</span>
-        </div>
-
-        {/* 마디 구분된 차트 요약 */}
-        <div className="chart-line" aria-label="차트 요약">
-          {Array.from({ length: BARS }, (_, bi) => (
-            <div
-              key={bi}
-              className={`bar-group ${bar === bi ? "focus" : ""}`}
-              role="group"
-              aria-label={`${bi + 1}마디`}
-            >
-              <button
-                type="button"
-                className="bar-tag"
-                onClick={() => selectBar(bi)}
-              >
-                {bi + 1}
-              </button>
-              {Array.from({ length: BEATS }, (_, qi) => {
-                const i = bi * BEATS + qi;
-                const d = sheet.degrees[i] ?? null;
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`bead ${selected === i ? "on" : ""} ${d === null ? "empty" : ""}`}
-                    onClick={() => setSelected(i)}
-                    aria-label={`${bi + 1}마디 ${qi + 1}박`}
-                  >
-                    {d === null ? "·" : slotRoman(d)}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-
         <div className="lcd-meta">
           <button
             type="button"
@@ -220,6 +180,57 @@ export default function App() {
             />
             <span className="chip-v">{sheet.bpm}</span>
           </label>
+          <span className="lcd-mode">{modeLabel(mode)}</span>
+        </div>
+
+        {/* 손악보식 요약: 마디선 · 코드+원 도수 · 스트럼 */}
+        <div className="staff" aria-label="차트">
+          {Array.from({ length: BARS }, (_, bi) => {
+            const rhythm = sheet.rhythm[bi] ?? [];
+            const strum = Array.from({ length: BEATS }, (_, qi) => {
+              const step = qi * SUBDIV;
+              return strumGlyph(rhythm[step] ?? "rest");
+            }).join("");
+            return (
+              <div
+                key={bi}
+                className={`measure ${bar === bi ? "focus" : ""}`}
+                role="group"
+                aria-label={`${bi + 1}마디`}
+                onClick={() => selectBar(bi)}
+              >
+                <span className="measure-idx">{bi + 1}</span>
+                <div className="measure-body">
+                  <div className="measure-chords">
+                    {Array.from({ length: BEATS }, (_, qi) => {
+                      const i = bi * BEATS + qi;
+                      const d = sheet.degrees[i] ?? null;
+                      const roman = slotRoman(d);
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          className={`chord-cell ${selected === i ? "on" : ""} ${d === null ? "empty" : ""}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelected(i);
+                          }}
+                          aria-label={`${bi + 1}마디 ${qi + 1}박`}
+                        >
+                          <span className="chord-name">{slotLabel(sheet.key, d)}</span>
+                          {roman ? <span className="degree-dot">{roman}</span> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="measure-rail" aria-hidden />
+                  <div className="measure-strum" aria-hidden>
+                    {strum}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
