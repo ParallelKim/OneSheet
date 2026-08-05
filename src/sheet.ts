@@ -4,6 +4,7 @@
  * 셀: D / U / X(뮤트) / hold(링) / rest(쉼).
  *
  * toStrudel: SheetState → @strudel/web 평가 코드.
+ * 길이는 mini `@n` 가중치로 표현 (clip 남용으로 한 음에 붙는 문제 회피).
  */
 
 export type Articulation = "D" | "U" | "X" | "hold" | "rest";
@@ -109,7 +110,7 @@ export function scaleOf(key: string): readonly string[] {
 
 /**
  * Strudel chord() 심볼.
- * dim은 딕셔너리 키 `o` (예: Bo). `dim` 표기는 voicing이 모를 수 있음.
+ * dim은 딕셔너리 키 `o` (예: Bo).
  */
 export function chordFromDegree(key: string, degree: number): string {
   const root = scaleOf(key)[degree] ?? "C";
@@ -152,7 +153,6 @@ export function artLabel(art: Articulation): string {
   return art;
 }
 
-/** 손악보용 스트럼 기호 (대략) */
 export function strumGlyph(art: Articulation): string {
   if (art === "D") return "↓";
   if (art === "U") return "↑";
@@ -171,10 +171,6 @@ export function setBarArticulation(
     if (bi !== bar) return row;
     return row.map((cell, si) => (si === step ? art : cell));
   });
-}
-
-function mini(tokens: Array<string | number>): string {
-  return tokens.map(String).join(" ");
 }
 
 function isAttack(art: Articulation): boolean {
@@ -196,64 +192,100 @@ export function cyclesPerSecond(bpm: number): number {
   return bpm / 60 / SLOTS;
 }
 
+export type TimedEvent = {
+  /** null = rest */
+  chord: string | null;
+  /** 16분음표 개수 (mini @n) */
+  steps: number;
+  gain: number;
+};
+
 export type StrudelParts = {
   cps: number;
   hasHits: boolean;
-  chordSeq: string[];
-  clipSeq: number[];
-  gainSeq: number[];
+  events: TimedEvent[];
+  totalSteps: number;
   metro: boolean;
   sound: string;
   cutoff: number;
 };
 
-/** UI 상태 → 재생에 쓰는 중간 표현 (테스트·디버그용) */
+/** 리듬 그리드를 길이 가중 이벤트로 펼친다 */
 export function compileSheet(sheet: SheetState): StrudelParts {
   const voice = voiceById(sheet.voice);
-  const chordSeq: string[] = [];
-  const clipSeq: number[] = [];
-  const gainSeq: number[] = [];
+  const events: TimedEvent[] = [];
 
   for (let bar = 0; bar < BARS; bar++) {
     const barRhythm = sheet.rhythm[bar] ?? defaultBarRhythm();
-    for (let step = 0; step < BAR_STEPS; step++) {
+    let step = 0;
+    while (step < BAR_STEPS) {
       const art = barRhythm[step] ?? "rest";
       const beat = Math.floor(step / SUBDIV);
       const degree = sheet.degrees[bar * BEATS + beat] ?? null;
 
-      if (!isAttack(art) || degree === null) {
-        chordSeq.push("~");
-        clipSeq.push(1);
-        gainSeq.push(0);
+      if (isAttack(art) && degree !== null) {
+        const holds = holdRun(barRhythm, step);
+        // 뮤트는 짧게, 나머지는 hold까지 이어서 한 음
+        const steps = art === "X" ? 1 : 1 + holds;
+        const base = sheet.gain;
+        const gain = art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
+        events.push({
+          chord: chordFromDegree(sheet.key, degree),
+          steps,
+          gain: Number(gain.toFixed(3)),
+        });
+        // X도 그리드상 hold가 있으면 나머진 쉼으로 소비
+        if (art === "X" && holds > 0) {
+          events.push({ chord: null, steps: holds, gain: 0 });
+        }
+        step += 1 + holds;
         continue;
       }
 
-      const holds = holdRun(barRhythm, step);
-      const clip = art === "X" ? 0.45 : 1 + holds;
-      const base = sheet.gain;
-      const gain = art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
-
-      chordSeq.push(chordFromDegree(sheet.key, degree));
-      clipSeq.push(Number(clip.toFixed(2)));
-      gainSeq.push(Number(gain.toFixed(3)));
+      // rest / orphan hold / 도수 없는 공격 → 쉼 구간 병합
+      let span = 1;
+      step += 1;
+      while (step < BAR_STEPS) {
+        const a2 = barRhythm[step] ?? "rest";
+        const b2 = Math.floor(step / SUBDIV);
+        const d2 = sheet.degrees[bar * BEATS + b2] ?? null;
+        if (isAttack(a2) && d2 !== null) break;
+        span += 1;
+        step += 1;
+      }
+      events.push({ chord: null, steps: span, gain: 0 });
     }
   }
 
+  const totalSteps = events.reduce((n, e) => n + e.steps, 0);
+
   return {
     cps: cyclesPerSecond(sheet.bpm),
-    hasHits: chordSeq.some((t) => t !== "~"),
-    chordSeq,
-    clipSeq,
-    gainSeq,
+    hasHits: events.some((e) => e.chord !== null),
+    events,
+    totalSteps,
     metro: sheet.metro,
     sound: voice.sound,
     cutoff: voice.cutoff,
   };
 }
 
+function timedMini(events: TimedEvent[], field: "chord" | "gain"): string {
+  return events
+    .map((e) => {
+      if (field === "chord") {
+        const tok = e.chord ?? "~";
+        return e.steps === 1 ? tok : `${tok}@${e.steps}`;
+      }
+      const g = e.chord ? e.gain : 0;
+      return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
+    })
+    .join(" ");
+}
+
 /**
- * SheetState → Strudel 코드 문자열.
- * evaluate(code)로 바로 재생 가능.
+ * SheetState → Strudel 코드.
+ * `Am@4 C@4 …` 가중 시퀀스 = 한 사이클(4마디) 안에서 박이 진행된다.
  */
 export function toStrudel(sheet: SheetState): string {
   const parts = compileSheet(sheet);
@@ -262,19 +294,18 @@ export function toStrudel(sheet: SheetState): string {
   if (parts.hasHits) {
     layers.push(
       [
-        `chord("<${mini(parts.chordSeq)}>")`,
+        `chord("${timedMini(parts.events, "chord")}")`,
         `.dict("triads")`,
         `.voicing()`,
         `.s("${parts.sound}")`,
-        `.gain("<${mini(parts.gainSeq)}>")`,
+        `.gain("${timedMini(parts.events, "gain")}")`,
         `.cutoff(${parts.cutoff})`,
-        `.clip("<${mini(parts.clipSeq)}>")`,
+        `.clip(0.95)`,
       ].join(""),
     );
   }
 
   if (parts.metro) {
-    // 샘플 없이 신스 클릭 (woodblock은 번들에 없음)
     layers.push(
       `note("g5").s("triangle").struct("x*${SLOTS}").gain(0.07).clip(0.08)`,
     );

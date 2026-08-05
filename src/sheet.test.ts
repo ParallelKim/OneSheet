@@ -34,18 +34,18 @@ describe("holdRun", () => {
 });
 
 describe("compileSheet / toStrudel", () => {
-  it("초기 차트는 64스텝과 공격 클립을 만든다", () => {
+  it("초기 차트는 4분 다운을 @4 이벤트로 만든다", () => {
     const sheet = createInitialSheet();
     const parts = compileSheet(sheet);
-    expect(parts.chordSeq).toHaveLength(64);
+    expect(parts.totalSteps).toBe(64);
     expect(parts.hasHits).toBe(true);
     expect(parts.cps).toBeCloseTo(cyclesPerSecond(96));
-    // 각 박 시작이 D → 16 공격
-    expect(parts.chordSeq.filter((t) => t !== "~")).toHaveLength(16);
-    expect(parts.clipSeq[0]).toBe(4); // D + 3 hold
+    // 16박 × D··· → 이벤트 16개, 각 steps=4
+    expect(parts.events.filter((e) => e.chord !== null)).toHaveLength(16);
+    expect(parts.events.every((e) => e.chord === null || e.steps === 4)).toBe(true);
   });
 
-  it("D·U· 패턴은 박마다 공격 2개", () => {
+  it("D·U· 패턴은 박마다 공격 2개(@2)", () => {
     const sheet = createInitialSheet();
     const bar: Articulation[] = Array.from({ length: 16 }, (_, i) => {
       const sub = i % 4;
@@ -55,9 +55,9 @@ describe("compileSheet / toStrudel", () => {
     });
     sheet.rhythm = [bar, bar, bar, bar];
     const parts = compileSheet(sheet);
-    expect(parts.chordSeq.filter((t) => t !== "~")).toHaveLength(32);
-    expect(parts.clipSeq[0]).toBe(2); // D + 1 hold
-    expect(parts.clipSeq[2]).toBe(2); // U + 1 hold
+    const hits = parts.events.filter((e) => e.chord !== null);
+    expect(hits).toHaveLength(32);
+    expect(hits.every((e) => e.steps === 2)).toBe(true);
   });
 
   it("도수·리듬이 모두 비면 silence", () => {
@@ -82,10 +82,10 @@ describe("compileSheet / toStrudel", () => {
     expect(code).not.toContain("chord(");
   });
 
-  it("코드 재생 코드는 dict·voicing·setcps를 포함한다", () => {
+  it("코드 재생 코드는 @길이·dict·voicing·setcps를 포함한다", () => {
     const code = toStrudel(createInitialSheet());
     expect(code).toMatch(/^setcps\(/);
-    expect(code).toContain('chord("<');
+    expect(code).toContain("chord(\"Am@4");
     expect(code).toContain('.dict("triads")');
     expect(code).toContain(".voicing()");
     expect(code).toContain('.s("sawtooth")');

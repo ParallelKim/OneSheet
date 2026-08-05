@@ -42,7 +42,13 @@ export default function App() {
   const pushPattern = useCallback(async (next: SheetState) => {
     if (!playingRef.current) return;
     try {
-      await evaluateStrudel(toStrudel(next));
+      const ok = await evaluateStrudel(toStrudel(next));
+      if (!ok && playingRef.current) {
+        // 정지 레이스로 무효화된 평가
+        playingRef.current = false;
+        setEngine((e) => (e === "error" ? e : "ready"));
+        setStatus("정지");
+      }
     } catch (err) {
       console.error(err, getLastStrudelCode());
       setEngine("error");
@@ -77,11 +83,18 @@ export default function App() {
   }, [engine]);
 
   const onPlay = useCallback(async () => {
-    const ok = await ensureReady();
-    if (!ok) return;
+    const okReady = await ensureReady();
+    if (!okReady) return;
     try {
       const code = toStrudel(sheetRef.current);
-      await evaluateStrudel(code);
+      const ok = await evaluateStrudel(code);
+      if (!ok) {
+        // 평가 중 정지된 경우
+        playingRef.current = false;
+        setEngine("ready");
+        setStatus("정지");
+        return;
+      }
       playingRef.current = true;
       setEngine("playing");
       setStatus("재생 중");
