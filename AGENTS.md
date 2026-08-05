@@ -1,8 +1,12 @@
 # Cursor Cloud specific instructions
 
+세션 인수인계·제품 원칙은 **`HANDOFF.md`** 와 **`.cursor/rules/onesheet-paradigm.mdc`** 를 먼저 읽는다.
+
 ## App
 
 OneSheet is a Vite + React + TypeScript SPA. Sound uses `@strudel/web` in the browser (Web Audio). There is no backend server.
+
+Current UI: 4×4 quarter-note chart, diatonic degrees, metronome, bottom transport row. See `HANDOFF.md`.
 
 ## Commands
 
@@ -16,8 +20,8 @@ OneSheet is a Vite + React + TypeScript SPA. Sound uses `@strudel/web` in the br
 ## Verify
 
 1. Start the dev server and open `http://localhost:5173`.
-2. Confirm Parts / Form / Play UI render.
-3. Click Play (browser gesture required for audio). Editing chords while playing should re-evaluate via Strudel.
+2. Confirm 4×4 chart, degree/preset palette, and transport (play / metronome / modes).
+3. Click Play (browser gesture required for audio). Editing while playing should re-evaluate via Strudel.
 
 ## Firebase Hosting
 
