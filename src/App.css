@@ -201,6 +201,113 @@ button {
   border-right: 2px solid var(--fg);
 }
 
+/* RHY 모드: 마디 = BASE / LINK / OWN */
+.measure.rhy-show {
+  position: relative;
+}
+
+.measure.rhy-show::after {
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.measure.rhy-show.rhy-base::after {
+  background: var(--fg);
+  opacity: 0.85;
+}
+
+.measure.rhy-show.rhy-link::after {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--muted) 0 3px,
+    transparent 3px 6px
+  );
+  opacity: 0.9;
+}
+
+.measure.rhy-show.rhy-own::after {
+  background: var(--fg);
+  opacity: 0.55;
+  height: 3px;
+}
+
+.rhy-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 12px;
+  min-height: 22px;
+  flex-shrink: 0;
+}
+
+.rhy-tag {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.rhy-tag-base {
+  color: var(--fg);
+}
+
+.rhy-tag-own {
+  color: var(--fg);
+}
+
+.rhy-tag-link {
+  color: var(--muted);
+}
+
+.rhy-hint {
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.rhy-reset {
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--fill);
+  color: var(--fg);
+}
+
+.rhy-reset:active {
+  transform: scale(0.97);
+}
+
+/* 상속 리듬 패드: 유령처럼 — override와 구분 */
+.pad.rhy-link {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.pad.rhy-link.hit {
+  background: var(--fill-2);
+}
+
+.pad.rhy-own {
+  box-shadow: inset 0 0 0 1px rgba(236, 236, 236, 0.22);
+}
+
+.pad.rhy-base.hit {
+  background: var(--fill-2);
+}
+
 .chord-cell {
   display: flex;
   flex-direction: column;

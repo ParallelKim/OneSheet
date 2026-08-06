@@ -1,8 +1,15 @@
 # OneSheet 핸드오프
 
-작성 시점: 2026-08-06 · 브랜치 `cursor/strudel-playback-4663`
+작성 시점: 2026-08-06 · 브랜치 `cursor/rhythm-inherit-4663`
 
 ---
+
+## 리듬 상속 (PR5)
+
+- **BASE** = 1마디(`rhythm`) — 전곡 기본 스트로크
+- **LINK** = 2~4마디, override 없음 → BASE 상속
+- **OWN** = 2~4마디 override — 첫 편집 시 fork, `USE BASE`로 되돌림
+- UI: 스태프 밑줄(실선/점선) + 패드 dashed/opacity + `rhy-meta` 태그
 
 ## MODE
 
@@ -11,25 +18,9 @@
 | `strum` | ✅ | 오픈셰이프 + late 쓸기 → GM clean |
 | `piano` | | 오픈셰이프 전음 동시 → `gm_piano` |
 
-docs / arp / gm / block 제거. MODE 칩으로 strum ↔ piano.
-
-### strum
-
-- `stack`/`late`(~8ms), late만큼 clip↓
-- 코드마다 5~6음 (C/Am 오픈은 6번줄 뮤트)
-- 피치별 gain: 저현↓ / 1번줄↑ + `hpf`
-- D=저→고, U=고→저
-
-### piano
-
-- `note("a2,e3,a3,c4,e4")` 동시 타건
-- 차트 리듬·오픈셰이프 공유, late 없음
-
 ## Persist
 
-- 시트 편집본 → `localStorage` (`onesheet.sheet.v1`)
-- 로드 시 normalize (옛 MODE → strum)
-- 서버 동기화는 나중
+- `onesheet.sheet.v2` (v1 `rhythm[][]` → base+override 마이그레이션)
 
 ```bash
 npm test

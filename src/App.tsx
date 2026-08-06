@@ -3,13 +3,16 @@ import {
   ARTICULATIONS,
   artLabel,
   barIndex,
+  barRhythm,
   BEATS,
   BARS,
   BAR_STEPS,
+  clearRhythmOverride,
   DEGREE_META,
   nextKey,
   nextSoundMode,
-  setBarArticulation,
+  paintRhythmStep,
+  rhythmBarKind,
   SLOTS,
   slotLabel,
   slotRoman,
@@ -271,13 +274,15 @@ export default function App() {
   const paintRhythm = (step: number) => {
     const bar = barIndex(selected);
     update((prev) => {
-      const current = prev.rhythm[bar]?.[step] ?? "rest";
+      const current = barRhythm(prev, bar)[step] ?? "rest";
       const nextArt = current === brush ? "rest" : brush;
-      return {
-        ...prev,
-        rhythm: setBarArticulation(prev.rhythm, bar, step, nextArt),
-      };
+      return paintRhythmStep(prev, bar, step, nextArt);
     });
+  };
+
+  const resetRhythmLink = () => {
+    const bar = barIndex(selected);
+    update((prev) => clearRhythmOverride(prev, bar));
   };
 
   const selectBar = (bar: number) => {
@@ -289,7 +294,8 @@ export default function App() {
   const currentDegree = sheet.degrees[selected] ?? null;
   const bar = barIndex(selected);
   const beat = (selected % BEATS) + 1;
-  const barRhythm = sheet.rhythm[bar] ?? [];
+  const barRhythmRow = barRhythm(sheet, bar);
+  const rhyKind = rhythmBarKind(sheet, bar);
   const playBar = playSlot !== null ? barIndex(playSlot) : null;
   const playBeat = playSlot !== null ? (playSlot % BEATS) + 1 : null;
   /** 하이라이트할 마디: 재생 중이면 재생 마디, 아니면 선택 마디 */
@@ -350,9 +356,9 @@ export default function App() {
             {Array.from({ length: BARS }, (_, bi) => (
               <div
                 key={bi}
-                className="measure"
+                className={`measure rhy-${rhythmBarKind(sheet, bi)} ${mode === "rhythm" ? "rhy-show" : ""}`}
                 role="group"
-                aria-label={`bar ${bi + 1}`}
+                aria-label={`bar ${bi + 1} ${rhythmBarKind(sheet, bi)}`}
                 onClick={() => selectBar(bi)}
               >
                 {Array.from({ length: BEATS }, (_, qi) => {
@@ -483,24 +489,45 @@ export default function App() {
       </nav>
 
       {mode === "rhythm" && (
-        <div className="brush-row" aria-label="articulation">
-          {ARTICULATIONS.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              className={`brush ${brush === a.id ? "on" : ""}`}
-              onClick={() => setBrush(a.id)}
-            >
-              <span className="brush-mark">{a.label}</span>
-              <span className="brush-hint">{a.hint}</span>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="rhy-meta" aria-label="rhythm source">
+            <span className={`rhy-tag rhy-tag-${rhyKind}`}>
+              {rhyKind === "base" && "BASE · BAR 1"}
+              {rhyKind === "link" && `LINK · ← BAR 1`}
+              {rhyKind === "own" && `OWN · BAR ${bar + 1}`}
+            </span>
+            {rhyKind === "own" && (
+              <button
+                type="button"
+                className="rhy-reset"
+                onClick={resetRhythmLink}
+              >
+                USE BASE
+              </button>
+            )}
+            {rhyKind === "link" && (
+              <span className="rhy-hint">edit to fork</span>
+            )}
+          </div>
+          <div className="brush-row" aria-label="articulation">
+            {ARTICULATIONS.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className={`brush ${brush === a.id ? "on" : ""}`}
+                onClick={() => setBrush(a.id)}
+              >
+                <span className="brush-mark">{a.label}</span>
+                <span className="brush-hint">{a.hint}</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       <div
         ref={padStageRef}
-        className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode}`}
+        className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode} rhy-${rhyKind}`}
         style={{ "--mark-bar": markBar } as CSSProperties}
       >
         <div className="pad-board" ref={padBoardRef}>
@@ -574,7 +601,7 @@ export default function App() {
 
             {mode === "rhythm" &&
               Array.from({ length: BAR_STEPS }, (_, step) => {
-                const art = barRhythm[step] ?? "rest";
+                const art = barRhythmRow[step] ?? "rest";
                 const beatNo = Math.floor(step / SUBDIV) + 1;
                 const sub = step % SUBDIV;
                 const subMark = ["1", "e", "&", "a"][sub]!;
@@ -582,7 +609,7 @@ export default function App() {
                   <button
                     key={step}
                     type="button"
-                    className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""}`}
+                    className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""} ${rhyKind === "link" ? "rhy-link" : ""} ${rhyKind === "own" ? "rhy-own" : ""} ${rhyKind === "base" ? "rhy-base" : ""}`}
                     onClick={() => paintRhythm(step)}
                   >
                     <span className="pad-sub">

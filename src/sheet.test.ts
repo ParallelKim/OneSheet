@@ -1,18 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
+  barRhythm,
   chordFromDegree,
+  clearRhythmOverride,
   compileSheet,
   createInitialSheet,
   cyclesPerSecond,
   guitarShape,
   holdRun,
+  isRhythmOverridden,
   nextSoundMode,
+  paintRhythmStep,
+  rhythmBarKind,
+  rhythmFromLegacyBars,
   SOUND_MODES,
   toStrudel,
   type Articulation,
   type SheetState,
   type SoundModeId,
 } from "./sheet";
+
+function duPattern(): Articulation[] {
+  return Array.from({ length: 16 }, (_, i) => {
+    const sub = i % 4;
+    if (sub === 0) return "D";
+    if (sub === 2) return "U";
+    return "hold";
+  });
+}
 
 describe("chordFromDegree", () => {
   it("메이저/마이너/디민 심볼을 Strudel triads 딕셔너리에 맞게 낸다", () => {
@@ -37,6 +52,59 @@ describe("holdRun", () => {
   });
 });
 
+describe("rhythm inherit / override", () => {
+  it("초기에는 전 마디가 1마디 리듬을 상속", () => {
+    const sheet = createInitialSheet();
+    expect(sheet.rhythm).toHaveLength(16);
+    expect(sheet.rhythmOverride.every((r) => r == null)).toBe(true);
+    expect(rhythmBarKind(sheet, 0)).toBe("base");
+    expect(rhythmBarKind(sheet, 1)).toBe("link");
+    expect(barRhythm(sheet, 2)).toEqual(sheet.rhythm);
+  });
+
+  it("bar0 수정은 상속 마디에 전파", () => {
+    let sheet = createInitialSheet();
+    sheet = paintRhythmStep(sheet, 0, 0, "U");
+    expect(sheet.rhythm[0]).toBe("U");
+    expect(isRhythmOverridden(sheet, 1)).toBe(false);
+    expect(barRhythm(sheet, 1)[0]).toBe("U");
+  });
+
+  it("bar≥1 편집은 override로 분기", () => {
+    let sheet = createInitialSheet();
+    sheet = paintRhythmStep(sheet, 2, 0, "X");
+    expect(rhythmBarKind(sheet, 2)).toBe("own");
+    expect(barRhythm(sheet, 2)[0]).toBe("X");
+    expect(barRhythm(sheet, 0)[0]).toBe("D");
+    expect(barRhythm(sheet, 1)[0]).toBe("D");
+  });
+
+  it("clearRhythmOverride는 상속으로 되돌림", () => {
+    let sheet = createInitialSheet();
+    sheet = paintRhythmStep(sheet, 1, 0, "X");
+    sheet = clearRhythmOverride(sheet, 1);
+    expect(rhythmBarKind(sheet, 1)).toBe("link");
+    expect(barRhythm(sheet, 1)).toEqual(sheet.rhythm);
+  });
+
+  it("legacy 4마디 배열에서 같은 패턴은 상속으로", () => {
+    const bar = duPattern();
+    const { rhythm, rhythmOverride } = rhythmFromLegacyBars([bar, bar, bar, bar]);
+    expect(rhythm).toEqual(bar);
+    expect(rhythmOverride.every((r) => r == null)).toBe(true);
+  });
+
+  it("legacy에서 다른 마디만 override", () => {
+    const bar = duPattern();
+    const own = [...bar];
+    own[0] = "X";
+    const { rhythmOverride } = rhythmFromLegacyBars([bar, bar, own, bar]);
+    expect(rhythmOverride[1]).toBeNull();
+    expect(rhythmOverride[2]?.[0]).toBe("X");
+    expect(rhythmOverride[3]).toBeNull();
+  });
+});
+
 describe("compileSheet / toStrudel", () => {
   it("초기 차트는 4분 다운을 @4 이벤트로 만든다", () => {
     const sheet = createInitialSheet();
@@ -48,19 +116,26 @@ describe("compileSheet / toStrudel", () => {
     expect(parts.events.every((e) => e.chord === null || e.steps === 4)).toBe(true);
   });
 
-  it("D·U· 패턴은 박마다 공격 2개(@2)", () => {
-    const sheet = createInitialSheet();
-    const bar: Articulation[] = Array.from({ length: 16 }, (_, i) => {
-      const sub = i % 4;
-      if (sub === 0) return "D";
-      if (sub === 2) return "U";
-      return "hold";
-    });
-    sheet.rhythm = [bar, bar, bar, bar];
+  it("D·U· 패턴은 박마다 공격 2개(@2) — 상속으로 전 마디", () => {
+    const sheet = { ...createInitialSheet(), rhythm: duPattern() };
     const parts = compileSheet(sheet);
     const hits = parts.events.filter((e) => e.chord !== null);
     expect(hits).toHaveLength(32);
     expect(hits.every((e) => e.steps === 2)).toBe(true);
+  });
+
+  it("override 마디만 다른 리듬으로 컴파일", () => {
+    let sheet = createInitialSheet();
+    // bar1만 전부 rest → 그 마디 공격 없음 (degree는 있음)
+    const restBar = Array.from({ length: 16 }, () => "rest" as Articulation);
+    sheet = {
+      ...sheet,
+      rhythmOverride: [null, restBar, null, null],
+    };
+    const parts = compileSheet(sheet);
+    const hits = parts.events.filter((e) => e.chord !== null);
+    // 기본 4분 다운 × 3마디 = 12 (bar1 제외)
+    expect(hits).toHaveLength(12);
   });
 
   it("도수·리듬이 모두 비면 silence", () => {
@@ -96,15 +171,7 @@ describe("compileSheet / toStrudel", () => {
   });
 
   it("strum은 note+late 오픈셰이프·GM clean·차트 리듬", () => {
-    const sheet = createInitialSheet();
-    const bar: Articulation[] = Array.from({ length: 16 }, (_, i) => {
-      const sub = i % 4;
-      if (sub === 0) return "D";
-      if (sub === 2) return "U";
-      return "hold";
-    });
-    sheet.rhythm = [bar, bar, bar, bar];
-
+    const sheet = { ...createInitialSheet(), rhythm: duPattern() };
     const code = toStrudel({ ...sheet, soundMode: "strum" });
     expect(code).toMatch(/^setcps\(/);
     expect(code).toContain("a2@2");
@@ -147,8 +214,10 @@ describe("compileSheet / toStrudel", () => {
   });
 
   it("rest 구간은 공격이 없다", () => {
-    const sheet = createInitialSheet();
-    sheet.rhythm = sheet.rhythm.map(() => Array(16).fill("rest") as Articulation[]);
+    const sheet = {
+      ...createInitialSheet(),
+      rhythm: Array(16).fill("rest") as Articulation[],
+    };
     const parts = compileSheet(sheet);
     expect(parts.hasHits).toBe(false);
   });

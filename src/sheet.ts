@@ -1,6 +1,6 @@
 /**
  * 차트 = 4행(마디) × 4열(박).
- * 리듬 = 선택 마디의 4×4 (행=4분, 칸=16분).
+ * 리듬 = 1마디 기본(rhythm) + 이후 마디 override(또는 상속).
  * 셀: D / U / X(뮤트) / hold(링) / rest(쉼).
  *
  * soundMode: 차트 리듬·오픈셰이프를 공유하고, 타격 축만 바꾼다.
@@ -35,7 +35,14 @@ export type SheetState = {
   bpm: number;
   key: string;
   degrees: Array<number | null>;
-  rhythm: Articulation[][];
+  /** 기본 리듬 = 1마디(bar 0). 16분음표 × 16 */
+  rhythm: Articulation[];
+  /**
+   * 마디별 override. 길이 = BARS.
+   * [0]은 항상 null (bar0이 소스).
+   * null = `rhythm` 상속, 배열 = 이 마디만 따로.
+   */
+  rhythmOverride: Array<Articulation[] | null>;
   gain: number;
   metro: boolean;
   soundMode: SoundModeId;
@@ -213,8 +220,16 @@ function defaultBarRhythm(): Articulation[] {
   return Array.from({ length: BEATS }, () => [...QUARTER_DOWN]).flat();
 }
 
-function defaultRhythm(): Articulation[][] {
-  return Array.from({ length: BARS }, () => defaultBarRhythm());
+function emptyOverrides(): Array<Articulation[] | null> {
+  return Array.from({ length: BARS }, () => null);
+}
+
+function artsEqual(a: Articulation[], b: Articulation[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 function repeatBar(bar: Array<number | null>): Array<number | null> {
@@ -226,7 +241,8 @@ export function createInitialSheet(): SheetState {
     bpm: 96,
     key: "C",
     degrees: repeatBar([5, 0, 4, 3]),
-    rhythm: defaultRhythm(),
+    rhythm: defaultBarRhythm(),
+    rhythmOverride: emptyOverrides(),
     gain: 0.55,
     metro: true,
     soundMode: "strum",
@@ -292,16 +308,77 @@ export function strumGlyph(art: Articulation): string {
   return " ";
 }
 
-export function setBarArticulation(
-  rhythm: Articulation[][],
+/** 재생·표시용: bar0=기본, 이후는 override 없으면 상속 */
+export function barRhythm(sheet: SheetState, bar: number): Articulation[] {
+  if (bar <= 0) return sheet.rhythm;
+  return sheet.rhythmOverride[bar] ?? sheet.rhythm;
+}
+
+/** bar0은 소스(override 아님). bar≥1은 override 배열이 있으면 true */
+export function isRhythmOverridden(sheet: SheetState, bar: number): boolean {
+  return bar > 0 && sheet.rhythmOverride[bar] != null;
+}
+
+export type RhythmBarKind = "base" | "link" | "own";
+
+export function rhythmBarKind(sheet: SheetState, bar: number): RhythmBarKind {
+  if (bar <= 0) return "base";
+  return isRhythmOverridden(sheet, bar) ? "own" : "link";
+}
+
+/**
+ * 한 칸 칠하기.
+ * bar0 → 기본 리듬 수정(상속 마디에 전파).
+ * bar≥1 → 첫 편집 시 base를 복사해 override로 분기.
+ */
+export function paintRhythmStep(
+  sheet: SheetState,
   bar: number,
   step: number,
   art: Articulation,
-): Articulation[][] {
-  return rhythm.map((row, bi) => {
-    if (bi !== bar) return row;
-    return row.map((cell, si) => (si === step ? art : cell));
+): SheetState {
+  if (bar <= 0) {
+    const rhythm = sheet.rhythm.map((cell, i) => (i === step ? art : cell));
+    return { ...sheet, rhythm };
+  }
+  const src = barRhythm(sheet, bar);
+  const next = src.map((cell, i) => (i === step ? art : cell));
+  const rhythmOverride = sheet.rhythmOverride.map((row, i) =>
+    i === bar ? next : row,
+  );
+  return { ...sheet, rhythmOverride };
+}
+
+/** override 버리고 1마디 리듬으로 되돌림 */
+export function clearRhythmOverride(
+  sheet: SheetState,
+  bar: number,
+): SheetState {
+  if (bar <= 0 || sheet.rhythmOverride[bar] == null) return sheet;
+  const rhythmOverride = sheet.rhythmOverride.map((row, i) =>
+    i === bar ? null : row,
+  );
+  return { ...sheet, rhythmOverride };
+}
+
+/**
+ * 옛 4×마디 rhythm[][] → base + override.
+ * bar0과 같으면 상속(null), 다르면 own.
+ */
+export function rhythmFromLegacyBars(
+  rows: Articulation[][],
+): Pick<SheetState, "rhythm" | "rhythmOverride"> {
+  const rhythm =
+    rows[0] && rows[0].length === BAR_STEPS
+      ? [...rows[0]]
+      : defaultBarRhythm();
+  const rhythmOverride = Array.from({ length: BARS }, (_, bar) => {
+    if (bar === 0) return null;
+    const row = rows[bar];
+    if (!row || row.length !== BAR_STEPS) return null;
+    return artsEqual(row, rhythm) ? null : [...row];
   });
+  return { rhythm, rhythmOverride };
 }
 
 function isAttack(art: Articulation): boolean {
@@ -340,15 +417,15 @@ export function compileSheet(sheet: SheetState): StrudelParts {
   const events: TimedEvent[] = [];
 
   for (let bar = 0; bar < BARS; bar++) {
-    const barRhythm = sheet.rhythm[bar] ?? defaultBarRhythm();
+    const barRhythmRow = barRhythm(sheet, bar);
     let step = 0;
     while (step < BAR_STEPS) {
-      const art = barRhythm[step] ?? "rest";
+      const art = barRhythmRow[step] ?? "rest";
       const beat = Math.floor(step / SUBDIV);
       const degree = sheet.degrees[bar * BEATS + beat] ?? null;
 
       if (isAttack(art) && degree !== null) {
-        const holds = holdRun(barRhythm, step);
+        const holds = holdRun(barRhythmRow, step);
         const steps = art === "X" ? 1 : 1 + holds;
         const base = sheet.gain;
         const gain =
@@ -369,7 +446,7 @@ export function compileSheet(sheet: SheetState): StrudelParts {
       let span = 1;
       step += 1;
       while (step < BAR_STEPS) {
-        const a2 = barRhythm[step] ?? "rest";
+        const a2 = barRhythmRow[step] ?? "rest";
         const b2 = Math.floor(step / SUBDIV);
         const d2 = sheet.degrees[bar * BEATS + b2] ?? null;
         if (isAttack(a2) && d2 !== null) break;
