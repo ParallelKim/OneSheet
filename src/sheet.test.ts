@@ -121,11 +121,19 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain('.s("gm_electric_guitar_clean:5")');
     expect(code).not.toContain("gm_piano");
     expect(code).toContain(".late(");
-    expect(code).toContain(".decay(0.12)");
-    expect(code).toContain(".sustain(0.35)");
+    expect(code).toContain(".hpf(180)");
+    expect(code).toContain(".decay(0.1)");
+    expect(code).toContain(".sustain(0.28)");
     expect(code).toContain("note(");
     expect(code).not.toContain('dict("gtr6")');
     expect(code).not.toMatch(/\bn\("/);
+    // 저현(a2) gain < 고현(e4) — 베이스 마스킹 방지
+    const gains = [...code.matchAll(/\.gain\("([^"]+)"\)/g)].map((m) => m[1]!);
+    expect(gains.length).toBeGreaterThanOrEqual(5);
+    const low = Number(gains[0]!.split(" ")[0]!.split("@")[0]);
+    const high = Number(gains[4]!.split(" ")[0]!.split("@")[0]);
+    expect(low).toBeGreaterThan(0);
+    expect(low).toBeLessThan(high);
   });
 
   it("arp/gm은 차트 리듬·D↓U↑를 반영하고 바디만 다르다", () => {

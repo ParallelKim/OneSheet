@@ -511,10 +511,40 @@ function strokeNotes(chord: string, art: AttackArt): string[] {
 
 /**
  * 오픈셰이프 note + late 스트럼.
- * - onset만 수 ms 어긋남 → 먼저 친 현이 같은 길이만큼 먼저 끝남
- * - hold가 길수록 gain↓ (지속∝작아짐)
- * - 기본 사운드폰트(그랜드) — GM 기타 바디 배제
+ * - late로 onset만 어긋남. clip을 late만큼 줄여 **같은 절대 시각에 끝나게**
+ *   (안 줄이면 고현이 다음 코드로 밀려, 전환 순간 저현만 들림)
+ * - gain은 피치 기준 — GM 저현이 덮지 않게
+ * - 가벼운 hpf로 저역 머드 컷
  */
+function noteMidi(tok: string): number {
+  const m = tok.match(/^([a-g])([#b]?)(-?\d+)$/i);
+  if (!m) return 60;
+  const letter = m[1]!.toLowerCase();
+  const acc = m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0;
+  const oct = Number(m[3]);
+  const base: Record<string, number> = {
+    c: 0,
+    d: 2,
+    e: 4,
+    f: 5,
+    g: 7,
+    a: 9,
+    b: 11,
+  };
+  return (oct + 1) * 12 + (base[letter] ?? 0) + acc;
+}
+
+/** GM 기타 저현 억제 — a2~ 아래일수록 작음 */
+function pitchGain(midi: number): number {
+  if (midi >= 64) return 1; // e4+
+  if (midi >= 60) return 0.92; // c4
+  if (midi >= 55) return 0.78; // g3
+  if (midi >= 52) return 0.62; // e3
+  if (midi >= 48) return 0.42; // c3
+  if (midi >= 45) return 0.28; // a2
+  return 0.2; // e2~g2
+}
+
 function layerStrum(parts: StrudelParts): string {
   const maxVoices = Math.max(
     1,
@@ -523,9 +553,11 @@ function layerStrum(parts: StrudelParts): string {
     ),
   );
   const gap = Number((STRUM_GAP_SEC * parts.cps).toFixed(5));
+  const total = Math.max(1, parts.totalSteps);
   const voices: string[] = [];
 
   for (let slot = 0; slot < maxVoices; slot++) {
+    const lateAmt = slot * gap;
     const toks = parts.events
       .map((e) => {
         if (!e.chord || !e.art) {
@@ -537,27 +569,33 @@ function layerStrum(parts: StrudelParts): string {
       })
       .join(" ");
 
-    // 지속 시간에 반비례한 gain (긴 hold → 작음) + 저현 살짝 억제
     const gainPat = parts.events
       .map((e) => {
         if (!e.chord || !e.art) {
           return e.steps === 1 ? "0" : `0@${e.steps}`;
         }
+        const n = strokeNotes(e.chord, e.art)[slot];
+        if (!n) return e.steps === 1 ? "0" : `0@${e.steps}`;
         const durScale = Math.min(1, 2 / Math.max(1, e.steps));
-        const stringLift =
-          0.72 + (0.28 * slot) / Math.max(1, maxVoices - 1);
-        const g = Number((e.gain * durScale * stringLift).toFixed(3));
+        const g = Number(
+          (e.gain * durScale * pitchGain(noteMidi(n))).toFixed(3),
+        );
         return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
       })
       .join(" ");
 
+    // late만큼 clip↓ → 먼저 친 현이 먼저 끝나고, 다음 코드와 안 겹침
     const clip = parts.events
       .map((e) => {
         if (!e.chord || !e.art) {
           return e.steps === 1 ? "0" : `0@${e.steps}`;
         }
-        // X 짧게. D/U는 clip1 — late된 현도 동일 길이(먼저 시작=먼저 끝)
-        const c = e.art === "X" ? 0.18 : 1;
+        if (e.art === "X") {
+          return e.steps === 1 ? "0.18" : `0.18@${e.steps}`;
+        }
+        const dur = e.steps / total;
+        const room = Math.max(0.2, (dur - lateAmt) / dur);
+        const c = Number((room * 0.9).toFixed(3));
         return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
       })
       .join(" ");
@@ -567,12 +605,12 @@ function layerStrum(parts: StrudelParts): string {
       `.s("${TONE_STRUM}")`,
       `.gain("${gainPat}")`,
       `.clip("${clip}")`,
-      // 울리는 동안 작아짐 (지속∝감쇠)
-      `.decay(0.12)`,
-      `.sustain(0.35)`,
+      `.hpf(180)`,
+      `.decay(0.1)`,
+      `.sustain(0.28)`,
     ].join("");
     if (slot > 0 && gap > 0) {
-      line += `.late(${(slot * gap).toFixed(5)})`;
+      line += `.late(${lateAmt.toFixed(5)})`;
     }
     voices.push(line);
   }
