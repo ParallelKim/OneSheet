@@ -87,7 +87,7 @@ describe("root × tones", () => {
     expect(chordSymbolFromParts("G", ["1", "2", "3", "5", "b7"])).toBe("G9");
   });
 
-  it("상대도수 순회는 채워진 슬롯 전부에 거울", () => {
+  it("상대도수 순회는 선택 슬롯에만 적용", () => {
     let sheet = createInitialSheet();
     sheet = {
       ...sheet,
@@ -98,17 +98,14 @@ describe("root × tones", () => {
         i < 4 ? defaultTonesForDegree(([5, 0, 4, 3] as const)[i]!) : null,
       ),
     };
-    // 축2: 해제→단(b2)→장(2). 두 번 눌러 장2
+    // 축2: 해제→단(b2)→장(2). 두 번 눌러 장2 — 슬롯0만
     sheet = paintToneSlot(sheet, 0, "2");
     sheet = paintToneSlot(sheet, 0, "2");
-    expect(sheet.tones.slice(0, 4)).toEqual([
-      ["1", "2", "b3", "5"],
-      ["1", "2", "3", "5"],
-      ["1", "2", "3", "5"],
-      ["1", "2", "3", "5"],
-    ]);
+    expect(sheet.tones[0]).toEqual(["1", "2", "b3", "5"]);
+    expect(sheet.tones[1]).toEqual(["1", "3", "5"]);
+    expect(sheet.tones[2]).toEqual(["1", "3", "5"]);
     expect(slotLabel("C", 5, sheet.tones[0])).toBe("Amadd2");
-    expect(slotLabel("C", 0, sheet.tones[1])).toBe("Cadd2");
+    expect(slotLabel("C", 0, sheet.tones[1])).toBe("C");
   });
 });
 

@@ -552,6 +552,39 @@ export function toneAxisOn(tones: ToneSet | null, axis: ToneAxis): boolean {
   return activeToneStep(tones, axis) != null;
 }
 
+/** 장·단(또는 감·완전) 쌍이 있는 축 — 아르카나 카드 */
+export function isPolarToneAxis(axis: ToneAxis): boolean {
+  return axisMembers(axis).length >= 2;
+}
+
+/**
+ * 아르카나 극성.
+ * min = 단·감 (역방향), maj = 장·완전 (정방향), on = 단극 축, off = 해제
+ */
+export type TonePolarity = "off" | "min" | "maj" | "on";
+
+export function toneAxisPolarity(
+  tones: ToneSet | null,
+  axis: ToneAxis,
+): TonePolarity {
+  const step = activeToneStep(tones, axis);
+  if (axis.id === "1") return tones != null ? "on" : "off";
+  if (step == null) return "off";
+  const members = axisMembers(axis);
+  if (members.length < 2) return "on";
+  if (step === members[0]) return "min";
+  return "maj";
+}
+
+/** 카드 양면 라벨 (min 끝 / maj 끝). 비극성이면 null */
+export function toneAxisFaces(
+  axis: ToneAxis,
+): { min: string; maj: string } | null {
+  const members = axisMembers(axis);
+  if (members.length < 2) return null;
+  return { min: members[0]!, maj: members[1]! };
+}
+
 /** 축을 특정 단계로 고정. step=null 이면 그 축 해제. 근음(1)은 유지. */
 export function setToneAxisStep(
   tones: ToneSet,
@@ -612,9 +645,7 @@ export function paintDegreeSlot(
   return { ...sheet, degrees, tones };
 }
 
-/**
- * 상대도수 축 순회 → 채워진 모든 슬롯에 같은 단계로 거울.
- */
+/** 상대도수 축 순회 — 선택 슬롯에만 적용 */
 export function paintToneSlot(
   sheet: SheetState,
   slot: number,
@@ -626,14 +657,8 @@ export function paintToneSlot(
   if (degree === null) return sheet;
   if (axis.id === "1") return sheet;
   const cur = sheet.tones[slot] ?? defaultTonesForDegree(degree);
-  const nextSelected = cycleToneAxis(cur, axis);
-  const want = activeToneStep(nextSelected, axis);
-  const tones = sheet.tones.map((t, i) => {
-    const d = sheet.degrees[i];
-    if (d === null) return null;
-    const base = t ?? defaultTonesForDegree(d);
-    return setToneAxisStep(base, axis, want);
-  });
+  const tones = [...sheet.tones];
+  tones[slot] = cycleToneAxis(cur, axis);
   return { ...sheet, tones };
 }
 

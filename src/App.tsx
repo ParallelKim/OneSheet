@@ -11,6 +11,7 @@ import {
   clearRhythmOverride,
   defaultTonesForDegree,
   DEGREE_META,
+  isPolarToneAxis,
   nextKey,
   nextSoundMode,
   paintDegreeSlot,
@@ -22,8 +23,10 @@ import {
   slotRoman,
   soundModeById,
   SUBDIV,
+  toneAxisFaces,
   toneAxisLabel,
   toneAxisOn,
+  toneAxisPolarity,
   TOTAL_STEPS,
   toStrudel,
   type Articulation,
@@ -624,16 +627,37 @@ export default function App() {
                 const tones = sheet.tones[selected];
                 const on = toneAxisOn(tones, axis);
                 const label = toneAxisLabel(tones, axis);
+                const polar = isPolarToneAxis(axis);
+                const polarity = toneAxisPolarity(tones, axis);
+                const faces = toneAxisFaces(axis);
                 return (
                   <button
                     key={`tone-${axis.id}`}
                     type="button"
-                    className={`pad tone ${on ? "on" : ""} ${axis.id === "1" ? "tone-root" : ""}`}
+                    className={[
+                      "pad",
+                      "tone",
+                      on ? "on" : "",
+                      axis.id === "1" ? "tone-root" : "",
+                      polar ? "arcana" : "",
+                      polar && polarity === "min" ? "reversed" : "",
+                      polar && polarity === "maj" ? "upright" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     onClick={() => paintTone(axis.id)}
                     aria-pressed={on}
                     aria-label={label}
                   >
-                    <span className="pad-label">{label}</span>
+                    {polar && faces ? (
+                      <span className="arcana-face">
+                        <span className="arcana-end maj">{faces.maj}</span>
+                        <span className="arcana-rule" aria-hidden />
+                        <span className="arcana-end min">{faces.min}</span>
+                      </span>
+                    ) : (
+                      <span className="pad-label">{label}</span>
+                    )}
                   </button>
                 );
               })}
