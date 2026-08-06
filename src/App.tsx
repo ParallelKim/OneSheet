@@ -194,8 +194,6 @@ export default function App() {
 
   const cycleSoundMode = useCallback(() => {
     const soundMode = nextSoundMode(sheetRef.current.soundMode);
-    const mode = soundModeById(soundMode);
-    setStatus(mode.source ? `${mode.blurb} · ${mode.source}` : mode.blurb);
     update((prev) => ({ ...prev, soundMode }));
   }, [update]);
 
@@ -309,7 +307,6 @@ export default function App() {
           <button
             type="button"
             className="chip"
-            title={soundModeById(sheet.soundMode).blurb}
             onClick={cycleSoundMode}
             aria-label="sound mode"
           >

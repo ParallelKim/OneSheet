@@ -15,9 +15,7 @@ export type SoundModeKind = "chart" | "example";
 export type SoundMode = {
   id: string;
   label: string;
-  blurb: string;
   kind: SoundModeKind;
-  source?: string;
   code?: string;
 };
 
@@ -29,32 +27,26 @@ export const SOUND_MODES: readonly SoundMode[] = [
     id: "block",
     label: "block",
     kind: "chart",
-    blurb: "한꺼번에 · saw · 차트 리듬",
   },
   {
     id: "strum",
     label: "strum",
     kind: "chart",
-    blurb: "오픈셰이프·late 쓸기 · 기본 SF · 차트",
   },
   {
     id: "arp",
     label: "arp",
     kind: "chart",
-    blurb: "한 음씩 펼침(아르페지오) · saw · 차트",
   },
   {
     id: "gm",
     label: "gm",
     kind: "chart",
-    blurb: "한 음씩 펼침 · GM · 차트",
   },
   {
     id: "docs",
     label: "docs",
     kind: "example",
-    source: "https://strudel.cc/recipes/recipes/",
-    blurb: "recipes 원문 · 차트 무시 (기준선)",
     code: `n("0 1 2 3").chord("Cm").mode("above:c3").voicing()
 .clip(2).s("gm_electric_guitar_clean")`,
   },
