@@ -13,6 +13,11 @@ declare module "@strudel/web" {
     baseUrl?: string,
     options?: Record<string, unknown>,
   ): Promise<void>;
+  export function registerVoicings(
+    name: string,
+    dictionary: Record<string, string[]>,
+    options?: Record<string, unknown>,
+  ): void;
 }
 
 declare module "@strudel/soundfonts" {

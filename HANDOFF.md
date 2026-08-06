@@ -1,7 +1,6 @@
 # OneSheet 핸드오프
 
-작성 시점: 2026-08-06 · 브랜치 `cursor/strudel-playback-4663`  
-base `main` · PR3 (재생 파이프라인)
+작성 시점: 2026-08-06 · 브랜치 `cursor/strudel-playback-4663`
 
 ---
 
@@ -11,48 +10,23 @@ base `main` · PR3 (재생 파이프라인)
 
 ---
 
-## 재생 파이프라인
+## MODE
 
-```
-SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
-  degrees[]      64스텝            MODE:
-  rhythm[][]                       · block / arp / gm → 차트 리듬·코드·BPM
-  bpm/metro                        · docs → recipes 원문 (차트 무시)
-  soundMode
-```
+| id | 축 | 리듬 |
+|----|-----|------|
+| `block` | 한꺼번에 (동시) + saw | ✅ |
+| `strum` | **6현 짧은 쓸기→링** + GM | ✅ |
+| `arp` | 한 음씩 펼침 (아르페지오) + saw | ✅ |
+| `gm` | 한 음씩 펼침 + GM | ✅ |
+| `docs` | recipes 원문 | ❌ |
 
-| 파일 | 역할 |
-|------|------|
-| `src/sheet.ts` | 모델 · compile · toStrudel · SOUND_MODES |
-| `src/engine.ts` | init / GM·dirt / evaluate 큐 |
-| `src/sheet.test.ts` | 단위 테스트 |
+`strum` 요지:
+- 기타는 **6현**. n = **현 인덱스** 0..5 (스케일 도수 아님)
+- 스트로크 = 짧은 delay로 전현을 친 뒤 **같이 지속** (아르페지오 ≠ 스트로크)
+- dict `gtr6`: R–3–5를 옥타브에 펼친 6음 (연속 도수 클러스터 금지)
+- `~`는 재공격만 막음. 링은 `clip`(steps×6)
 
 ```bash
 npm test
 npm run dev
 ```
-
----
-
-## MODE (청취 비교)
-
-같은 차트로 돌리고, **한 축만** 바꾼다.
-
-| id | LCD | 축 | 리듬 |
-|----|-----|-----|------|
-| `block` | block | 한꺼번에 (동시) + saw | ✅ 차트 |
-| `arp` | arp | 한 음씩 D↓U↑ + saw | ✅ 차트 |
-| `gm` | gm | 한 음씩 D↓U↑ + GM `:5` | ✅ 차트 |
-| `docs` | docs | recipes 원문 1개 | ❌ 무시 |
-
-비교 방법: Play → 리듬 셀 바꾸며 block↔arp → 바디만 gm → docs는 기준선.
-
-## 학습
-
-| 시도 | 결과 |
-|------|------|
-| 쓸기+`~` 번역 | 기대 불일치 |
-| docs 원문만 여러 개 | 리듬 미반영 · 서로 비슷해 차이 안 들림 |
-| **소수 MODE + 차트 공유** (현재) | 주법(block/arp) vs 바디(gm) vs 원문(docs) |
-
-원칙: hold 링에 `~` 금지. docs는 하나만. 쓸기(짧은 창)는 아직 없음 — arp(펼침)만.

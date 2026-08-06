@@ -4,6 +4,8 @@ import {
   compileSheet,
   createInitialSheet,
   cyclesPerSecond,
+  GTR6_ANCHOR,
+  GTR6_NAME,
   holdRun,
   nextSoundMode,
   SOUND_MODES,
@@ -96,6 +98,31 @@ describe("compileSheet / toStrudel", () => {
     expect(code).not.toMatch(/\bn\("/);
   });
 
+  it("strum은 6현 짧은 쓸기→링·차트 리듬", () => {
+    const sheet = createInitialSheet();
+    const bar: Articulation[] = Array.from({ length: 16 }, (_, i) => {
+      const sub = i % 4;
+      if (sub === 0) return "D";
+      if (sub === 2) return "U";
+      return "hold";
+    });
+    sheet.rhythm = [bar, bar, bar, bar];
+
+    const code = toStrudel({ ...sheet, soundMode: "strum" });
+    expect(code).toMatch(/^setcps\(/);
+    expect(code).toContain('chord("Am@2');
+    // 6현 · 첫 스텝에 몰기
+    expect(code).toContain("[[0 1 2 3 4 5] ~@1]@2");
+    expect(code).toContain("[[5 4 3 2 1 0] ~@1]@2");
+    expect(code).toContain(`.dict("${GTR6_NAME}")`);
+    expect(code).toContain(`.mode("above:${GTR6_ANCHOR}")`);
+    expect(code).toContain('.s("gm_electric_guitar_clean:5")');
+    // hold=2 → clip 12 (2*6) — 마이크로 공격이 hold만큼 울리게
+    expect(code).toContain("12@2");
+    // 도수 4음 펼침이 아님
+    expect(code).not.toContain("[0 1 2 3]@2");
+  });
+
   it("arp/gm은 차트 리듬·D↓U↑를 반영하고 바디만 다르다", () => {
     const sheet = createInitialSheet();
     const bar: Articulation[] = Array.from({ length: 16 }, (_, i) => {
@@ -113,7 +140,6 @@ describe("compileSheet / toStrudel", () => {
     expect(arp).toContain("[3 2 1 0]@2");
     expect(arp).toContain('.s("sawtooth")');
     expect(arp).toContain('.mode("above:c3")');
-    // 링에 ~ 쓰지 않음 (rest 자리의 ~@ 는 허용)
     expect(arp).not.toMatch(/\[0 1 2 3\]@\d+ ~@/);
 
     const gm = toStrudel({ ...sheet, soundMode: "gm" });
@@ -136,8 +162,14 @@ describe("compileSheet / toStrudel", () => {
     expect(code).not.toContain("setcps(");
   });
 
-  it("MODE는 4슬롯 순환", () => {
-    expect(SOUND_MODES.map((m) => m.id)).toEqual(["block", "arp", "gm", "docs"]);
+  it("MODE는 block→strum→arp→gm→docs 순환", () => {
+    expect(SOUND_MODES.map((m) => m.id)).toEqual([
+      "block",
+      "strum",
+      "arp",
+      "gm",
+      "docs",
+    ]);
     let id: SoundModeId = "block";
     for (let i = 0; i < SOUND_MODES.length; i++) id = nextSoundMode(id);
     expect(id).toBe("block");

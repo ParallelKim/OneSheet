@@ -4,7 +4,7 @@
  * 셀: D / U / X(뮤트) / hold(링) / rest(쉼).
  *
  * soundMode: 차트 리듬을 공유하고, 한 축만 바꾼다.
- * docs 하나만 원문 기준선(차트 무시).
+ * strum = 6현 짧은 쓸기 후 동시 링 (도수 아르페지오 아님).
  */
 
 export type Articulation = "D" | "U" | "X" | "hold" | "rest";
@@ -14,19 +14,15 @@ export type SoundModeKind = "chart" | "example";
 
 export type SoundMode = {
   id: string;
-  /** LCD에 짧게 */
   label: string;
-  /** 무엇이 다른지 (피드백용) — 청취 시 이 축만 비교 */
   blurb: string;
   kind: SoundModeKind;
   source?: string;
-  /** example만. 차트 무시 */
   code?: string;
 };
 
 /**
- * MODE — 적은 슬롯, 큰 청취 차이.
- * block/arp/gm = 같은 차트(리듬·코드·BPM). docs = recipes 원문 1개.
+ * MODE — block/strum/arp/gm = 차트. docs = recipes 원문 1개.
  */
 export const SOUND_MODES: readonly SoundMode[] = [
   {
@@ -36,16 +32,22 @@ export const SOUND_MODES: readonly SoundMode[] = [
     blurb: "한꺼번에 · saw · 차트 리듬",
   },
   {
+    id: "strum",
+    label: "strum",
+    kind: "chart",
+    blurb: "6현 짧은 쓸기→링 · D↓U↑ · GM · 차트",
+  },
+  {
     id: "arp",
     label: "arp",
     kind: "chart",
-    blurb: "한 음씩 D↓U↑ · saw · 차트 리듬",
+    blurb: "한 음씩 펼침(아르페지오) · saw · 차트",
   },
   {
     id: "gm",
     label: "gm",
     kind: "chart",
-    blurb: "한 음씩 D↓U↑ · GM clean:5 · 차트 리듬",
+    blurb: "한 음씩 펼침 · GM · 차트",
   },
   {
     id: "docs",
@@ -71,8 +73,22 @@ export type SheetState = {
 };
 
 const TONE_SAW = { sound: "sawtooth", cutoff: 1400 } as const;
-/** recipes 음색 + 보이싱 후 뱅크 고정 */
 const TONE_GM = "gm_electric_guitar_clean:5";
+
+/** 기타 6현. n = 현 인덱스(저→고), 스케일 도수 아님 */
+export const GTR_STRINGS = 6;
+/**
+ * 오픈형 6음 보이싱 (근음 기준 반음).
+ * R–3–5를 옥타브에 펼친 형태 — 연속 도수 클러스터가 아님.
+ */
+export const GTR6_DICT: Record<string, string[]> = {
+  "": ["0 4 7 12 16 19"],
+  M: ["0 4 7 12 16 19"],
+  m: ["0 3 7 12 15 19"],
+  o: ["0 3 6 12 15 18"],
+};
+export const GTR6_NAME = "gtr6";
+export const GTR6_ANCHOR = "e2";
 
 export const BARS = 4;
 export const BEATS = 4;
@@ -316,8 +332,7 @@ function timedGain(events: TimedEvent[]): string {
 }
 
 /**
- * D/U를 hold 길이에 펼침 (recipes arp 축).
- * rest만 `~`. 링 구간에 `~`를 넣지 않는다.
+ * D/U를 hold 길이에 펼침 (recipes arp 축 — 스트로크 아님).
  */
 function timedArpN(events: TimedEvent[]): string {
   return events
@@ -330,6 +345,45 @@ function timedArpN(events: TimedEvent[]): string {
       }
       const order = e.art === "D" ? "[0 1 2 3]" : "[3 2 1 0]";
       return e.steps === 1 ? order : `${order}@${e.steps}`;
+    })
+    .join(" ");
+}
+
+/**
+ * 6현 스트로크: 첫 스텝에 전현을 짧게 쓸고, 나머지는 재공격 없음.
+ * `~` = 새 공격 없음. 링은 clip이 담당 (침묵으로 링을 흉내 내지 않음).
+ * n = 현 인덱스 0..5 (저→고), 도수 아님.
+ */
+function timedStrumN(events: TimedEvent[]): string {
+  return events
+    .map((e) => {
+      if (!e.chord || !e.art) {
+        return e.steps === 1 ? "~" : `~@${e.steps}`;
+      }
+      if (e.art === "X") {
+        // 뮤트: 중현 동시·짧게
+        return e.steps === 1 ? "[1,2,3]" : `[[1,2,3] ~@${e.steps - 1}]@${e.steps}`;
+      }
+      const seq = e.art === "D" ? "0 1 2 3 4 5" : "5 4 3 2 1 0";
+      if (e.steps <= 1) return `[${seq}]`;
+      return `[[${seq}] ~@${e.steps - 1}]@${e.steps}`;
+    })
+    .join(" ");
+}
+
+/**
+ * 스트로크 서브이벤트(첫 스텝/6) × clip ≥ hold 길이.
+ * X는 짧게.
+ */
+function timedStrumClip(events: TimedEvent[]): string {
+  return events
+    .map((e) => {
+      if (!e.chord || !e.art) {
+        return e.steps === 1 ? "0" : `0@${e.steps}`;
+      }
+      const clip =
+        e.art === "X" ? 0.22 : Math.max(GTR_STRINGS, e.steps * GTR_STRINGS);
+      return e.steps === 1 ? String(clip) : `${clip}@${e.steps}`;
     })
     .join(" ");
 }
@@ -361,15 +415,14 @@ function layerBlock(parts: StrudelParts): string {
 }
 
 /**
- * 한 음씩 — recipes `n("0 1 2 3").chord.voicing` 축을 차트 이벤트에 적용.
- * D=저→고, U=고→저. hold 길이에 균등 배치.
+ * 한 음씩 — recipes arp (스트로크 아님).
  */
 function layerArp(
   parts: StrudelParts,
   sound: string,
   opts: { cutoff?: number; clip: number },
 ): string {
-  const parts_ = [
+  const out = [
     `n("${timedArpN(parts.events)}")`,
     `.chord("${timedChord(parts.events)}")`,
     `.dict("triads")`,
@@ -378,9 +431,26 @@ function layerArp(
     `.s("${sound}")`,
     `.gain("${timedGain(parts.events)}")`,
   ];
-  if (opts.cutoff != null) parts_.push(`.cutoff(${opts.cutoff})`);
-  parts_.push(`.clip(${opts.clip})`);
-  return parts_.join("");
+  if (opts.cutoff != null) out.push(`.cutoff(${opts.cutoff})`);
+  out.push(`.clip(${opts.clip})`);
+  return out.join("");
+}
+
+/**
+ * 6현 스트로크 — 짧은 쓸기 후 전현 링.
+ * dict gtr6: n=현. GM 바디.
+ */
+function layerStrum(parts: StrudelParts): string {
+  return [
+    `n("${timedStrumN(parts.events)}")`,
+    `.chord("${timedChord(parts.events)}")`,
+    `.dict("${GTR6_NAME}")`,
+    `.mode("above:${GTR6_ANCHOR}")`,
+    `.voicing()`,
+    `.s("${TONE_GM}")`,
+    `.gain("${timedGain(parts.events)}")`,
+    `.clip("${timedStrumClip(parts.events)}")`,
+  ].join("");
 }
 
 function chartToStrudel(sheet: SheetState, modeId: SoundModeId): string {
@@ -388,7 +458,9 @@ function chartToStrudel(sheet: SheetState, modeId: SoundModeId): string {
   const layers: string[] = [];
 
   if (parts.hasHits) {
-    if (modeId === "arp") {
+    if (modeId === "strum") {
+      layers.push(layerStrum(parts));
+    } else if (modeId === "arp") {
       layers.push(
         layerArp(parts, TONE_SAW.sound, {
           cutoff: TONE_SAW.cutoff,
