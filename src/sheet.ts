@@ -24,89 +24,38 @@ export type SheetState = {
 };
 
 /**
- * SOUND 축.
- * 공식/유저 예제: dirt-samples `gtr` 실WAV가 진짜 기타.
- * GM soundfont는 싸구려 신스에 가깝고 8bit처럼 들리기 쉬움 → 보조.
- * 파형(saw/square/tri)은 명시적 신스 옵션.
+ * SOUND 축 — 겹치지 않는 4슬롯.
+ * clean/drive/dist = dirt-samples 실기타 WAV (docs `gtr`)
+ * saw = 신스 (기타가 아님을 이름만으로 알 수 있게)
+ * GM nylon/steel/clean·square/tri 는 톤이 겹치거나 예측 불가 → 제거
  */
-export type SoundId =
-  | "gtr"
-  | "drive"
-  | "dist"
-  | "clean"
-  | "nylon"
-  | "steel"
-  | "saw"
-  | "square"
-  | "tri";
+export type SoundId = "clean" | "drive" | "dist" | "saw";
 
-export type SoundKind = "sample" | "font" | "synth";
+export type SoundKind = "sample" | "synth";
 
 export type SoundPreset = {
   id: SoundId;
   label: string;
   kind: SoundKind;
-  /** .s() 이름 (sample/font는 :n 뱅크 가능) */
+  /** .s() 이름 */
   sound: string;
-  /** soundfont 파일 (프리로드). sample/synth면 null */
-  font: string | null;
   cutoff?: number;
 };
 
 export const SOUND_PRESETS: readonly SoundPreset[] = [
-  // dirt-samples 실기타 (docs: note(...).s("gtr").clip(1))
-  { id: "gtr", label: "gtr", kind: "sample", sound: "gtr", font: null },
-  { id: "drive", label: "drive", kind: "sample", sound: "gtr:1", font: null },
-  { id: "dist", label: "dist", kind: "sample", sound: "gtr:2", font: null },
-  // GM — recipes가 쓰는 clean (뱅크 기본)
-  {
-    id: "clean",
-    label: "clean",
-    kind: "font",
-    sound: "gm_electric_guitar_clean",
-    font: "0270_Aspirin_sf2_file",
-  },
-  {
-    id: "nylon",
-    label: "nylon",
-    kind: "font",
-    sound: "gm_acoustic_guitar_nylon",
-    font: "0240_JCLive_sf2_file",
-  },
-  {
-    id: "steel",
-    label: "steel",
-    kind: "font",
-    sound: "gm_acoustic_guitar_steel",
-    font: "0250_LK_AcousticSteel_SF2_file",
-  },
+  { id: "clean", label: "clean", kind: "sample", sound: "gtr" },
+  { id: "drive", label: "drive", kind: "sample", sound: "gtr:1" },
+  { id: "dist", label: "dist", kind: "sample", sound: "gtr:2" },
   {
     id: "saw",
     label: "saw",
     kind: "synth",
     sound: "sawtooth",
-    font: null,
     cutoff: 1600,
-  },
-  {
-    id: "square",
-    label: "square",
-    kind: "synth",
-    sound: "square",
-    font: null,
-    cutoff: 2400,
-  },
-  {
-    id: "tri",
-    label: "tri",
-    kind: "synth",
-    sound: "triangle",
-    font: null,
-    cutoff: 2200,
   },
 ] as const;
 
-/** 뮤트(X) — GM muted. sample 기타일 때도 짧게 끊는 용 */
+/** 뮤트(X) — palm mute 샘플 */
 export const MUTE_SOUND = "gm_electric_guitar_muted";
 export const MUTE_FONT = "0280_Aspirin_sf2_file";
 
@@ -178,7 +127,7 @@ export function createInitialSheet(): SheetState {
     key: "C",
     degrees: repeatBar([5, 0, 4, 3]), // vi I V IV
     rhythm: defaultRhythm(),
-    sound: "gtr",
+    sound: "clean",
     gain: 0.55,
     metro: true,
   };
@@ -230,8 +179,15 @@ export function nextBody(current: SoundId): SoundId {
   return nextSound(current);
 }
 
-export function soundById(id: SoundId): SoundPreset {
-  return SOUND_PRESETS.find((v) => v.id === id) ?? SOUND_PRESETS[0]!;
+export function soundById(id: string): SoundPreset {
+  const found = SOUND_PRESETS.find((v) => v.id === id);
+  if (found) return found;
+  // 구 id 호환
+  if (id === "gtr" || id === "nylon" || id === "steel") {
+    return SOUND_PRESETS[0]!;
+  }
+  if (id === "square" || id === "tri") return SOUND_PRESETS[3]!;
+  return SOUND_PRESETS[0]!;
 }
 
 /** @deprecated soundById */

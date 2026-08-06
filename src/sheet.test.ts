@@ -37,11 +37,11 @@ describe("holdRun", () => {
 });
 
 describe("nextSound", () => {
-  it("gtr → drive → dist → … → tri → gtr", () => {
-    expect(nextSound("gtr")).toBe("drive");
+  it("clean → drive → dist → saw → clean", () => {
+    expect(nextSound("clean")).toBe("drive");
     expect(nextSound("drive")).toBe("dist");
-    expect(nextSound("dist")).toBe("clean");
-    expect(nextSound("tri")).toBe("gtr");
+    expect(nextSound("dist")).toBe("saw");
+    expect(nextSound("saw")).toBe("clean");
   });
 });
 
@@ -59,14 +59,14 @@ describe("strumN", () => {
 });
 
 describe("compileSheet / toStrudel", () => {
-  it("초기 차트는 dirt-samples gtr 기본", () => {
+  it("초기 차트는 dirt-samples clean(gtr) 기본", () => {
     const sheet = createInitialSheet();
     const parts = compileSheet(sheet);
     expect(parts.totalSteps).toBe(64);
     expect(parts.hasHits).toBe(true);
     expect(parts.cps).toBeCloseTo(cyclesPerSecond(96));
     expect(parts.events.filter((e) => e.chord !== null)).toHaveLength(16);
-    expect(parts.preset.id).toBe("gtr");
+    expect(parts.preset.id).toBe("clean");
     expect(parts.preset.sound).toBe("gtr");
   });
 

@@ -7,12 +7,7 @@ import {
   initStrudel,
   samples,
 } from "@strudel/web";
-import {
-  MUTE_FONT,
-  SOUND_PRESETS,
-  soundById,
-  type SoundId,
-} from "./sheet";
+import { MUTE_FONT, type SoundId } from "./sheet";
 
 /** initStrudel 반환 타입이 느슨해서 scheduler만 느슨히 잡는다 */
 // deno-lint-ignore no-explicit-any
@@ -29,14 +24,13 @@ let lastCode = "";
  */
 let epoch = 0;
 
-/** 워밍 완료된 font 파일 */
-const warmedFonts = new Set<string>();
 let warmPromise: Promise<void> | null = null;
 let gestureWarmed = false;
 let dirtGtrLoaded = false;
+let muteWarmed = false;
 
-/** 폰트 파일 + 대표 존 */
-const PRELOAD_MIDI = [48, 55, 60, 67];
+/** 뮤트 폰트 대표 존 */
+const PRELOAD_MIDI = [55, 60, 67];
 
 /** dirt-samples 실기타 WAV (strudel docs 예제와 동일) */
 const DIRT_GTR = {
@@ -116,7 +110,6 @@ export function getAudioState(): string {
 
 async function loadDirtGtr(): Promise<void> {
   if (dirtGtrLoaded) return;
-  // docs: samples({ gtr: 'gtr/0001_cleanC.wav' }, 'github:tidalcycles/dirt-samples')
   await samples({ ...DIRT_GTR }, DIRT_BASE);
   dirtGtrLoaded = true;
 }
@@ -125,8 +118,8 @@ export async function initStrudelEngine(): Promise<Repl> {
   if (!boot) {
     boot = initStrudel({
       prebake: async () => {
+        // X 뮤트용 GM + gtr 샘플 맵
         registerSoundfonts();
-        // 실기타 샘플 맵 등록 (파일은 재생/워밍 때 lazy)
         await loadDirtGtr();
       },
     })
@@ -143,45 +136,34 @@ export async function initStrudelEngine(): Promise<Repl> {
   return boot;
 }
 
-async function warmFont(font: string, ctx: AudioContext): Promise<void> {
-  if (warmedFonts.has(font)) return;
+async function warmMuteFont(ctx: AudioContext): Promise<void> {
+  if (muteWarmed) return;
   await Promise.all(
     PRELOAD_MIDI.map((midi) =>
-      getFontBufferSource(font, { note: midi }, ctx).catch((err: unknown) => {
-        console.warn("soundfont preload", font, midi, err);
-        return null;
-      }),
+      getFontBufferSource(MUTE_FONT, { note: midi }, ctx).catch(
+        (err: unknown) => {
+          console.warn("mute font preload", midi, err);
+          return null;
+        },
+      ),
     ),
   );
-  warmedFonts.add(font);
+  muteWarmed = true;
 }
 
 /**
  * 첫 포인터 제스처에서 호출.
- * 오디오 unlock + gtr 샘플·GM 폰트 워밍. Play를 막지 않는다.
+ * 오디오 unlock + gtr/mute 워밍. Play를 막지 않는다.
  */
-export function warmOnGesture(preferred?: SoundId): Promise<void> {
+export function warmOnGesture(_preferred?: SoundId): Promise<void> {
   if (warmPromise) return warmPromise;
   warmPromise = (async () => {
     await initStrudelEngine();
     await ensureAudioRunning();
     gestureWarmed = true;
     const ctx = getAudioContext() as AudioContext;
-
-    // gtr 실샘플을 먼저 (기본 SOUND)
     await loadDirtGtr();
-    // 한 음 트리거로 버퍼 디코드 유도 — evaluate 한 번 silent는 과함.
-    // sampler는 첫 note 때 lazy load. mute/GM만 선워밍.
-    await warmFont(MUTE_FONT, ctx);
-
-    const prefer = preferred ? soundById(preferred).font : null;
-    if (prefer) await warmFont(prefer, ctx);
-
-    for (const p of SOUND_PRESETS) {
-      if (p.font && p.font !== prefer && p.font !== MUTE_FONT) {
-        await warmFont(p.font, ctx);
-      }
-    }
+    await warmMuteFont(ctx);
   })().catch((err) => {
     console.warn("warmOnGesture failed", err);
     warmPromise = null;
