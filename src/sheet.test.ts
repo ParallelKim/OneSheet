@@ -118,7 +118,7 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain("a2@2");
     expect(code).toContain("e3@2");
     expect(code).toContain("c4@2");
-    expect(code).toContain('.s("gm_acoustic_grand_piano")');
+    expect(code).toContain('.s("gm_piano")');
     expect(code).not.toContain("gm_electric_guitar_clean");
     expect(code).toContain(".late(");
     expect(code).toContain(".decay(0.12)");

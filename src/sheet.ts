@@ -66,8 +66,8 @@ export type SheetState = {
 
 const TONE_SAW = { sound: "sawtooth", cutoff: 1400 } as const;
 const TONE_GM = "gm_electric_guitar_clean:5";
-/** strum 테스트용 — GM 기타 바디/저음 색 없음 (GM #0) */
-const TONE_STRUM = "gm_acoustic_grand_piano";
+/** strum 테스트용 — GM #0 Acoustic Grand (`gm_piano`). 잘못된 이름이면 무음. */
+const TONE_STRUM = "gm_piano";
 
 /**
  * 오픈(·바레) 셰이프 — 저→고 절대음.
