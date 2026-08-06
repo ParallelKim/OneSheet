@@ -407,7 +407,25 @@ export default function App() {
           aria-pressed={sheet.metro}
           aria-label="metronome"
         >
-          <span className="tr-icon">♩</span>
+          <span className="tr-icon" aria-hidden>
+            <svg className="tr-metro" viewBox="0 0 16 16" width="14" height="14">
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.35"
+                strokeLinejoin="round"
+                d="M3.1 13.8 8 2.4l4.9 11.4H3.1Z"
+              />
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.35"
+                strokeLinecap="round"
+                d="M2.2 13.8h11.6M8 3.6l3.1 6.2"
+              />
+              <circle fill="currentColor" cx="11.1" cy="9.8" r="1.2" />
+            </svg>
+          </span>
           <span className="tr-label">CLICK</span>
         </button>
         <button

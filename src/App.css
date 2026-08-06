@@ -336,6 +336,12 @@ button {
   line-height: 1;
 }
 
+.tr-icon .tr-metro {
+  display: block;
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
 .tr-btn.loading .tr-icon {
   display: flex;
   align-items: center;
