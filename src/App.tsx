@@ -426,40 +426,35 @@ export default function App() {
           <span className="tr-icon" aria-hidden>
             <svg
               className="tr-metro"
-              viewBox="0 0 20 20"
+              viewBox="0 0 24 24"
               width="16"
               height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              {/* 본체 + 받침 */}
-              <path
-                fill="currentColor"
-                d="M5.2 16.2 8.4 4.1c.15-.55.9-.55 1.05 0L12.8 16.2H5.2Z"
-              />
-              <rect
-                fill="currentColor"
-                x="3.6"
-                y="15.4"
-                width="12.8"
-                height="2.1"
-                rx="0.4"
-              />
-              {/* 눈금 — on 상태에선 버튼 배경색으로 */}
+              {/* 사다리꼴 본체 (플랫탑) */}
+              <path d="M8 3.5h8l3.2 16.5H4.8L8 3.5Z" />
+              {/* 중앙 눈금대 */}
+              <path d="M12 5.2v12.2" />
               <path
                 className="tr-metro-ticks"
-                fill="none"
-                strokeWidth="1"
-                strokeLinecap="round"
-                d="M9.2 7.2h1.6M8.7 9.4h2.6M8.2 11.6h3.6"
+                d="M10.2 7.2h3.6M10.2 9.4h3.6M10.2 11.6h3.6M10.2 13.8h3.6"
               />
-              {/* 추 — 밖으로 크게 빠져 메트로놈으로 읽히게 */}
-              <path
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                d="M10 4.2 16.4 11.6"
+              {/* 추봉 + 사각 슬라이드 추 */}
+              <path d="M12 5.8 18.6 9.6" />
+              <rect
+                x="16.9"
+                y="8.35"
+                width="3.4"
+                height="2.5"
+                rx="0.35"
+                transform="rotate(28 18.6 9.6)"
+                fill="currentColor"
+                stroke="none"
               />
-              <circle fill="currentColor" cx="16.4" cy="11.6" r="2.2" />
             </svg>
           </span>
           <span className="tr-label">CLICK</span>
