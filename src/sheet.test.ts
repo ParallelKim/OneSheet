@@ -8,7 +8,6 @@ import {
   holdRun,
   nextSoundMode,
   SOUND_MODES,
-  soundModeById,
   toStrudel,
   type Articulation,
   type SheetState,
@@ -86,15 +85,8 @@ describe("compileSheet / toStrudel", () => {
     expect(code).not.toContain("chord(");
   });
 
-  it("block은 동시 보이싱·차트 리듬", () => {
-    const sheet = createInitialSheet();
-    expect(sheet.soundMode).toBe("block");
-    const code = toStrudel(sheet);
-    expect(code).toMatch(/^setcps\(/);
-    expect(code).toContain('chord("Am@4');
-    expect(code).toContain('.s("sawtooth")');
-    expect(code).toContain(".clip(0.95)");
-    expect(code).not.toMatch(/\bn\("/);
+  it("기본 MODE는 strum", () => {
+    expect(createInitialSheet().soundMode).toBe("strum");
   });
 
   it("오픈 C/Am 셰이프는 절대음·뮤트 현 제외", () => {
@@ -119,15 +111,11 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain("e3@2");
     expect(code).toContain("c4@2");
     expect(code).toContain('.s("gm_electric_guitar_clean:5")');
-    expect(code).not.toContain("gm_piano");
     expect(code).toContain(".late(");
     expect(code).toContain(".hpf(180)");
-    expect(code).toContain(".decay(0.08)");
-    expect(code).toContain(".sustain(0.4)");
     expect(code).toContain("note(");
     expect(code).not.toContain('dict("gtr6")');
     expect(code).not.toMatch(/\bn\("/);
-    // 저현(a2) << 1번줄(e4) — 고현이 묻히지 않게
     const gains = [...code.matchAll(/\.gain\("([^"]+)"\)/g)].map((m) => m[1]!);
     expect(gains.length).toBeGreaterThanOrEqual(5);
     const low = Number(gains[0]!.split(" ")[0]!.split("@")[0]);
@@ -136,56 +124,26 @@ describe("compileSheet / toStrudel", () => {
     expect(high / low).toBeGreaterThan(3);
   });
 
-  it("arp/gm은 차트 리듬·D↓U↑를 반영하고 바디만 다르다", () => {
+  it("piano는 오픈셰이프 전음 동시·gm_piano·late 없음", () => {
     const sheet = createInitialSheet();
-    const bar: Articulation[] = Array.from({ length: 16 }, (_, i) => {
-      const sub = i % 4;
-      if (sub === 0) return "D";
-      if (sub === 2) return "U";
-      return "hold";
-    });
-    sheet.rhythm = [bar, bar, bar, bar];
-
-    const arp = toStrudel({ ...sheet, soundMode: "arp" });
-    expect(arp).toMatch(/^setcps\(/);
-    expect(arp).toContain('chord("Am@2');
-    expect(arp).toContain("[0 1 2 3]@2");
-    expect(arp).toContain("[3 2 1 0]@2");
-    expect(arp).toContain('.s("sawtooth")');
-    expect(arp).toContain('.mode("above:c3")');
-    expect(arp).not.toMatch(/\[0 1 2 3\]@\d+ ~@/);
-
-    const gm = toStrudel({ ...sheet, soundMode: "gm" });
-    expect(gm).toContain("[0 1 2 3]@2");
-    expect(gm).toContain('.s("gm_electric_guitar_clean:5")');
-    expect(gm).toContain(".clip(2)");
-    expect(gm).not.toContain("sawtooth");
+    const code = toStrudel({ ...sheet, soundMode: "piano", metro: false });
+    expect(code).toMatch(/^setcps\(/);
+    expect(code).toContain("a2,e3,a3,c4,e4@4");
+    expect(code).toContain("c3,e3,g3,c4,e4@4");
+    expect(code).toContain("g2,b2,d3,g3,b3,g4@4");
+    expect(code).toContain('.s("gm_piano")');
+    expect(code).not.toContain(".late(");
+    expect(code).not.toContain("gm_electric_guitar_clean");
+    expect(code).not.toContain("sawtooth");
   });
 
-  it("docs만 차트 무시·원문", () => {
-    const mode = soundModeById("docs");
-    const code = toStrudel({
-      ...createInitialSheet(),
-      soundMode: "docs",
-      bpm: 40,
-      degrees: Array(16).fill(null),
-    });
-    expect(code).toBe(mode.code);
-    expect(code).toContain('chord("Cm")');
-    expect(code).not.toContain("setcps(");
-  });
-
-  it("MODE는 block→strum→arp→gm→docs 순환", () => {
-    expect(SOUND_MODES.map((m) => m.id)).toEqual([
-      "block",
-      "strum",
-      "arp",
-      "gm",
-      "docs",
-    ]);
-    let id: SoundModeId = "block";
+  it("MODE는 strum→piano 순환", () => {
+    expect(SOUND_MODES.map((m) => m.id)).toEqual(["strum", "piano"]);
+    let id: SoundModeId = "strum";
     for (let i = 0; i < SOUND_MODES.length; i++) id = nextSoundMode(id);
-    expect(id).toBe("block");
+    expect(id).toBe("strum");
+    expect(nextSoundMode("strum")).toBe("piano");
+    expect(nextSoundMode("piano")).toBe("strum");
   });
 
   it("rest 구간은 공격이 없다", () => {
