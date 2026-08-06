@@ -699,18 +699,20 @@ button {
   pointer-events: none;
 }
 
-/* 아르카나: 장·단 쌍 축 — 가로선 + 정/역 회전 */
+/* 아르카나: 가로선 + 정/역 회전. 여백은 고정 gap으로 일관 */
 .pad.tone.arcana {
-  padding: 0.28em 0.2em;
+  padding: 0.2em 0.15em;
 }
 
 .pad.tone.arcana .arcana-face {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 0.14em;
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: 100%;
   min-height: 0;
   transition: transform 0.38s cubic-bezier(0.33, 1.15, 0.42, 1);
   transform: rotate(0deg);
@@ -721,10 +723,11 @@ button {
 }
 
 .pad.tone.arcana .arcana-end {
-  font-size: clamp(0.72rem, 3.1vw, 0.95rem);
+  font-family: var(--font-ui);
+  font-size: clamp(0.68rem, 2.9vw, 0.88rem);
   font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 /* 역방향 끝이 뒤집혔을 때 바로 읽히도록 미리 180° */
@@ -734,11 +737,11 @@ button {
 
 .pad.tone.arcana .arcana-rule {
   display: block;
-  width: 62%;
+  width: 58%;
   height: 1px;
-  margin: 0.12em 0;
+  margin: 0;
   background: currentColor;
-  opacity: 0.4;
+  opacity: 0.42;
   flex-shrink: 0;
 }
 
@@ -746,8 +749,9 @@ button {
   opacity: 0.55;
 }
 
-.pad.tone.arcana:not(.on) .arcana-end.min {
-  opacity: 0.45;
+.pad.tone.arcana.mirror:not(.on) .arcana-end.min,
+.pad.tone.arcana.polar:not(.on) .arcana-end.min {
+  opacity: 0.5;
 }
 
 .pad-sub,

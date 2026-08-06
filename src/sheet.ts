@@ -539,12 +539,20 @@ export function activeToneStep(
   return null;
 }
 
+/** 화면용 음정 글리프 — b→♭, #→♯ (내부 id는 ASCII 유지) */
+export function formatIntervalGlyph(interval: string): string {
+  if (interval.startsWith("b")) return `♭${interval.slice(1)}`;
+  if (interval.startsWith("#")) return `♯${interval.slice(1)}`;
+  return interval;
+}
+
 /** 패드 라벨: 켜진 상대도수, 해제면 축 이름(1…7) */
 export function toneAxisLabel(
   tones: ToneSet | null,
   axis: ToneAxis,
 ): string {
-  return activeToneStep(tones, axis) ?? axis.id;
+  const step = activeToneStep(tones, axis);
+  return formatIntervalGlyph(step ?? axis.id);
 }
 
 export function toneAxisOn(tones: ToneSet | null, axis: ToneAxis): boolean {
@@ -552,7 +560,7 @@ export function toneAxisOn(tones: ToneSet | null, axis: ToneAxis): boolean {
   return activeToneStep(tones, axis) != null;
 }
 
-/** 장·단(또는 감·완전) 쌍이 있는 축 — 아르카나 카드 */
+/** 장·단(또는 감·완전) 쌍이 있는 축 — 정/역 회전 대상 */
 export function isPolarToneAxis(axis: ToneAxis): boolean {
   return axisMembers(axis).length >= 2;
 }
@@ -576,13 +584,25 @@ export function toneAxisPolarity(
   return "maj";
 }
 
-/** 카드 양면 라벨 (min 끝 / maj 끝). 비극성이면 null */
-export function toneAxisFaces(
-  axis: ToneAxis,
-): { min: string; maj: string } | null {
+/**
+ * 카드 양면 라벨.
+ * 단·장 쌍 → min/maj 각각. 단도 없으면 위·아래 모두 장(유일)도.
+ */
+export function toneAxisFaces(axis: ToneAxis): {
+  min: string;
+  maj: string;
+  polar: boolean;
+} {
   const members = axisMembers(axis);
-  if (members.length < 2) return null;
-  return { min: members[0]!, maj: members[1]! };
+  if (members.length >= 2) {
+    return {
+      min: formatIntervalGlyph(members[0]!),
+      maj: formatIntervalGlyph(members[1]!),
+      polar: true,
+    };
+  }
+  const only = formatIntervalGlyph(members[0] ?? axis.id);
+  return { min: only, maj: only, polar: false };
 }
 
 /** 축을 특정 단계로 고정. step=null 이면 그 축 해제. 근음(1)은 유지. */

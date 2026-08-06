@@ -11,7 +11,6 @@ import {
   clearRhythmOverride,
   defaultTonesForDegree,
   DEGREE_META,
-  isPolarToneAxis,
   nextKey,
   nextSoundMode,
   paintDegreeSlot,
@@ -627,9 +626,8 @@ export default function App() {
                 const tones = sheet.tones[selected];
                 const on = toneAxisOn(tones, axis);
                 const label = toneAxisLabel(tones, axis);
-                const polar = isPolarToneAxis(axis);
-                const polarity = toneAxisPolarity(tones, axis);
                 const faces = toneAxisFaces(axis);
+                const polarity = toneAxisPolarity(tones, axis);
                 return (
                   <button
                     key={`tone-${axis.id}`}
@@ -637,11 +635,12 @@ export default function App() {
                     className={[
                       "pad",
                       "tone",
+                      "arcana",
                       on ? "on" : "",
                       axis.id === "1" ? "tone-root" : "",
-                      polar ? "arcana" : "",
-                      polar && polarity === "min" ? "reversed" : "",
-                      polar && polarity === "maj" ? "upright" : "",
+                      faces.polar ? "polar" : "mirror",
+                      faces.polar && polarity === "min" ? "reversed" : "",
+                      faces.polar && polarity === "maj" ? "upright" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
@@ -649,15 +648,11 @@ export default function App() {
                     aria-pressed={on}
                     aria-label={label}
                   >
-                    {polar && faces ? (
-                      <span className="arcana-face">
-                        <span className="arcana-end maj">{faces.maj}</span>
-                        <span className="arcana-rule" aria-hidden />
-                        <span className="arcana-end min">{faces.min}</span>
-                      </span>
-                    ) : (
-                      <span className="pad-label">{label}</span>
-                    )}
+                    <span className="arcana-face">
+                      <span className="arcana-end maj">{faces.maj}</span>
+                      <span className="arcana-rule" aria-hidden />
+                      <span className="arcana-end min">{faces.min}</span>
+                    </span>
                   </button>
                 );
               })}

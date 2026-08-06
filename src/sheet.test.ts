@@ -9,6 +9,7 @@ import {
   cyclesPerSecond,
   cycleToneAxis,
   defaultTonesForDegree,
+  formatIntervalGlyph,
   guitarShape,
   holdRun,
   intervalNoteLabel,
@@ -21,6 +22,7 @@ import {
   slotLabel,
   SOUND_MODES,
   TONE_AXES,
+  toneAxisFaces,
   toStrudel,
   type Articulation,
   type SheetState,
@@ -85,6 +87,17 @@ describe("root × tones", () => {
     expect(chordSymbolFromParts("C", ["1", "2", "3", "5"])).toBe("Cadd2");
     expect(chordSymbolFromParts("G", ["1", "2", "5"])).toBe("Gsus2");
     expect(chordSymbolFromParts("G", ["1", "2", "3", "5", "b7"])).toBe("G9");
+  });
+
+  it("화면 글리프는 ♭ / 단극 축은 양면 동일", () => {
+    expect(formatIntervalGlyph("b3")).toBe("♭3");
+    expect(formatIntervalGlyph("3")).toBe("3");
+    const a3 = toneAxisFaces(TONE_AXES.find((a) => a.id === "3")!);
+    expect(a3).toEqual({ min: "♭3", maj: "3", polar: true });
+    const a4 = toneAxisFaces(TONE_AXES.find((a) => a.id === "4")!);
+    expect(a4).toEqual({ min: "4", maj: "4", polar: false });
+    const a1 = toneAxisFaces(TONE_AXES.find((a) => a.id === "1")!);
+    expect(a1).toEqual({ min: "1", maj: "1", polar: false });
   });
 
   it("상대도수 순회는 선택 슬롯에만 적용", () => {
