@@ -15,11 +15,12 @@
 
 ### strum
 
-- 오픈셰이프 절대음 + `stack`/`late`(~12ms)
-- **GM clean** `gm_electric_guitar_clean:5` (피아노 SF는 톤이 안 맞음)
-- late만큼 clip↓ → 먼저 친 현이 먼저 끝 (다음 코드로 안 밀림)
-- 피치별 gain↓(저현) + `hpf` — 코드 전환 시 베이스 마스킹 완화
-- hold 길수록 gain↓, `.decay`/`.sustain`
+- 오픈셰이프 절대음 + `stack`/`late`(~8ms)
+- **GM clean** `gm_electric_guitar_clean:5`
+- 코드마다 5~6음 (C/Am 오픈은 6번줄 뮤트)
+- late만큼 clip↓ → 다음 코드로 안 밀림
+- 피치별 gain: 저현↓ / **1번줄(e4~)↑**
+- `hpf` + decay/sustain
 - D=저→고, U=고→저
 
 ```bash

@@ -126,8 +126,8 @@ const PC_NAME = [
   "b",
 ] as const;
 
-/** 현 사이 쓸기 간격(초). late(cycles) = sec * cps */
-const STRUM_GAP_SEC = 0.012;
+/** 현 사이 쓸기 간격(초). 너무 길면 마지막(1번줄)이 묻힘 */
+const STRUM_GAP_SEC = 0.008;
 
 export function parseChordSymbol(sym: string): {
   root: string;
@@ -511,10 +511,10 @@ function strokeNotes(chord: string, art: AttackArt): string[] {
 
 /**
  * 오픈셰이프 note + late 스트럼.
- * - late로 onset만 어긋남. clip을 late만큼 줄여 **같은 절대 시각에 끝나게**
- *   (안 줄이면 고현이 다음 코드로 밀려, 전환 순간 저현만 들림)
- * - gain은 피치 기준 — GM 저현이 덮지 않게
- * - 가벼운 hpf로 저역 머드 컷
+ * - 코드마다 5~6음 (C/Am 오픈은 6번줄 뮤트 → 5)
+ * - late로 onset만 어긋남. clip을 late만큼 줄여 다음 코드와 안 겹침
+ * - 피치별 gain: 저현↓ / **1번줄(고현)↑** — GM이 고현을 작게 내는 보정
+ * - hpf로 저역 머드 컷
  */
 function noteMidi(tok: string): number {
   const m = tok.match(/^([a-g])([#b]?)(-?\d+)$/i);
@@ -534,14 +534,15 @@ function noteMidi(tok: string): number {
   return (oct + 1) * 12 + (base[letter] ?? 0) + acc;
 }
 
-/** GM 기타 저현 억제 — a2~ 아래일수록 작음 */
+/** GM clean 보정 — 저현 억제, 1번줄(e4~) 부스트 */
 function pitchGain(midi: number): number {
-  if (midi >= 64) return 1; // e4+
-  if (midi >= 60) return 0.92; // c4
-  if (midi >= 55) return 0.78; // g3
-  if (midi >= 52) return 0.62; // e3
-  if (midi >= 48) return 0.42; // c3
-  if (midi >= 45) return 0.28; // a2
+  if (midi >= 67) return 1.55; // g4+ (G/F 1번줄)
+  if (midi >= 64) return 1.45; // e4 (C/Am 1번줄)
+  if (midi >= 60) return 1.1; // c4
+  if (midi >= 55) return 0.82; // g3
+  if (midi >= 52) return 0.58; // e3
+  if (midi >= 48) return 0.38; // c3
+  if (midi >= 45) return 0.26; // a2
   return 0.2; // e2~g2
 }
 
@@ -584,7 +585,7 @@ function layerStrum(parts: StrudelParts): string {
       })
       .join(" ");
 
-    // late만큼 clip↓ → 먼저 친 현이 먼저 끝나고, 다음 코드와 안 겹침
+    // late만큼 clip↓ — 바닥을 더 높여 마지막 현(1번줄)이 너무 짧아지지 않게
     const clip = parts.events
       .map((e) => {
         if (!e.chord || !e.art) {
@@ -594,8 +595,8 @@ function layerStrum(parts: StrudelParts): string {
           return e.steps === 1 ? "0.18" : `0.18@${e.steps}`;
         }
         const dur = e.steps / total;
-        const room = Math.max(0.2, (dur - lateAmt) / dur);
-        const c = Number((room * 0.9).toFixed(3));
+        const room = Math.max(0.55, (dur - lateAmt) / dur);
+        const c = Number((room * 0.92).toFixed(3));
         return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
       })
       .join(" ");
@@ -606,8 +607,8 @@ function layerStrum(parts: StrudelParts): string {
       `.gain("${gainPat}")`,
       `.clip("${clip}")`,
       `.hpf(180)`,
-      `.decay(0.1)`,
-      `.sustain(0.28)`,
+      `.decay(0.08)`,
+      `.sustain(0.4)`,
     ].join("");
     if (slot > 0 && gap > 0) {
       line += `.late(${lateAmt.toFixed(5)})`;
