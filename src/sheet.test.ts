@@ -6,6 +6,7 @@ import {
   cyclesPerSecond,
   holdRun,
   MUTE_SOUND,
+  nextBody,
   strumN,
   toStrudel,
   type Articulation,
@@ -32,6 +33,14 @@ describe("holdRun", () => {
     const bar: Articulation[] = ["D", "hold", "hold", "hold", "U", "hold", "rest", "rest"];
     expect(holdRun(bar, 0)).toBe(3);
     expect(holdRun(bar, 4)).toBe(1);
+  });
+});
+
+describe("nextBody", () => {
+  it("nylon → steel → clean → nylon", () => {
+    expect(nextBody("nylon")).toBe("steel");
+    expect(nextBody("steel")).toBe("clean");
+    expect(nextBody("clean")).toBe("nylon");
   });
 });
 

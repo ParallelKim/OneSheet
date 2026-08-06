@@ -6,8 +6,10 @@ import {
   BEATS,
   BARS,
   BAR_STEPS,
+  bodyById,
   createInitialSheet,
   DEGREE_META,
+  nextBody,
   nextKey,
   setBarArticulation,
   SLOTS,
@@ -20,7 +22,9 @@ import {
   type SheetState,
 } from "./sheet";
 import {
+  ensureAudioRunning,
   evaluateStrudel,
+  getAudioState,
   getCyclePhase,
   getLastStrudelCode,
   getPlaybackEpoch,
@@ -28,6 +32,7 @@ import {
   initStrudelEngine,
   preloadGuitarSamples,
 } from "./engine";
+import { getAudioContext } from "@strudel/web";
 import "./App.css";
 
 type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
@@ -168,42 +173,64 @@ export default function App() {
     [pushPattern],
   );
 
-  const onPlay = useCallback(async () => {
+  const onPlay = useCallback(() => {
     const gate = getPlaybackEpoch();
     setEngine("loading");
     setStatus("");
+    // 클릭 스택에서 즉시 resume 시작 (await 전에 제스처 묶기)
     try {
-      await initStrudelEngine();
-      if (getPlaybackEpoch() !== gate) {
-        setEngine((e) => (e === "error" ? e : "ready"));
-        return;
-      }
-      const warmed = await preloadGuitarSamples(
-        sheetRef.current.body,
-        gate,
-      );
-      if (!warmed || getPlaybackEpoch() !== gate) {
-        setEngine((e) => (e === "error" ? e : "ready"));
-        return;
-      }
-      const code = toStrudel(sheetRef.current);
-      const ok = await evaluateStrudel(code);
-      if (!ok || getPlaybackEpoch() !== gate) {
-        playingRef.current = false;
-        setEngine((e) => (e === "error" ? e : "ready"));
-        setStatus("");
-        return;
-      }
-      playingRef.current = true;
-      setEngine("playing");
-      setStatus("");
-    } catch (err) {
-      console.error(err, getLastStrudelCode());
-      playingRef.current = false;
-      setEngine("error");
-      setStatus("play error");
+      void (getAudioContext() as AudioContext).resume();
+    } catch {
+      /* 엔진 미기동 시 컨텍스트 없음 → 아래에서 생성 */
     }
+
+    void (async () => {
+      try {
+        await ensureAudioRunning();
+        if (getPlaybackEpoch() !== gate) {
+          setEngine((e) => (e === "error" ? e : "ready"));
+          return;
+        }
+        await initStrudelEngine();
+        if (getPlaybackEpoch() !== gate) {
+          setEngine((e) => (e === "error" ? e : "ready"));
+          return;
+        }
+        await preloadGuitarSamples(sheetRef.current.body, gate);
+        if (getPlaybackEpoch() !== gate) {
+          setEngine((e) => (e === "error" ? e : "ready"));
+          return;
+        }
+        await ensureAudioRunning();
+        if (getPlaybackEpoch() !== gate) {
+          setEngine((e) => (e === "error" ? e : "ready"));
+          return;
+        }
+        const code = toStrudel(sheetRef.current);
+        const ok = await evaluateStrudel(code);
+        if (!ok || getPlaybackEpoch() !== gate) {
+          playingRef.current = false;
+          setEngine((e) => (e === "error" ? e : "ready"));
+          setStatus("");
+          return;
+        }
+        playingRef.current = true;
+        setEngine("playing");
+        setStatus(
+          getAudioState() === "running" ? "" : "audio locked — tap PLAY",
+        );
+      } catch (err) {
+        console.error(err, getLastStrudelCode());
+        playingRef.current = false;
+        setEngine("error");
+        setStatus("play error");
+      }
+    })();
   }, []);
+
+  const cycleBody = useCallback(() => {
+    update((prev) => ({ ...prev, body: nextBody(prev.body) }));
+  }, [update]);
 
   const onStop = useCallback(() => {
     hushStrudel();
@@ -264,6 +291,15 @@ export default function App() {
           >
             <span className="chip-k">KEY</span>
             <span className="chip-v">{sheet.key}</span>
+          </button>
+          <button
+            type="button"
+            className="chip"
+            onClick={cycleBody}
+            aria-label="sound body"
+          >
+            <span className="chip-k">SOUND</span>
+            <span className="chip-v">{bodyById(sheet.body).label}</span>
           </button>
           <label className="chip tempo-chip">
             <span className="chip-k">BPM</span>
@@ -332,6 +368,15 @@ export default function App() {
         <button
           type="button"
           className={`tr-btn play ${playing ? "on" : ""} ${loading ? "loading" : ""}`}
+          onPointerDown={() => {
+            // click보다 이른 제스처에서 unlock
+            if (playing || loading) return;
+            try {
+              void (getAudioContext() as AudioContext).resume();
+            } catch {
+              /* ignore */
+            }
+          }}
           onClick={() => void (playing || loading ? onStop() : onPlay())}
           aria-label={loading ? "loading" : playing ? "stop" : "play"}
           aria-busy={loading}

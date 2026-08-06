@@ -163,6 +163,12 @@ export function nextKey(current: string): string {
   return KEY_LIST[((i < 0 ? 0 : i) + 1) % KEY_LIST.length]!;
 }
 
+export function nextBody(current: GuitarBodyId): GuitarBodyId {
+  const i = GUITAR_BODIES.findIndex((b) => b.id === current);
+  const next = GUITAR_BODIES[((i < 0 ? 0 : i) + 1) % GUITAR_BODIES.length]!;
+  return next.id;
+}
+
 export function bodyById(id: GuitarBodyId) {
   return GUITAR_BODIES.find((v) => v.id === id) ?? GUITAR_BODIES[0]!;
 }

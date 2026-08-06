@@ -31,11 +31,10 @@ let epoch = 0;
 const preloadedBodies = new Set<string>();
 
 /**
- * 코드 보이싱이 닿는 MIDI 대역(약 C3–E5).
- * 존마다 한 번씩 decode해 첫 히트 로딩을 피한다.
- * (너무 낮은 음은 일부 기타 프리셋에 zone이 없음)
+ * 폰트 파일 + 대표 존만 워밍.
+ * (많이 돌리면 첫 Play가 길어져 제스처/컨텍스트가 식음)
  */
-const PRELOAD_MIDI = [48, 52, 55, 60, 64, 67, 72];
+const PRELOAD_MIDI = [60, 67];
 
 export function getLastStrudelCode(): string {
   return lastCode;
@@ -58,6 +57,41 @@ export function getCyclePhase(): number | null {
     return ((t % 1) + 1) % 1;
   } catch {
     return null;
+  }
+}
+
+/**
+ * AudioContext running 보장.
+ * superdough initAudio의 resume 조건이 깨져 있어(`(!ctx) instanceof …`)
+ * 여기서 명시적으로 resume + silent unlock 한다.
+ */
+export async function ensureAudioRunning(): Promise<void> {
+  const ctx = getAudioContext() as AudioContext;
+  if (ctx.state === "suspended") {
+    await ctx.resume();
+  }
+  await initAudio();
+  if (ctx.state === "suspended") {
+    await ctx.resume();
+  }
+  // 일부 브라우저는 resume만으로 부족 — 무음 노드로 destination unlock
+  if (ctx.state === "running") {
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    const osc = ctx.createOscillator();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const t = ctx.currentTime;
+    osc.start(t);
+    osc.stop(t + 0.05);
+  }
+}
+
+export function getAudioState(): string {
+  try {
+    return (getAudioContext() as AudioContext).state;
+  } catch {
+    return "missing";
   }
 }
 
@@ -84,6 +118,7 @@ export async function initStrudelEngine(): Promise<Repl> {
 
 /**
  * 기타 soundfont를 미리 받아 디코드한다.
+ * 실패해도 재생은 시도할 수 있게 true/false만 게이트용으로 쓴다.
  * @returns 이 호출이 여전히 유효한지 (로딩 중 정지면 false)
  */
 export async function preloadGuitarSamples(
@@ -94,8 +129,7 @@ export async function preloadGuitarSamples(
   await initStrudelEngine();
   if (gateEpoch !== epoch) return false;
 
-  // Play 클릭(사용자 제스처)에서 AudioContext resume
-  await initAudio();
+  await ensureAudioRunning();
   if (gateEpoch !== epoch) return false;
 
   if (preloadedBodies.has(bodyId)) return true;
@@ -120,6 +154,12 @@ export async function preloadGuitarSamples(
   return true;
 }
 
+/** 바디 바꿀 때 워밍 캐시 무효 (다음 Play에서 다시 받음) */
+export function invalidateBodyPreload(bodyId?: GuitarBodyId): void {
+  if (bodyId) preloadedBodies.delete(bodyId);
+  else preloadedBodies.clear();
+}
+
 /**
  * Strudel 코드 평가·재생.
  * @returns 이 호출이 여전히 유효한 재생인지 (정지 레이스면 false)
@@ -131,6 +171,8 @@ export async function evaluateStrudel(code: string): Promise<boolean> {
   const run = async (): Promise<boolean> => {
     if (my !== epoch) return false;
     await initStrudelEngine();
+    if (my !== epoch) return false;
+    await ensureAudioRunning();
     if (my !== epoch) return false;
     await evaluate(code);
     if (my !== epoch) {
