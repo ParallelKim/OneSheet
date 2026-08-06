@@ -336,6 +336,43 @@ button {
   line-height: 1;
 }
 
+.tr-icon .tr-metro {
+  display: block;
+  width: 1.05rem;
+  height: 1.05rem;
+  overflow: visible;
+}
+
+.tr-metro-ticks {
+  stroke: var(--bg);
+}
+
+.tr-btn.on .tr-metro-ticks {
+  stroke: var(--fg);
+}
+
+.tr-btn.loading .tr-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0.9rem;
+}
+
+.tr-btn .spin {
+  width: 0.72rem;
+  height: 0.72rem;
+  border: 1.5px solid var(--muted);
+  border-top-color: var(--fg);
+  border-radius: 50%;
+  animation: tr-spin 0.65s linear infinite;
+}
+
+@keyframes tr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .tr-label,
 .brush-hint {
   font-size: 0.58rem;
@@ -361,30 +398,41 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  /* overflow/패딩 없음 — 풀폭 이동 */
+  overflow: visible;
 }
 
-/* 페이지 폭에 맞춘 정사각 보드 */
+/* 풀폭 보드. 정사각 + cqw로 셀 길이 하나로 고정(링 정원) */
 .pad-board {
+  --pad-inset: 12px;
   --pad-gap: 8px;
-  --pad-cell: calc((100% - 3 * var(--pad-gap)) / 4);
-  --pad-stride: calc(var(--pad-cell) + var(--pad-gap));
+  /* 자손의 cqw = 보드 가로(=세로, aspect 1) */
+  container-type: size;
   position: relative;
   isolation: isolate;
   width: 100%;
   aspect-ratio: 1;
   flex-shrink: 0;
+  overflow: visible;
+}
+
+.pad-back,
+.pad-play,
+.pad-grid {
+  /* JS ResizeObserver가 --pad-cell-px / --pad-stride-px 를 심음 (정원 보장) */
+  --pad-cell: var(--pad-cell-px, calc((100cqw - 2 * var(--pad-inset) - 3 * var(--pad-gap)) / 4));
+  --pad-stride: var(--pad-stride-px, calc(var(--pad-cell) + var(--pad-gap)));
+  position: absolute;
+  inset: var(--pad-inset);
 }
 
 .pad-back {
-  position: absolute;
-  inset: 0;
   z-index: 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(4, 1fr);
   gap: var(--pad-gap);
   pointer-events: none;
+  overflow: visible;
 }
 
 .pad-ind {
@@ -401,13 +449,16 @@ button {
   box-shadow: none;
 }
 
-/* 재생 링 — overflow 없음, 보드 풀폭을 따라 이동 */
+/*
+ * 재생 링: 정사각 inset 레이어 좌표.
+ * overflow:hidden → wrap 고스트(±4열)만 클립. 본 링은 레이어 안에 들어감.
+ * 바깥 glow 금지 — app/레이어에 잘림.
+ */
 .pad-play {
-  position: absolute;
-  inset: 0;
   z-index: 2;
   pointer-events: none;
   opacity: var(--play-on);
+  overflow: hidden;
 }
 
 .pad-play-orb {
@@ -417,11 +468,10 @@ button {
   border-radius: 50%;
   border: 2px solid var(--fg);
   background: rgba(255, 255, 255, 0.06);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.2),
-    0 0 10px rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
   transform: translate(-50%, -50%);
   will-change: left, top;
+  box-sizing: border-box;
 }
 
 .pad-play-orb-chart.pad-play-orb-main {
@@ -455,18 +505,18 @@ button {
 }
 
 .pad-grid {
-  position: relative;
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
   gap: var(--pad-gap);
-  width: 100%;
-  height: 100%;
 }
 
 .pad {
-  aspect-ratio: 1;
   width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: transparent;
@@ -476,15 +526,15 @@ button {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  min-width: 0;
-  min-height: 0;
+  overflow: visible;
 }
 
 .pad.on {
   background: var(--fg);
   color: var(--bg);
   border-color: var(--fg);
-  box-shadow: var(--shadow-on);
+  /* 바깥 glow 대신 링 — 가장자리에서 app overflow에 안 잘리게 */
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
 }
 
 .pad.on .pad-sub,

@@ -1,48 +1,38 @@
 # OneSheet 핸드오프
 
-작성 시점: 2026-08-05 · 브랜치 `cursor/strudel-playback-4663`  
-base `main` · PR3 (재생 파이프라인)
+작성 시점: 2026-08-06 · 브랜치 `cursor/strudel-playback-4663`
 
 ---
 
-## 제품
+## MODE
 
-기타 차트 편집/재생기. UI는 런치패드 렌즈, 소리는 Strudel.
+| id | 기본 | 축 |
+|----|------|-----|
+| `strum` | ✅ | 오픈셰이프 + late 쓸기 → GM clean |
+| `piano` | | 오픈셰이프 전음 동시 → `gm_piano` |
 
----
+docs / arp / gm / block 제거. MODE 칩으로 strum ↔ piano.
 
-## 재생 파이프라인 (핵심)
+### strum
 
-```
-SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
-  degrees[]      64스텝 시퀀스      setcps+chord      @strudel/web
-  rhythm[][]     clip/gain          .dict.triads
-  bpm/metro                         .voicing()
-```
+- `stack`/`late`(~8ms), late만큼 clip↓
+- 코드마다 5~6음 (C/Am 오픈은 6번줄 뮤트)
+- 피치별 gain: 저현↓ / 1번줄↑ + `hpf`
+- D=저→고, U=고→저
 
-| 파일 | 역할 |
-|------|------|
-| `src/sheet.ts` | 모델 · `compileSheet` · `toStrudel` |
-| `src/engine.ts` | init / evaluate 큐 / hush |
-| `src/sheet.test.ts` | 변환 단위 테스트 |
+### piano
 
-- dim 코드 심볼은 `Bo` (`dim` 아님) — triads 딕셔너리
-- 음색은 WebAudio 신스만 (soundfont 없음)
-- 재생 중 편집 → `evaluateStrudel` 재평가 (직렬 큐)
-- **플레이헤드**: Guitar Pro식 세로 커서(`--play-phase`) + 마디 밴드(`--mark-bar`). 선택은 셀 배경·글자 반전.
+- `note("a2,e3,a3,c4,e4")` 동시 타건
+- 차트 리듬·오픈셰이프 공유, late 없음
+
+## Persist
+
+- 시트 편집본 → `localStorage` (`onesheet.sheet.v1`)
+- 로드 시 normalize (옛 MODE → strum)
+- 서버 동기화는 나중
 
 ```bash
 npm test
+npm run build
 npm run dev
 ```
-
----
-
-## UI (요약)
-
-LCD: 얇은 한 줄 차트 · transport · 4×4(차트/도수/리듬)  
-리듬 셀: D/U/X/hold/rest
-
-## 다음
-
-- 플레이헤드 · 아르페지오 · 사운드 설득력 · 조성 UX

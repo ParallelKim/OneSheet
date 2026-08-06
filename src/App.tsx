@@ -6,29 +6,36 @@ import {
   BEATS,
   BARS,
   BAR_STEPS,
-  createInitialSheet,
   DEGREE_META,
   nextKey,
+  nextSoundMode,
   setBarArticulation,
   SLOTS,
   slotLabel,
   slotRoman,
+  soundModeById,
   SUBDIV,
   TOTAL_STEPS,
   toStrudel,
   type Articulation,
   type SheetState,
 } from "./sheet";
+import { loadSheetState, saveStoredSheet } from "./persist";
 import {
+  ensureAudioRunning,
   evaluateStrudel,
+  getAudioState,
   getCyclePhase,
   getLastStrudelCode,
+  getPlaybackEpoch,
   hushStrudel,
   initStrudelEngine,
+  isEngineReady,
 } from "./engine";
+import { getAudioContext } from "@strudel/web";
 import "./App.css";
 
-type EngineState = "idle" | "ready" | "playing" | "error";
+type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
 /** 렌즈: 같은 4×4 패드의 의미를 바꾼다 */
 type Mode = "chart" | "degree" | "rhythm";
 
@@ -44,7 +51,7 @@ function playColHold(posInRow: number, hold = 0.7): number {
 }
 
 export default function App() {
-  const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
+  const [sheet, setSheet] = useState<SheetState>(loadSheetState);
   const [selected, setSelected] = useState(0);
   const [mode, setMode] = useState<Mode>("chart");
   const [brush, setBrush] = useState<Articulation>("D");
@@ -56,10 +63,65 @@ export default function App() {
   const playingRef = useRef(false);
   const staffRef = useRef<HTMLDivElement>(null);
   const padStageRef = useRef<HTMLDivElement>(null);
+  const padBoardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     sheetRef.current = sheet;
   }, [sheet]);
+
+  // 편집본 localStorage 캐시 (배포/새로고침 유지)
+  useEffect(() => {
+    saveStoredSheet(sheet);
+  }, [sheet]);
+
+  // 엔진은 마운트 직후 백그라운드 기동 (Play를 기다리지 않음)
+  useEffect(() => {
+    void initStrudelEngine().catch((err) => console.warn("engine boot", err));
+  }, []);
+
+  // 첫 포인터에서 오디오 unlock
+  useEffect(() => {
+    const onFirstPointer = () => {
+      void ensureAudioRunning().catch((err) =>
+        console.warn("audio unlock", err),
+      );
+    };
+    window.addEventListener("pointerdown", onFirstPointer, {
+      once: true,
+      passive: true,
+    });
+    return () => window.removeEventListener("pointerdown", onFirstPointer);
+  }, []);
+
+  /** 패드 실측 → --pad-cell-px / --pad-stride-px (항상 width===height 정원) */
+  useEffect(() => {
+    const board = padBoardRef.current;
+    if (!board) return;
+
+    const syncPadMetrics = () => {
+      const pads = board.querySelectorAll<HTMLElement>(".pad-grid > .pad");
+      const first = pads[0];
+      if (!first) return;
+      const a = first.getBoundingClientRect();
+      if (a.width < 2) return;
+      const cell = a.width;
+      const next = pads[1]?.getBoundingClientRect();
+      const below = pads[BEATS]?.getBoundingClientRect();
+      const strideX = next ? next.left - a.left : cell + 8;
+      const strideY = below ? below.top - a.top : strideX;
+      // 한 프레임에 가로·세로가 어긋나면 스킵 (레이아웃 미완료)
+      if (Math.abs(strideX - strideY) > 1) return;
+      board.style.setProperty("--pad-cell-px", `${cell}px`);
+      board.style.setProperty("--pad-stride-px", `${strideX}px`);
+    };
+
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(syncPadMetrics);
+    });
+    ro.observe(board);
+    requestAnimationFrame(syncPadMetrics);
+    return () => ro.disconnect();
+  }, [mode]);
 
   // Strudel 사이클 → LCD/그리드 재생 커서 CSS 변수
   useEffect(() => {
@@ -135,45 +197,57 @@ export default function App() {
     [pushPattern],
   );
 
-  const ensureReady = useCallback(async () => {
-    if (engine === "ready" || engine === "playing") return true;
-    setStatus("audio…");
-    try {
-      await initStrudelEngine();
-      setEngine("ready");
-      setStatus("");
-      return true;
-    } catch (err) {
-      console.error(err);
-      setEngine("error");
-      setStatus("audio error");
-      return false;
-    }
-  }, [engine]);
+  const cycleSoundMode = useCallback(() => {
+    const soundMode = nextSoundMode(sheetRef.current.soundMode);
+    update((prev) => ({ ...prev, soundMode }));
+  }, [update]);
 
-  const onPlay = useCallback(async () => {
-    const okReady = await ensureReady();
-    if (!okReady) return;
+  const onPlay = useCallback(() => {
+    const gate = getPlaybackEpoch();
     try {
-      const code = toStrudel(sheetRef.current);
-      const ok = await evaluateStrudel(code);
-      if (!ok) {
-        // 평가 중 정지된 경우
-        playingRef.current = false;
-        setEngine("ready");
-        setStatus("");
-        return;
-      }
-      playingRef.current = true;
-      setEngine("playing");
-      setStatus("");
-    } catch (err) {
-      console.error(err, getLastStrudelCode());
-      playingRef.current = false;
-      setEngine("error");
-      setStatus("play error");
+      void (getAudioContext() as AudioContext).resume();
+    } catch {
+      /* ignore */
     }
-  }, [ensureReady]);
+
+    if (!isEngineReady()) {
+      setEngine("loading");
+      setStatus("");
+    }
+
+    void (async () => {
+      try {
+        await ensureAudioRunning();
+        if (getPlaybackEpoch() !== gate) {
+          setEngine((e) => (e === "error" ? e : "ready"));
+          return;
+        }
+        await initStrudelEngine();
+        if (getPlaybackEpoch() !== gate) {
+          setEngine((e) => (e === "error" ? e : "ready"));
+          return;
+        }
+        const code = toStrudel(sheetRef.current);
+        const ok = await evaluateStrudel(code);
+        if (!ok || getPlaybackEpoch() !== gate) {
+          playingRef.current = false;
+          setEngine((e) => (e === "error" ? e : "ready"));
+          setStatus("");
+          return;
+        }
+        playingRef.current = true;
+        setEngine("playing");
+        setStatus(
+          getAudioState() === "running" ? "" : "audio locked — tap PLAY",
+        );
+      } catch (err) {
+        console.error(err, getLastStrudelCode());
+        playingRef.current = false;
+        setEngine("error");
+        setStatus("play error");
+      }
+    })();
+  }, []);
 
   const onStop = useCallback(() => {
     hushStrudel();
@@ -211,6 +285,7 @@ export default function App() {
   };
 
   const playing = engine === "playing";
+  const loading = engine === "loading";
   const currentDegree = sheet.degrees[selected] ?? null;
   const bar = barIndex(selected);
   const beat = (selected % BEATS) + 1;
@@ -233,6 +308,15 @@ export default function App() {
           >
             <span className="chip-k">KEY</span>
             <span className="chip-v">{sheet.key}</span>
+          </button>
+          <button
+            type="button"
+            className="chip"
+            onClick={cycleSoundMode}
+            aria-label="sound mode"
+          >
+            <span className="chip-k">MODE</span>
+            <span className="chip-v">{soundModeById(sheet.soundMode).label}</span>
           </button>
           <label className="chip tempo-chip">
             <span className="chip-k">BPM</span>
@@ -300,12 +384,26 @@ export default function App() {
       <nav className="transport" aria-label="transport">
         <button
           type="button"
-          className={`tr-btn play ${playing ? "on" : ""}`}
-          onClick={() => void (playing ? onStop() : onPlay())}
-          aria-label={playing ? "stop" : "play"}
+          className={`tr-btn play ${playing ? "on" : ""} ${loading ? "loading" : ""}`}
+          onPointerDown={() => {
+            // click보다 이른 제스처에서 unlock
+            if (playing || loading) return;
+            try {
+              void (getAudioContext() as AudioContext).resume();
+            } catch {
+              /* ignore */
+            }
+          }}
+          onClick={() => void (playing || loading ? onStop() : onPlay())}
+          aria-label={loading ? "loading" : playing ? "stop" : "play"}
+          aria-busy={loading}
         >
-          <span className="tr-icon">{playing ? "■" : "▶"}</span>
-          <span className="tr-label">{playing ? "STOP" : "PLAY"}</span>
+          <span className="tr-icon" aria-hidden>
+            {loading ? <span className="spin" /> : playing ? "■" : "▶"}
+          </span>
+          <span className="tr-label">
+            {loading ? "LOAD" : playing ? "STOP" : "PLAY"}
+          </span>
         </button>
         <button
           type="button"
@@ -314,7 +412,45 @@ export default function App() {
           aria-pressed={sheet.metro}
           aria-label="metronome"
         >
-          <span className="tr-icon">♩</span>
+          <span className="tr-icon" aria-hidden>
+            <svg
+              className="tr-metro"
+              viewBox="0 0 20 20"
+              width="16"
+              height="16"
+            >
+              {/* 본체 + 받침 */}
+              <path
+                fill="currentColor"
+                d="M5.2 16.2 8.4 4.1c.15-.55.9-.55 1.05 0L12.8 16.2H5.2Z"
+              />
+              <rect
+                fill="currentColor"
+                x="3.6"
+                y="15.4"
+                width="12.8"
+                height="2.1"
+                rx="0.4"
+              />
+              {/* 눈금 — on 상태에선 버튼 배경색으로 */}
+              <path
+                className="tr-metro-ticks"
+                fill="none"
+                strokeWidth="1"
+                strokeLinecap="round"
+                d="M9.2 7.2h1.6M8.7 9.4h2.6M8.2 11.6h3.6"
+              />
+              {/* 추 — 밖으로 크게 빠져 메트로놈으로 읽히게 */}
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                d="M10 4.2 16.4 11.6"
+              />
+              <circle fill="currentColor" cx="16.4" cy="11.6" r="2.2" />
+            </svg>
+          </span>
           <span className="tr-label">CLICK</span>
         </button>
         <button
@@ -367,7 +503,7 @@ export default function App() {
         className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode}`}
         style={{ "--mark-bar": markBar } as CSSProperties}
       >
-        <div className="pad-board">
+        <div className="pad-board" ref={padBoardRef}>
           <div className="pad-back" aria-hidden>
             {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
           </div>

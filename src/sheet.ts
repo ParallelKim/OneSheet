@@ -3,45 +3,175 @@
  * 리듬 = 선택 마디의 4×4 (행=4분, 칸=16분).
  * 셀: D / U / X(뮤트) / hold(링) / rest(쉼).
  *
- * toStrudel: SheetState → @strudel/web 평가 코드.
- * 길이는 mini `@n` 가중치로 표현 (clip 남용으로 한 음에 붙는 문제 회피).
+ * soundMode: 차트 리듬·오픈셰이프를 공유하고, 타격 축만 바꾼다.
+ * strum = 짧은 쓸기 후 링 / piano = 전음 동시.
  */
 
 export type Articulation = "D" | "U" | "X" | "hold" | "rest";
+export type AttackArt = "D" | "U" | "X";
+
+export type SoundMode = {
+  id: string;
+  label: string;
+};
+
+/**
+ * MODE — strum(기본) / piano(동시).
+ */
+export const SOUND_MODES: readonly SoundMode[] = [
+  {
+    id: "strum",
+    label: "strum",
+  },
+  {
+    id: "piano",
+    label: "piano",
+  },
+] as const;
+
+export type SoundModeId = (typeof SOUND_MODES)[number]["id"];
 
 export type SheetState = {
   bpm: number;
   key: string;
-  /** 16 slots: row-major, each = quarter note. null = chord rest */
   degrees: Array<number | null>;
-  /** 4 bars × 16 sixteenths */
   rhythm: Articulation[][];
-  voice: VoiceId;
   gain: number;
   metro: boolean;
+  soundMode: SoundModeId;
 };
 
-export type VoiceId = "warm" | "bright" | "soft" | "keys";
+/** strum — GM clean 기타 */
+const TONE_STRUM = "gm_electric_guitar_clean:5";
+/** piano — 전음 동시, GM 피아노 */
+const TONE_PIANO = "gm_piano";
 
-/** WebAudio 신스만 사용 (soundfont 미포함 번들) */
-export const VOICES: readonly {
-  id: VoiceId;
-  label: string;
-  sound: string;
-  cutoff: number;
-}[] = [
-  { id: "warm", label: "warm", sound: "sawtooth", cutoff: 1400 },
-  { id: "bright", label: "bright", sound: "square", cutoff: 3200 },
-  { id: "soft", label: "soft", sound: "triangle", cutoff: 1800 },
-  { id: "keys", label: "keys", sound: "triangle", cutoff: 2400 },
+/**
+ * 오픈(·바레) 셰이프 — 저→고 절대음.
+ * 뮤트 현은 목록에서 빠짐 (예: C는 6현 없음).
+ * 출처: 표준 오픈코드 / Splice MIDI-guitar 가이드.
+ */
+const OPEN_SHAPES: Record<string, readonly string[]> = {
+  C: ["c3", "e3", "g3", "c4", "e4"],
+  D: ["a2", "d3", "a3", "d4", "f#4"],
+  E: ["e2", "b2", "e3", "g#3", "b3", "e4"],
+  F: ["f2", "c3", "f3", "a3", "c4", "f4"],
+  G: ["g2", "b2", "d3", "g3", "b3", "g4"],
+  A: ["a2", "e3", "a3", "c#4", "e4"],
+  B: ["b2", "f#3", "b3", "d#4", "f#4", "b4"],
+  Am: ["a2", "e3", "a3", "c4", "e4"],
+  Dm: ["a2", "d3", "a3", "d4", "f4"],
+  Em: ["e2", "b2", "e3", "g3", "b3", "e4"],
+  Fm: ["f2", "c3", "f3", "ab3", "c4", "f4"],
+  Gm: ["g2", "d3", "g3", "bb3", "d4", "g4"],
+  Bm: ["b2", "f#3", "b3", "d4", "f#4", "b4"],
+  Cm: ["c3", "g3", "c4", "eb4", "g4"],
+};
+
+const PC: Record<string, number> = {
+  C: 0,
+  "C#": 1,
+  Db: 1,
+  D: 2,
+  "D#": 3,
+  Eb: 3,
+  E: 4,
+  F: 5,
+  "F#": 6,
+  Gb: 6,
+  G: 7,
+  "G#": 8,
+  Ab: 8,
+  A: 9,
+  "A#": 10,
+  Bb: 10,
+  B: 11,
+};
+
+const PC_NAME = [
+  "c",
+  "c#",
+  "d",
+  "eb",
+  "e",
+  "f",
+  "f#",
+  "g",
+  "ab",
+  "a",
+  "bb",
+  "b",
 ] as const;
+
+/** 현 사이 쓸기 간격(초). 너무 길면 마지막(1번줄)이 묻힘 */
+const STRUM_GAP_SEC = 0.008;
+
+export function parseChordSymbol(sym: string): {
+  root: string;
+  quality: "maj" | "min" | "dim";
+} {
+  const m = sym.match(/^([A-G][#b]?)(m|o)?$/);
+  if (!m) return { root: "C", quality: "maj" };
+  const root = m[1]!;
+  if (m[2] === "m") return { root, quality: "min" };
+  if (m[2] === "o") return { root, quality: "dim" };
+  return { root, quality: "maj" };
+}
+
+function noteToMidi(note: string): number {
+  const m = note.match(/^([a-gA-G][#b]?)(-?\d+)$/);
+  if (!m) return 60;
+  let name = m[1]!;
+  name = name[0]!.toUpperCase() + name.slice(1);
+  if (name.length > 1 && name[1] === "b") {
+    /* Db */
+  } else if (name.length > 1 && name[1] === "#") {
+    /* C# */
+  }
+  const pc = PC[name] ?? PC[name[0]!] ?? 0;
+  const oct = Number(m[2]);
+  return (oct + 1) * 12 + pc;
+}
+
+function midiToNote(midi: number): string {
+  const pc = ((midi % 12) + 12) % 12;
+  const oct = Math.floor(midi / 12) - 1;
+  return `${PC_NAME[pc]}${oct}`;
+}
+
+function transposeNotes(notes: readonly string[], semitones: number): string[] {
+  return notes.map((n) => midiToNote(noteToMidi(n) + semitones));
+}
+
+function dimShape(root: string): string[] {
+  const pc = PC[root] ?? 0;
+  // A2(45) 근처에서 근음 배치
+  let midi = 45 + ((pc - 9 + 12) % 12);
+  if (midi < 42) midi += 12;
+  return [midi, midi + 3, midi + 6, midi + 12].map(midiToNote);
+}
+
+/**
+ * 코드 심볼 → 기타 지판 음 (저→고).
+ * 오픈 테이블 우선, 없으면 E/Em 바레 이조, dim은 감3화음.
+ */
+export function guitarShape(chord: string): string[] {
+  const hit = OPEN_SHAPES[chord];
+  if (hit) return [...hit];
+  const { root, quality } = parseChordSymbol(chord);
+  if (quality === "dim") return dimShape(root);
+  const base = quality === "min" ? OPEN_SHAPES.Em! : OPEN_SHAPES.E!;
+  const semitones = (PC[root]! - PC.E! + 12) % 12;
+  if (semitones === 0) return [...base];
+  return transposeNotes(base, semitones);
+}
 
 export const BARS = 4;
 export const BEATS = 4;
-export const SLOTS = BARS * BEATS; // 16 quarters
-export const SUBDIV = 4; // sixteenths per quarter
-export const BAR_STEPS = BEATS * SUBDIV; // 16 sixteenths per bar
-export const TOTAL_STEPS = BARS * BAR_STEPS; // 64
+export const SLOTS = BARS * BEATS;
+export const SUBDIV = 4;
+export const BAR_STEPS = BEATS * SUBDIV;
+export const TOTAL_STEPS = BARS * BAR_STEPS;
 
 export const ARTICULATIONS: readonly {
   id: Articulation;
@@ -77,7 +207,6 @@ export const DEGREE_META = [
   { roman: "vii°", quality: "dim" },
 ] as const;
 
-/** 한 박: 다운 후 링 ×3 → 4분 스트로크 */
 const QUARTER_DOWN: Articulation[] = ["D", "hold", "hold", "hold"];
 
 function defaultBarRhythm(): Articulation[] {
@@ -96,22 +225,28 @@ export function createInitialSheet(): SheetState {
   return {
     bpm: 96,
     key: "C",
-    degrees: repeatBar([5, 0, 4, 3]), // vi I V IV
+    degrees: repeatBar([5, 0, 4, 3]),
     rhythm: defaultRhythm(),
-    voice: "warm",
-    gain: 0.35,
+    gain: 0.55,
     metro: true,
+    soundMode: "strum",
   };
+}
+
+export function soundModeById(id: string): SoundMode {
+  return SOUND_MODES.find((m) => m.id === id) ?? SOUND_MODES[0]!;
+}
+
+export function nextSoundMode(current: SoundModeId): SoundModeId {
+  const i = SOUND_MODES.findIndex((m) => m.id === current);
+  const next = SOUND_MODES[((i < 0 ? 0 : i) + 1) % SOUND_MODES.length]!;
+  return next.id;
 }
 
 export function scaleOf(key: string): readonly string[] {
   return MAJOR_KEYS[key] ?? MAJOR_KEYS.C!;
 }
 
-/**
- * Strudel chord() 심볼.
- * dim은 딕셔너리 키 `o` (예: Bo).
- */
 export function chordFromDegree(key: string, degree: number): string {
   const root = scaleOf(key)[degree] ?? "C";
   const q = DEGREE_META[degree]?.quality ?? "maj";
@@ -137,10 +272,6 @@ export function slotRoman(degree: number | null): string {
 export function nextKey(current: string): string {
   const i = KEY_LIST.indexOf(current);
   return KEY_LIST[((i < 0 ? 0 : i) + 1) % KEY_LIST.length]!;
-}
-
-export function voiceById(id: VoiceId) {
-  return VOICES.find((v) => v.id === id) ?? VOICES[0]!;
 }
 
 export function barIndex(slot: number): number {
@@ -177,7 +308,6 @@ function isAttack(art: Articulation): boolean {
   return art === "D" || art === "U" || art === "X";
 }
 
-/** 공격 뒤 이어지는 hold 개수 (rest·다음 공격 전) */
 export function holdRun(barRhythm: Articulation[], from: number): number {
   let n = 0;
   for (let i = from + 1; i < barRhythm.length; i++) {
@@ -187,17 +317,15 @@ export function holdRun(barRhythm: Articulation[], from: number): number {
   return n;
 }
 
-/** 한 사이클 = 4마디 = 16박. cps = bpm/60/16 */
 export function cyclesPerSecond(bpm: number): number {
   return bpm / 60 / SLOTS;
 }
 
 export type TimedEvent = {
-  /** null = rest */
   chord: string | null;
-  /** 16분음표 개수 (mini @n) */
   steps: number;
   gain: number;
+  art: AttackArt | null;
 };
 
 export type StrudelParts = {
@@ -206,13 +334,9 @@ export type StrudelParts = {
   events: TimedEvent[];
   totalSteps: number;
   metro: boolean;
-  sound: string;
-  cutoff: number;
 };
 
-/** 리듬 그리드를 길이 가중 이벤트로 펼친다 */
 export function compileSheet(sheet: SheetState): StrudelParts {
-  const voice = voiceById(sheet.voice);
   const events: TimedEvent[] = [];
 
   for (let bar = 0; bar < BARS; bar++) {
@@ -225,24 +349,23 @@ export function compileSheet(sheet: SheetState): StrudelParts {
 
       if (isAttack(art) && degree !== null) {
         const holds = holdRun(barRhythm, step);
-        // 뮤트는 짧게, 나머지는 hold까지 이어서 한 음
         const steps = art === "X" ? 1 : 1 + holds;
         const base = sheet.gain;
-        const gain = art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
+        const gain =
+          art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
         events.push({
           chord: chordFromDegree(sheet.key, degree),
           steps,
           gain: Number(gain.toFixed(3)),
+          art: art as AttackArt,
         });
-        // X도 그리드상 hold가 있으면 나머진 쉼으로 소비
         if (art === "X" && holds > 0) {
-          events.push({ chord: null, steps: holds, gain: 0 });
+          events.push({ chord: null, steps: holds, gain: 0, art: null });
         }
         step += 1 + holds;
         continue;
       }
 
-      // rest / orphan hold / 도수 없는 공격 → 쉼 구간 병합
       let span = 1;
       step += 1;
       while (step < BAR_STEPS) {
@@ -253,73 +376,226 @@ export function compileSheet(sheet: SheetState): StrudelParts {
         span += 1;
         step += 1;
       }
-      events.push({ chord: null, steps: span, gain: 0 });
+      events.push({ chord: null, steps: span, gain: 0, art: null });
     }
   }
-
-  const totalSteps = events.reduce((n, e) => n + e.steps, 0);
 
   return {
     cps: cyclesPerSecond(sheet.bpm),
     hasHits: events.some((e) => e.chord !== null),
     events,
-    totalSteps,
+    totalSteps: events.reduce((n, e) => n + e.steps, 0),
     metro: sheet.metro,
-    sound: voice.sound,
-    cutoff: voice.cutoff,
   };
 }
 
-function timedMini(events: TimedEvent[], field: "chord" | "gain"): string {
-  return events
-    .map((e) => {
-      if (field === "chord") {
-        const tok = e.chord ?? "~";
-        return e.steps === 1 ? tok : `${tok}@${e.steps}`;
-      }
-      const g = e.chord ? e.gain : 0;
-      return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
-    })
-    .join(" ");
+function metroLayer(): string {
+  const clicks = Array.from({ length: SLOTS }, (_, i) =>
+    i % BEATS === 0 ? "c6" : "a5",
+  ).join(" ");
+  return `note("${clicks}").s("triangle").gain(0.12).clip(0.03).cutoff(6000)`;
+}
+
+function stackBody(layers: string[]): string {
+  if (layers.length === 0) return "silence";
+  if (layers.length === 1) return layers[0]!;
+  return `stack(\n  ${layers.join(",\n  ")}\n)`;
 }
 
 /**
- * SheetState → Strudel 코드.
- * `Am@4 C@4 …` 가중 시퀀스 = 한 사이클(4마디) 안에서 박이 진행된다.
+ * 쓸기 순서로 배치된 음열 (D=저→고, U=고→저).
+ * X=중현만.
  */
-export function toStrudel(sheet: SheetState): string {
+function strokeNotes(chord: string, art: AttackArt): string[] {
+  const shape = guitarShape(chord);
+  if (art === "X") {
+    const mid = Math.floor(shape.length / 2);
+    return shape.slice(Math.max(0, mid - 1), mid + 2);
+  }
+  return art === "U" ? [...shape].reverse() : [...shape];
+}
+
+/**
+ * piano — 오픈셰이프 전음을 한꺼번에 (쉼표 = 동시).
+ * X는 중현만·짧게.
+ */
+function layerPiano(parts: StrudelParts): string {
+  const toks = parts.events
+    .map((e) => {
+      if (!e.chord || !e.art) {
+        return e.steps === 1 ? "~" : `~@${e.steps}`;
+      }
+      const notes =
+        e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord);
+      const chord = notes.join(",");
+      return e.steps === 1 ? chord : `${chord}@${e.steps}`;
+    })
+    .join(" ");
+
+  const gainPat = parts.events
+    .map((e) => {
+      if (!e.chord || !e.art) {
+        return e.steps === 1 ? "0" : `0@${e.steps}`;
+      }
+      const durScale = Math.min(1, 2 / Math.max(1, e.steps));
+      // 5~6음 동시 → 헤드룸
+      const g = Number((e.gain * durScale * 0.42).toFixed(3));
+      return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
+    })
+    .join(" ");
+
+  const clip = parts.events
+    .map((e) => {
+      if (!e.chord || !e.art) {
+        return e.steps === 1 ? "0" : `0@${e.steps}`;
+      }
+      const c = e.art === "X" ? 0.18 : 0.92;
+      return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
+    })
+    .join(" ");
+
+  return [
+    `note("${toks}")`,
+    `.s("${TONE_PIANO}")`,
+    `.gain("${gainPat}")`,
+    `.clip("${clip}")`,
+    `.decay(0.15)`,
+    `.sustain(0.45)`,
+  ].join("");
+}
+
+/**
+ * 오픈셰이프 note + late 스트럼.
+ * - 코드마다 5~6음 (C/Am 오픈은 6번줄 뮤트 → 5)
+ * - late로 onset만 어긋남. clip을 late만큼 줄여 다음 코드와 안 겹침
+ * - 피치별 gain: 저현↓ / **1번줄(고현)↑** — GM이 고현을 작게 내는 보정
+ * - hpf로 저역 머드 컷
+ */
+function noteMidi(tok: string): number {
+  const m = tok.match(/^([a-g])([#b]?)(-?\d+)$/i);
+  if (!m) return 60;
+  const letter = m[1]!.toLowerCase();
+  const acc = m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0;
+  const oct = Number(m[3]);
+  const base: Record<string, number> = {
+    c: 0,
+    d: 2,
+    e: 4,
+    f: 5,
+    g: 7,
+    a: 9,
+    b: 11,
+  };
+  return (oct + 1) * 12 + (base[letter] ?? 0) + acc;
+}
+
+/** GM clean 보정 — 저현 억제, 1번줄(e4~) 부스트 */
+function pitchGain(midi: number): number {
+  if (midi >= 67) return 1.55; // g4+ (G/F 1번줄)
+  if (midi >= 64) return 1.45; // e4 (C/Am 1번줄)
+  if (midi >= 60) return 1.1; // c4
+  if (midi >= 55) return 0.82; // g3
+  if (midi >= 52) return 0.58; // e3
+  if (midi >= 48) return 0.38; // c3
+  if (midi >= 45) return 0.26; // a2
+  return 0.2; // e2~g2
+}
+
+function layerStrum(parts: StrudelParts): string {
+  const maxVoices = Math.max(
+    1,
+    ...parts.events.map((e) =>
+      e.chord && e.art ? strokeNotes(e.chord, e.art).length : 0,
+    ),
+  );
+  const gap = Number((STRUM_GAP_SEC * parts.cps).toFixed(5));
+  const total = Math.max(1, parts.totalSteps);
+  const voices: string[] = [];
+
+  for (let slot = 0; slot < maxVoices; slot++) {
+    const lateAmt = slot * gap;
+    const toks = parts.events
+      .map((e) => {
+        if (!e.chord || !e.art) {
+          return e.steps === 1 ? "~" : `~@${e.steps}`;
+        }
+        const n = strokeNotes(e.chord, e.art)[slot];
+        if (!n) return e.steps === 1 ? "~" : `~@${e.steps}`;
+        return e.steps === 1 ? n : `${n}@${e.steps}`;
+      })
+      .join(" ");
+
+    const gainPat = parts.events
+      .map((e) => {
+        if (!e.chord || !e.art) {
+          return e.steps === 1 ? "0" : `0@${e.steps}`;
+        }
+        const n = strokeNotes(e.chord, e.art)[slot];
+        if (!n) return e.steps === 1 ? "0" : `0@${e.steps}`;
+        const durScale = Math.min(1, 2 / Math.max(1, e.steps));
+        const g = Number(
+          (e.gain * durScale * pitchGain(noteMidi(n))).toFixed(3),
+        );
+        return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
+      })
+      .join(" ");
+
+    // late만큼 clip↓ — 바닥을 더 높여 마지막 현(1번줄)이 너무 짧아지지 않게
+    const clip = parts.events
+      .map((e) => {
+        if (!e.chord || !e.art) {
+          return e.steps === 1 ? "0" : `0@${e.steps}`;
+        }
+        if (e.art === "X") {
+          return e.steps === 1 ? "0.18" : `0.18@${e.steps}`;
+        }
+        const dur = e.steps / total;
+        const room = Math.max(0.55, (dur - lateAmt) / dur);
+        const c = Number((room * 0.92).toFixed(3));
+        return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
+      })
+      .join(" ");
+
+    let line = [
+      `note("${toks}")`,
+      `.s("${TONE_STRUM}")`,
+      `.gain("${gainPat}")`,
+      `.clip("${clip}")`,
+      `.hpf(180)`,
+      `.decay(0.08)`,
+      `.sustain(0.4)`,
+    ].join("");
+    if (slot > 0 && gap > 0) {
+      line += `.late(${lateAmt.toFixed(5)})`;
+    }
+    voices.push(line);
+  }
+
+  return stackBody(voices);
+}
+
+function chartToStrudel(sheet: SheetState, modeId: SoundModeId): string {
   const parts = compileSheet(sheet);
   const layers: string[] = [];
 
   if (parts.hasHits) {
-    layers.push(
-      [
-        `chord("${timedMini(parts.events, "chord")}")`,
-        `.dict("triads")`,
-        `.voicing()`,
-        `.s("${parts.sound}")`,
-        `.gain("${timedMini(parts.events, "gain")}")`,
-        `.cutoff(${parts.cutoff})`,
-        `.clip(0.95)`,
-      ].join(""),
-    );
+    if (modeId === "piano") {
+      layers.push(layerPiano(parts));
+    } else {
+      layers.push(layerStrum(parts));
+    }
   }
 
-  if (parts.metro) {
-    // 4분마다 클릭. 마디 첫 박은 높은 음(강세), 나머지는 낮은 음.
-    // square + 짧은 clip = 코드 레이어 위에서도 들리는 메트로 클릭.
-    const clicks = Array.from({ length: SLOTS }, (_, i) =>
-      i % BEATS === 0 ? "c6" : "a5",
-    ).join(" ");
-    layers.push(
-      `note("${clicks}").s("square").gain(0.3).clip(0.04).cutoff(10000)`,
-    );
-  }
+  if (parts.metro) layers.push(metroLayer());
 
-  if (layers.length === 0) return "silence";
-
-  const body =
-    layers.length === 1 ? layers[0]! : `stack(\n  ${layers.join(",\n  ")}\n)`;
-
+  const body = stackBody(layers);
+  if (body === "silence") return "silence";
   return `setcps(${parts.cps})\n${body}`;
+}
+
+/**
+ * Play/재평가용 코드 — 차트 리듬·코드·BPM 반영.
+ */
+export function toStrudel(sheet: SheetState): string {
+  return chartToStrudel(sheet, soundModeById(sheet.soundMode).id);
 }

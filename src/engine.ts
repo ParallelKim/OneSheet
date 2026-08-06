@@ -1,4 +1,12 @@
-import { evaluate, hush, initStrudel } from "@strudel/web";
+import { registerSoundfonts } from "@strudel/soundfonts";
+import {
+  evaluate,
+  getAudioContext,
+  hush,
+  initAudio,
+  initStrudel,
+  samples,
+} from "@strudel/web";
 
 /** initStrudel 반환 타입이 느슨해서 scheduler만 느슨히 잡는다 */
 // deno-lint-ignore no-explicit-any
@@ -15,12 +23,28 @@ let lastCode = "";
  */
 let epoch = 0;
 
+let dirtGtrLoaded = false;
+
+/**
+ * dirt-samples gtr — 단일 WAV만.
+ * 다중 WAV면 n(스트럼)이 샘플 인덱스로 겹쳐 깨진다.
+ */
+const DIRT_GTR = {
+  gtr: ["gtr/0001_cleanC.wav"],
+} as const;
+const DIRT_BASE =
+  "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/";
+
 export function getLastStrudelCode(): string {
   return lastCode;
 }
 
 export function getPlaybackEpoch(): number {
   return epoch;
+}
+
+export function isEngineReady(): boolean {
+  return replRef != null;
 }
 
 /**
@@ -39,9 +63,43 @@ export function getCyclePhase(): number | null {
   }
 }
 
+/**
+ * AudioContext running 보장.
+ * superdough initAudio의 resume 조건이 깨져 있어 여기서 명시 resume.
+ */
+export async function ensureAudioRunning(): Promise<void> {
+  const ctx = getAudioContext() as AudioContext;
+  if (ctx.state === "suspended") {
+    await ctx.resume();
+  }
+  await initAudio();
+  if (ctx.state === "suspended") {
+    await ctx.resume();
+  }
+}
+
+export function getAudioState(): string {
+  try {
+    return (getAudioContext() as AudioContext).state;
+  } catch {
+    return "missing";
+  }
+}
+
+async function loadDirtGtr(): Promise<void> {
+  if (dirtGtrLoaded) return;
+  await samples({ ...DIRT_GTR }, DIRT_BASE);
+  dirtGtrLoaded = true;
+}
+
 export async function initStrudelEngine(): Promise<Repl> {
   if (!boot) {
-    boot = initStrudel()
+    boot = initStrudel({
+      prebake: async () => {
+        registerSoundfonts();
+        await loadDirtGtr();
+      },
+    })
       .then((repl: Repl) => {
         replRef = repl;
         return repl;
@@ -66,6 +124,8 @@ export async function evaluateStrudel(code: string): Promise<boolean> {
   const run = async (): Promise<boolean> => {
     if (my !== epoch) return false;
     await initStrudelEngine();
+    if (my !== epoch) return false;
+    await ensureAudioRunning();
     if (my !== epoch) return false;
     await evaluate(code);
     if (my !== epoch) {
