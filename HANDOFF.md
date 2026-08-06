@@ -28,11 +28,12 @@ SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
 | `src/sheet.test.ts` | 변환 단위 테스트 |
 
 - dim 코드 심볼은 `Bo` (`dim` 아님) — triads 딕셔너리
-- 음색: SOUND 칩 — steel/nylon/clean(GM 전용 뱅크 :5) + saw/square/tri
-  - recipes식 `.mode("above:c3")` 기타 음역
-  - X는 `gm_electric_guitar_muted`
-- 주법: D=`n([0 1 2 3])` 다운스트럼, U=`n([3 2 1 0])` 업, X=동시타+짧은 clip
-- 프리로드: 마운트 시 엔진 기동, **첫 pointerdown**에서 샘플 워밍. Play는 막지 않음
+- 음색: SOUND — **gtr/drive/dist** (dirt-samples 실WAV, 유저·docs 예제)
+  - 보조: clean/nylon/steel (GM), saw/square/tri (파형)
+  - `.mode("above:c3")` 기타 음역
+  - 메트로: 조용한 triangle (square=8bit 회피)
+- 주법: D/U/X 스트럼
+- 프리로드: 마운트 엔진 + 첫 pointerdown에서 gtr/GM 워밍. Play 비차단
 - AudioContext: Play pointerdown에서 즉시 resume
 - 재생 중 편집 → `evaluateStrudel` 재평가 (직렬 큐)
 - **플레이헤드**: Guitar Pro식 세로 커서(`--play-phase`) + 마디 밴드(`--mark-bar`). 선택은 셀 배경·글자 반전.

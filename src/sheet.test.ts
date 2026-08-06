@@ -37,13 +37,11 @@ describe("holdRun", () => {
 });
 
 describe("nextSound", () => {
-  it("steel → nylon → clean → saw → square → tri → steel", () => {
-    expect(nextSound("steel")).toBe("nylon");
-    expect(nextSound("nylon")).toBe("clean");
-    expect(nextSound("clean")).toBe("saw");
-    expect(nextSound("saw")).toBe("square");
-    expect(nextSound("square")).toBe("tri");
-    expect(nextSound("tri")).toBe("steel");
+  it("gtr → drive → dist → … → tri → gtr", () => {
+    expect(nextSound("gtr")).toBe("drive");
+    expect(nextSound("drive")).toBe("dist");
+    expect(nextSound("dist")).toBe("clean");
+    expect(nextSound("tri")).toBe("gtr");
   });
 });
 
@@ -61,15 +59,15 @@ describe("strumN", () => {
 });
 
 describe("compileSheet / toStrudel", () => {
-  it("초기 차트는 4분 다운을 @4 이벤트로 만든다", () => {
+  it("초기 차트는 dirt-samples gtr 기본", () => {
     const sheet = createInitialSheet();
     const parts = compileSheet(sheet);
     expect(parts.totalSteps).toBe(64);
     expect(parts.hasHits).toBe(true);
     expect(parts.cps).toBeCloseTo(cyclesPerSecond(96));
     expect(parts.events.filter((e) => e.chord !== null)).toHaveLength(16);
-    expect(parts.events.every((e) => e.chord === null || e.steps === 4)).toBe(true);
-    expect(parts.preset.id).toBe("clean");
+    expect(parts.preset.id).toBe("gtr");
+    expect(parts.preset.sound).toBe("gtr");
   });
 
   it("D·U· 패턴은 박마다 공격 2개(@2)", () => {
@@ -85,8 +83,6 @@ describe("compileSheet / toStrudel", () => {
     const hits = parts.events.filter((e) => e.chord !== null);
     expect(hits).toHaveLength(32);
     expect(hits.every((e) => e.steps === 2)).toBe(true);
-    expect(hits.filter((e) => e.art === "D")).toHaveLength(16);
-    expect(hits.filter((e) => e.art === "U")).toHaveLength(16);
   });
 
   it("도수·리듬이 모두 비면 silence", () => {
@@ -98,7 +94,7 @@ describe("compileSheet / toStrudel", () => {
     expect(toStrudel(sheet)).toBe("silence");
   });
 
-  it("메트로만 켜도 클릭 레이어가 나온다", () => {
+  it("메트로는 triangle 클릭 (square 8bit 회피)", () => {
     const sheet: SheetState = {
       ...createInitialSheet(),
       degrees: Array(16).fill(null),
@@ -107,11 +103,11 @@ describe("compileSheet / toStrudel", () => {
     const code = toStrudel(sheet);
     expect(code).toContain("setcps(");
     expect(code).toContain("note(\"c6 a5 a5 a5");
-    expect(code).toContain('.s("square")');
+    expect(code).toContain('.s("triangle")');
     expect(code).not.toContain("chord(");
   });
 
-  it("코드 재생은 스트럼 n·기타 음역·voicing을 포함한다", () => {
+  it("코드 재생은 gtr 샘플·기타 음역·voicing을 포함한다", () => {
     const code = toStrudel(createInitialSheet());
     expect(code).toMatch(/^setcps\(/);
     expect(code).toContain('n("[[0 1 2 3]@1 ~@3]@4');
@@ -119,8 +115,8 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain('.dict("triads")');
     expect(code).toContain('.mode("above:c3")');
     expect(code).toContain(".voicing()");
-    expect(code).toContain("gm_electric_guitar_clean:5");
-    expect(code).toContain('.s("square")');
+    expect(code).toContain('.s("gtr');
+    expect(code).not.toContain("sawtooth");
   });
 
   it("X는 뮤트 샘플과 짧은 clip", () => {

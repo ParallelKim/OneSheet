@@ -4,7 +4,13 @@ declare module '@strudel/web' {
   export function hush(): void
   export function getAudioContext(): AudioContext
   export function initAudio(options?: Record<string, unknown>): Promise<AudioContext>
+  export function samples(
+    sampleMap: Record<string, unknown> | string,
+    baseUrl?: string,
+    options?: Record<string, unknown>,
+  ): Promise<void>
 }
+
 
 declare module '@strudel/soundfonts' {
   export function registerSoundfonts(): void

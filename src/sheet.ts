@@ -24,52 +24,61 @@ export type SheetState = {
 };
 
 /**
- * SOUND 축: GM 기타(전용 뱅크) + 파형.
- * strudel recipes는 clean + mode("above:c3")를 기타 예제로 씀.
- * steel/nylon은 LK 전용 프리셋(:5) — 기본 0번 뱅크는 기타감이 약함.
+ * SOUND 축.
+ * 공식/유저 예제: dirt-samples `gtr` 실WAV가 진짜 기타.
+ * GM soundfont는 싸구려 신스에 가깝고 8bit처럼 들리기 쉬움 → 보조.
+ * 파형(saw/square/tri)은 명시적 신스 옵션.
  */
 export type SoundId =
-  | "steel"
-  | "nylon"
+  | "gtr"
+  | "drive"
+  | "dist"
   | "clean"
+  | "nylon"
+  | "steel"
   | "saw"
   | "square"
   | "tri";
 
-export type SoundKind = "font" | "synth";
+export type SoundKind = "sample" | "font" | "synth";
 
 export type SoundPreset = {
   id: SoundId;
   label: string;
   kind: SoundKind;
-  /** .s() 에 넣는 이름 (font는 bank 포함 가능) */
+  /** .s() 이름 (sample/font는 :n 뱅크 가능) */
   sound: string;
-  /** soundfont 파일 (프리로드용). synth면 null */
+  /** soundfont 파일 (프리로드). sample/synth면 null */
   font: string | null;
   cutoff?: number;
 };
 
 export const SOUND_PRESETS: readonly SoundPreset[] = [
+  // dirt-samples 실기타 (docs: note(...).s("gtr").clip(1))
+  { id: "gtr", label: "gtr", kind: "sample", sound: "gtr", font: null },
+  { id: "drive", label: "drive", kind: "sample", sound: "gtr:1", font: null },
+  { id: "dist", label: "dist", kind: "sample", sound: "gtr:2", font: null },
+  // GM — recipes가 쓰는 clean (뱅크 기본)
   {
-    id: "steel",
-    label: "steel",
+    id: "clean",
+    label: "clean",
     kind: "font",
-    sound: "gm_acoustic_guitar_steel:5",
-    font: "0250_LK_AcousticSteel_SF2_file",
+    sound: "gm_electric_guitar_clean",
+    font: "0270_Aspirin_sf2_file",
   },
   {
     id: "nylon",
     label: "nylon",
     kind: "font",
-    sound: "gm_acoustic_guitar_nylon:5",
-    font: "0240_LK_Godin_Nylon_SF2_file",
+    sound: "gm_acoustic_guitar_nylon",
+    font: "0240_JCLive_sf2_file",
   },
   {
-    id: "clean",
-    label: "clean",
+    id: "steel",
+    label: "steel",
     kind: "font",
-    sound: "gm_electric_guitar_clean:5",
-    font: "0270_Stratocaster_sf2_file",
+    sound: "gm_acoustic_guitar_steel",
+    font: "0250_LK_AcousticSteel_SF2_file",
   },
   {
     id: "saw",
@@ -97,9 +106,9 @@ export const SOUND_PRESETS: readonly SoundPreset[] = [
   },
 ] as const;
 
-/** 뮤트(X) — LesPaul 뮤트 뱅크 */
-export const MUTE_SOUND = "gm_electric_guitar_muted:4";
-export const MUTE_FONT = "0280_LesPaul_sf2_file";
+/** 뮤트(X) — GM muted. sample 기타일 때도 짧게 끊는 용 */
+export const MUTE_SOUND = "gm_electric_guitar_muted";
+export const MUTE_FONT = "0280_Aspirin_sf2_file";
 
 /** @deprecated */
 export type GuitarBodyId = SoundId;
@@ -169,7 +178,7 @@ export function createInitialSheet(): SheetState {
     key: "C",
     degrees: repeatBar([5, 0, 4, 3]), // vi I V IV
     rhythm: defaultRhythm(),
-    sound: "clean",
+    sound: "gtr",
     gain: 0.55,
     metro: true,
   };
@@ -413,9 +422,9 @@ function timedSound(events: TimedEvent[], preset: SoundPreset): string {
   return events
     .map((e) => {
       if (!e.chord) return e.steps === 1 ? "~" : `~@${e.steps}`;
-      // font: X는 뮤트 샘플. synth: 같은 파형 유지(짧은 clip으로 구분)
+      // X: font/sample은 뮤트 샘플, synth는 같은 파형+짧은 clip
       const s =
-        preset.kind === "font" && e.art === "X" ? MUTE_SOUND : preset.sound;
+        e.art === "X" && preset.kind !== "synth" ? MUTE_SOUND : preset.sound;
       return e.steps === 1 ? s : `${s}@${e.steps}`;
     })
     .join(" ");
@@ -434,7 +443,7 @@ function timedClip(events: TimedEvent[]): string {
 
 /**
  * SheetState → Strudel 코드.
- * 공식 recipes: n().chord().mode("above:c3").voicing().s("gm_electric_guitar_clean")
+ * 유저/공식 예제: note/voicing + .s("gtr"|gm_electric_guitar_clean) + mode above:c3
  */
 export function toStrudel(sheet: SheetState): string {
   const parts = compileSheet(sheet);
@@ -446,7 +455,6 @@ export function toStrudel(sheet: SheetState): string {
       `n("${timedN(parts.events)}")`,
       `.chord("${timedChord(parts.events)}")`,
       `.dict("triads")`,
-      // 기타 음역 — 기본 anchor(c5)는 피아노처럼 들림
       `.mode("above:c3")`,
       `.voicing()`,
       `.s("${timedSound(parts.events, preset)}")`,
@@ -460,12 +468,12 @@ export function toStrudel(sheet: SheetState): string {
   }
 
   if (parts.metro) {
-    // 4분마다 클릭. 마디 첫 박은 높은 음(강세), 나머지는 낮은 음.
+    // square 메트로는 8bit 게임처럼 들림 → 짧고 조용한 triangle 클릭
     const clicks = Array.from({ length: SLOTS }, (_, i) =>
       i % BEATS === 0 ? "c6" : "a5",
     ).join(" ");
     layers.push(
-      `note("${clicks}").s("square").gain(0.3).clip(0.04).cutoff(10000)`,
+      `note("${clicks}").s("triangle").gain(0.12).clip(0.03).cutoff(6000)`,
     );
   }
 

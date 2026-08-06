@@ -5,6 +5,7 @@ import {
   hush,
   initAudio,
   initStrudel,
+  samples,
 } from "@strudel/web";
 import {
   MUTE_FONT,
@@ -32,9 +33,21 @@ let epoch = 0;
 const warmedFonts = new Set<string>();
 let warmPromise: Promise<void> | null = null;
 let gestureWarmed = false;
+let dirtGtrLoaded = false;
 
 /** 폰트 파일 + 대표 존 */
 const PRELOAD_MIDI = [48, 55, 60, 67];
+
+/** dirt-samples 실기타 WAV (strudel docs 예제와 동일) */
+const DIRT_GTR = {
+  gtr: [
+    "gtr/0001_cleanC.wav",
+    "gtr/0002_ovrdC.wav",
+    "gtr/0003_distC.wav",
+  ],
+} as const;
+const DIRT_BASE =
+  "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/";
 
 export function getLastStrudelCode(): string {
   return lastCode;
@@ -101,11 +114,20 @@ export function getAudioState(): string {
   }
 }
 
+async function loadDirtGtr(): Promise<void> {
+  if (dirtGtrLoaded) return;
+  // docs: samples({ gtr: 'gtr/0001_cleanC.wav' }, 'github:tidalcycles/dirt-samples')
+  await samples({ ...DIRT_GTR }, DIRT_BASE);
+  dirtGtrLoaded = true;
+}
+
 export async function initStrudelEngine(): Promise<Repl> {
   if (!boot) {
     boot = initStrudel({
       prebake: async () => {
         registerSoundfonts();
+        // 실기타 샘플 맵 등록 (파일은 재생/워밍 때 lazy)
+        await loadDirtGtr();
       },
     })
       .then((repl: Repl) => {
@@ -136,8 +158,7 @@ async function warmFont(font: string, ctx: AudioContext): Promise<void> {
 
 /**
  * 첫 포인터 제스처에서 호출.
- * 오디오 unlock + 모든 GM 기타/뮤트 폰트를 백그라운드 워밍.
- * Play를 막지 않는다.
+ * 오디오 unlock + gtr 샘플·GM 폰트 워밍. Play를 막지 않는다.
  */
 export function warmOnGesture(preferred?: SoundId): Promise<void> {
   if (warmPromise) return warmPromise;
@@ -147,14 +168,19 @@ export function warmOnGesture(preferred?: SoundId): Promise<void> {
     gestureWarmed = true;
     const ctx = getAudioContext() as AudioContext;
 
-    // 현재 SOUND 우선
-    const prefer = preferred ? soundById(preferred).font : null;
-    if (prefer) await warmFont(prefer, ctx);
+    // gtr 실샘플을 먼저 (기본 SOUND)
+    await loadDirtGtr();
+    // 한 음 트리거로 버퍼 디코드 유도 — evaluate 한 번 silent는 과함.
+    // sampler는 첫 note 때 lazy load. mute/GM만 선워밍.
     await warmFont(MUTE_FONT, ctx);
 
-    // 나머지 font 프리셋 idle에 가깝게 이어서
+    const prefer = preferred ? soundById(preferred).font : null;
+    if (prefer) await warmFont(prefer, ctx);
+
     for (const p of SOUND_PRESETS) {
-      if (p.font && p.font !== prefer) await warmFont(p.font, ctx);
+      if (p.font && p.font !== prefer && p.font !== MUTE_FONT) {
+        await warmFont(p.font, ctx);
+      }
     }
   })().catch((err) => {
     console.warn("warmOnGesture failed", err);
