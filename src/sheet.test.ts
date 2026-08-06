@@ -7,6 +7,7 @@ import {
   holdRun,
   nextSoundMode,
   SOUND_MODES,
+  soundModeById,
   toStrudel,
   type Articulation,
   type SheetState,
@@ -79,12 +80,12 @@ describe("compileSheet / toStrudel", () => {
     };
     const code = toStrudel(sheet);
     expect(code).toContain("setcps(");
-    expect(code).toContain("note(\"c6 a5 a5 a5");
+    expect(code).toContain('note("c6 a5 a5 a5');
     expect(code).toContain('.s("triangle")');
     expect(code).not.toContain("chord(");
   });
 
-  it("기본은 block — 동시 보이싱·sawtooth·clip", () => {
+  it("기본 block은 차트→동시 보이싱·sawtooth", () => {
     const sheet = createInitialSheet();
     expect(sheet.soundMode).toBe("block");
     const code = toStrudel(sheet);
@@ -98,37 +99,33 @@ describe("compileSheet / toStrudel", () => {
     expect(code).not.toMatch(/\bn\("/);
   });
 
-  it("실험 모드는 n 스트럼·음색이 갈린다", () => {
-    const cases: Array<{
-      id: SoundModeId;
-      hasN: boolean;
-      sound: string;
-      clip: string;
-    }> = [
-      { id: "block", hasN: false, sound: "sawtooth", clip: "0.95" },
-      { id: "strum-saw", hasN: true, sound: "sawtooth", clip: "2" },
-      {
-        id: "strum-gm",
-        hasN: true,
-        sound: "gm_electric_guitar_clean:5",
-        clip: "2",
-      },
-      { id: "arp-saw", hasN: true, sound: "sawtooth", clip: "1.2" },
-      { id: "dirt", hasN: true, sound: "gtr", clip: "1" },
-    ];
-
-    for (const c of cases) {
-      const code = toStrudel({ ...createInitialSheet(), soundMode: c.id });
-      expect(code).toContain(`.s("${c.sound}")`);
-      expect(code).toContain(`.clip(${c.clip})`);
-      if (c.hasN) {
-        expect(code).toMatch(/\bn\("/);
-        expect(code).toContain("[0 1 2 3]");
-        expect(code).toContain('.mode("above:c3")');
-      } else {
-        expect(code).not.toMatch(/\bn\("/);
-      }
+  it("예제 MODE는 docs 원문을 그대로 낸다", () => {
+    for (const mode of SOUND_MODES) {
+      if (mode.kind !== "example") continue;
+      const code = toStrudel({
+        ...createInitialSheet(),
+        soundMode: mode.id,
+        // 차트·BPM이 달라도 원문 불변
+        bpm: 40,
+        degrees: Array(16).fill(null),
+        metro: true,
+      });
+      expect(code).toBe(mode.code);
+      expect(code).not.toContain("setcps(");
+      expect(code).not.toContain("sawtooth");
     }
+  });
+
+  it("recipes arp 원문이 포함된다", () => {
+    const mode = soundModeById("ex-arp");
+    expect(mode.code).toContain('n("0 1 2 3")');
+    expect(mode.code).toContain('.chord("Cm")');
+    expect(mode.code).toContain('.mode("above:c3")');
+    expect(mode.code).toContain('.s("gm_electric_guitar_clean")');
+    expect(mode.code).not.toContain(":5");
+    expect(toStrudel({ ...createInitialSheet(), soundMode: "ex-arp" })).toBe(
+      mode.code,
+    );
   });
 
   it("MODE 칩은 SOUND_MODES를 순환한다", () => {

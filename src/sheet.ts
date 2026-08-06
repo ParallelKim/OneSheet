@@ -3,58 +3,99 @@
  * 리듬 = 선택 마디의 4×4 (행=4분, 칸=16분).
  * 셀: D / U / X(뮤트) / hold(링) / rest(쉼).
  *
- * soundMode: 기본(block) + 실험 모드. 유저 청취 피드백용.
+ * soundMode: block(차트) + docs/recipes 원문 예제.
+ * 예제는 해석·번역 없이 그대로 evaluate — 청취 기준선용.
  */
 
 export type Articulation = "D" | "U" | "X" | "hold" | "rest";
 export type AttackArt = "D" | "U" | "X";
 
-/**
- * 사운드 실험 모드.
- * block = 현재 기본 (동시 보이싱). 나머지는 조사 기반 A/B.
- */
-export type SoundModeId =
-  | "block"
-  | "strum-saw"
-  | "strum-gm"
-  | "arp-saw"
-  | "dirt";
+export type SoundModeKind = "chart" | "example";
 
 export type SoundMode = {
-  id: SoundModeId;
+  id: string;
   /** LCD에 짧게 */
   label: string;
   /** 무엇이 다른지 (피드백용) */
   blurb: string;
+  kind: SoundModeKind;
+  /** 출처 URL (예제만) */
+  source?: string;
+  /** 예제 원문 코드 (예제만). 차트/BPM/메트로 무시 */
+  code?: string;
 };
 
+/**
+ * MODE 슬롯.
+ * block만 차트→toStrudel. 나머지는 strudel.cc 원문 복제.
+ */
 export const SOUND_MODES: readonly SoundMode[] = [
   {
     id: "block",
     label: "block",
-    blurb: "동시 보이싱+saw — 기본. 피아노감?",
+    kind: "chart",
+    blurb: "차트 기본 — 동시 보이싱+saw",
   },
   {
-    id: "strum-saw",
-    label: "strum",
-    blurb: "D/U 짧은 쓸기+saw+clip2 — recipes식",
+    id: "ex-note",
+    label: "note",
+    kind: "example",
+    source: "https://strudel.cc/recipes/recipes/",
+    blurb: "recipes · note 아르페지오",
+    code: `note("c eb g c4")
+.clip(2).s("gm_electric_guitar_clean")`,
   },
   {
-    id: "strum-gm",
-    label: "gm",
-    blurb: "쓸기+GM clean:5+above:c3 — 공식 기타 예제",
+    id: "ex-scale",
+    label: "scale",
+    kind: "example",
+    source: "https://strudel.cc/recipes/recipes/",
+    blurb: "recipes · scale 아르페지오",
+    code: `n("0 2 4 7").scale("C:minor")
+.clip(2).s("gm_electric_guitar_clean")`,
   },
   {
-    id: "arp-saw",
+    id: "ex-arp",
     label: "arp",
-    blurb: "D/U를 hold 전체에 펼침 — 아르페지오",
+    kind: "example",
+    source: "https://strudel.cc/recipes/recipes/",
+    blurb: "recipes · chord+voicing 아르페지오",
+    code: `n("0 1 2 3").chord("Cm").mode("above:c3").voicing()
+.clip(2).s("gm_electric_guitar_clean")`,
   },
   {
-    id: "dirt",
-    label: "dirt",
-    blurb: "단일 gtr WAV+쓸기 — docs 샘플",
+    id: "ex-n4",
+    label: "n4",
+    kind: "example",
+    source: "https://strudel.cc/learn/tonal/",
+    blurb: "tonal · n+chord 진행",
+    code: `n("0 1 2 3").chord("<C Am F G>").voicing()`,
+  },
+  {
+    id: "ex-clip",
+    label: "clip",
+    kind: "example",
+    source: "https://strudel.cc/understand/voicings/",
+    blurb: "voicings · n 선택+clip 길이",
+    code: `n("0 3 1 2").chord("<C <Fm Db>>").voicing()
+.clip("4 3 2 1").room(.5)`,
+  },
+  {
+    id: "ex-gtr",
+    label: "gtr",
+    kind: "example",
+    source: "https://strudel.cc/learn/samples/",
+    blurb: "samples · dirt gtr(+moog) 피치",
+    code: `samples({
+'gtr': 'gtr/0001_cleanC.wav',
+'moog': { 'g3': 'moog/005_Mighty%20Moog%20G3.wav' },
+}, 'github:tidalcycles/dirt-samples');
+note("g3 [bb3 c4] <g4 f4 eb4 f3>@2").s("gtr,moog").clip(1)
+.gain(.5)`,
   },
 ] as const;
+
+export type SoundModeId = (typeof SOUND_MODES)[number]["id"];
 
 export type SheetState = {
   bpm: number;
@@ -63,14 +104,11 @@ export type SheetState = {
   rhythm: Articulation[][];
   gain: number;
   metro: boolean;
-  /** 사운드 실험 모드 (기본 block) */
+  /** 사운드 모드 (기본 block) */
   soundMode: SoundModeId;
 };
 
 const TONE_SAW = { sound: "sawtooth", cutoff: 1400 } as const;
-/** GM clean Strat 뱅크 — voicing 후 n이 지워져도 :5로 고정 */
-const TONE_GM = "gm_electric_guitar_clean:5";
-const TONE_DIRT = "gtr";
 
 export const BARS = 4;
 export const BEATS = 4;
@@ -240,7 +278,6 @@ export type StrudelParts = {
   events: TimedEvent[];
   totalSteps: number;
   metro: boolean;
-  soundMode: SoundModeId;
 };
 
 export function compileSheet(sheet: SheetState): StrudelParts {
@@ -293,7 +330,6 @@ export function compileSheet(sheet: SheetState): StrudelParts {
     events,
     totalSteps: events.reduce((n, e) => n + e.steps, 0),
     metro: sheet.metro,
-    soundMode: sheet.soundMode,
   };
 }
 
@@ -315,36 +351,6 @@ function timedGain(events: TimedEvent[]): string {
     .join(" ");
 }
 
-/** 쓸기: 앞 1스텝에 몰고 나머지는 링 자리(음 연장은 clip이 담당) */
-function strumN(art: AttackArt, steps: number, style: "rolled" | "spread"): string {
-  if (art === "X") {
-    return steps === 1 ? "[0,1,2]" : `[0,1,2]@${steps}`;
-  }
-  const order = art === "D" ? "[0 1 2 3]" : "[3 2 1 0]";
-  if (steps <= 1) return order;
-  if (style === "spread") {
-    // hold 전체에 균등 배치 (아르페지오)
-    return `${order}@${steps}`;
-  }
-  // rolled: 첫 1/steps 구간에 몰기
-  if (steps === 1) return order;
-  return `[${order}@1 ~@${steps - 1}]@${steps}`;
-}
-
-function timedN(
-  events: TimedEvent[],
-  style: "rolled" | "spread",
-): string {
-  return events
-    .map((e) => {
-      if (!e.chord || !e.art) {
-        return e.steps === 1 ? "~" : `~@${e.steps}`;
-      }
-      return strumN(e.art, e.steps, style);
-    })
-    .join(" ");
-}
-
 function metroLayer(): string {
   const clicks = Array.from({ length: SLOTS }, (_, i) =>
     i % BEATS === 0 ? "c6" : "a5",
@@ -358,7 +364,7 @@ function stackBody(layers: string[]): string {
   return `stack(\n  ${layers.join(",\n  ")}\n)`;
 }
 
-/** block: 동시 보이싱 (현재 기본) */
+/** block: 차트 → 동시 보이싱 (제품 기본) */
 function layerBlock(parts: StrudelParts): string {
   return [
     `chord("${timedChord(parts.events)}")`,
@@ -371,92 +377,24 @@ function layerBlock(parts: StrudelParts): string {
   ].join("");
 }
 
-/** 쓸기 + 신스 — clip(2)로 링 시도 */
-function layerStrumSaw(parts: StrudelParts): string {
-  return [
-    `n("${timedN(parts.events, "rolled")}")`,
-    `.chord("${timedChord(parts.events)}")`,
-    `.dict("triads")`,
-    `.mode("above:c3")`,
-    `.voicing()`,
-    `.s("${TONE_SAW.sound}")`,
-    `.gain("${timedGain(parts.events)}")`,
-    `.cutoff(${TONE_SAW.cutoff})`,
-    `.clip(2)`,
-  ].join("");
-}
-
-/** 쓸기 + GM clean:5 (공식 recipes) */
-function layerStrumGm(parts: StrudelParts): string {
-  return [
-    `n("${timedN(parts.events, "rolled")}")`,
-    `.chord("${timedChord(parts.events)}")`,
-    `.dict("triads")`,
-    `.mode("above:c3")`,
-    `.voicing()`,
-    `.s("${TONE_GM}")`,
-    `.gain("${timedGain(parts.events)}")`,
-    `.clip(2)`,
-  ].join("");
-}
-
-/** 아르페지오 — hold 전체에 펼침 */
-function layerArpSaw(parts: StrudelParts): string {
-  return [
-    `n("${timedN(parts.events, "spread")}")`,
-    `.chord("${timedChord(parts.events)}")`,
-    `.dict("triads")`,
-    `.mode("above:c3")`,
-    `.voicing()`,
-    `.s("${TONE_SAW.sound}")`,
-    `.gain("${timedGain(parts.events)}")`,
-    `.cutoff(${TONE_SAW.cutoff})`,
-    `.clip(1.2)`,
-  ].join("");
-}
-
-/** dirt 단일 gtr — n은 보이싱용, 샘플은 파일 1개라 인덱스 충돌 없음 */
-function layerDirt(parts: StrudelParts): string {
-  return [
-    `n("${timedN(parts.events, "rolled")}")`,
-    `.chord("${timedChord(parts.events)}")`,
-    `.dict("triads")`,
-    `.mode("above:c3")`,
-    `.voicing()`,
-    `.s("${TONE_DIRT}")`,
-    `.gain("${timedGain(parts.events)}")`,
-    `.clip(1)`,
-  ].join("");
-}
-
-export function toStrudel(sheet: SheetState): string {
+function chartToStrudel(sheet: SheetState): string {
   const parts = compileSheet(sheet);
   const layers: string[] = [];
-
-  if (parts.hasHits) {
-    switch (parts.soundMode) {
-      case "strum-saw":
-        layers.push(layerStrumSaw(parts));
-        break;
-      case "strum-gm":
-        layers.push(layerStrumGm(parts));
-        break;
-      case "arp-saw":
-        layers.push(layerArpSaw(parts));
-        break;
-      case "dirt":
-        layers.push(layerDirt(parts));
-        break;
-      case "block":
-      default:
-        layers.push(layerBlock(parts));
-        break;
-    }
-  }
-
+  if (parts.hasHits) layers.push(layerBlock(parts));
   if (parts.metro) layers.push(metroLayer());
-
   const body = stackBody(layers);
   if (body === "silence") return "silence";
   return `setcps(${parts.cps})\n${body}`;
+}
+
+/**
+ * Play/재평가용 코드.
+ * example MODE는 docs 원문만 — 차트·BPM·메트로 개입 없음.
+ */
+export function toStrudel(sheet: SheetState): string {
+  const mode = soundModeById(sheet.soundMode);
+  if (mode.kind === "example" && mode.code) {
+    return mode.code;
+  }
+  return chartToStrudel(sheet);
 }
