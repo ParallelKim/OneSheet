@@ -25,6 +25,12 @@ docs / arp / gm / block 제거. MODE 칩으로 strum ↔ piano.
 - `note("a2,e3,a3,c4,e4")` 동시 타건
 - 차트 리듬·오픈셰이프 공유, late 없음
 
+## Persist
+
+- 시트 편집본 → `localStorage` (`onesheet.sheet.v1`)
+- 로드 시 normalize (옛 MODE → strum)
+- 서버 동기화는 나중
+
 ```bash
 npm test
 npm run build

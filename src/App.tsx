@@ -6,7 +6,6 @@ import {
   BEATS,
   BARS,
   BAR_STEPS,
-  createInitialSheet,
   DEGREE_META,
   nextKey,
   nextSoundMode,
@@ -21,6 +20,7 @@ import {
   type Articulation,
   type SheetState,
 } from "./sheet";
+import { loadSheetState, saveStoredSheet } from "./persist";
 import {
   ensureAudioRunning,
   evaluateStrudel,
@@ -51,7 +51,7 @@ function playColHold(posInRow: number, hold = 0.7): number {
 }
 
 export default function App() {
-  const [sheet, setSheet] = useState<SheetState>(createInitialSheet);
+  const [sheet, setSheet] = useState<SheetState>(loadSheetState);
   const [selected, setSelected] = useState(0);
   const [mode, setMode] = useState<Mode>("chart");
   const [brush, setBrush] = useState<Articulation>("D");
@@ -67,6 +67,11 @@ export default function App() {
 
   useEffect(() => {
     sheetRef.current = sheet;
+  }, [sheet]);
+
+  // 편집본 localStorage 캐시 (배포/새로고침 유지)
+  useEffect(() => {
+    saveStoredSheet(sheet);
   }, [sheet]);
 
   // 엔진은 마운트 직후 백그라운드 기동 (Play를 기다리지 않음)
