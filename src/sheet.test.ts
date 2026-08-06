@@ -7,6 +7,7 @@ import {
   compileSheet,
   createInitialSheet,
   cyclesPerSecond,
+  cycleToneAxis,
   defaultTonesForDegree,
   guitarShape,
   holdRun,
@@ -19,7 +20,7 @@ import {
   rhythmFromLegacyBars,
   slotLabel,
   SOUND_MODES,
-  toggleChordTone,
+  TONE_AXES,
   toStrudel,
   type Articulation,
   type SheetState,
@@ -69,19 +70,24 @@ describe("root × tones", () => {
     expect(slotLabel("C", 3, ["1", "b3", "5"])).toBe("Fm");
   });
 
-  it("3↔b3 토글은 배타", () => {
-    const next = toggleChordTone(["1", "3", "5"], "b3");
-    expect(next).toEqual(["1", "b3", "5"]);
+  it("3축은 단→장→해제 순회", () => {
+    const axis3 = TONE_AXES.find((a) => a.id === "3")!;
+    const a = cycleToneAxis(["1", "3", "5"], axis3); // 장 → 해제
+    expect(a).toEqual(["1", "5"]);
+    const b = cycleToneAxis(a, axis3); // 해제 → 단
+    expect(b).toEqual(["1", "b3", "5"]);
+    const c = cycleToneAxis(b, axis3); // 단 → 장
+    expect(c).toEqual(["1", "3", "5"]);
   });
 
-  it("2 켜면 add2 / madd2", () => {
+  it("2 장도 = add2 / 3 없이 2 = sus2", () => {
     expect(chordSymbolFromParts("A", ["1", "2", "b3", "5"])).toBe("Amadd2");
     expect(chordSymbolFromParts("C", ["1", "2", "3", "5"])).toBe("Cadd2");
     expect(chordSymbolFromParts("G", ["1", "2", "5"])).toBe("Gsus2");
     expect(chordSymbolFromParts("G", ["1", "2", "3", "5", "b7"])).toBe("G9");
   });
 
-  it("구성음 토글은 채워진 슬롯 전부에 거울", () => {
+  it("상대도수 순회는 채워진 슬롯 전부에 거울", () => {
     let sheet = createInitialSheet();
     sheet = {
       ...sheet,
@@ -92,6 +98,8 @@ describe("root × tones", () => {
         i < 4 ? defaultTonesForDegree(([5, 0, 4, 3] as const)[i]!) : null,
       ),
     };
+    // 축2: 해제→단(b2)→장(2). 두 번 눌러 장2
+    sheet = paintToneSlot(sheet, 0, "2");
     sheet = paintToneSlot(sheet, 0, "2");
     expect(sheet.tones.slice(0, 4)).toEqual([
       ["1", "2", "b3", "5"],

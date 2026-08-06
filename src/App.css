@@ -693,6 +693,11 @@ button {
   color: var(--bg);
 }
 
+.mode-degree .pad-grid .pad.tone.tone-root {
+  opacity: 0.85;
+  pointer-events: none;
+}
+
 .pad-sub,
 .pad-roman {
   font-size: 0.55rem;

@@ -7,11 +7,10 @@ import {
   BEATS,
   BARS,
   BAR_STEPS,
-  TONE_PADS,
+  TONE_AXES,
   clearRhythmOverride,
   defaultTonesForDegree,
   DEGREE_META,
-  intervalNoteLabel,
   nextKey,
   nextSoundMode,
   paintDegreeSlot,
@@ -23,12 +22,13 @@ import {
   slotRoman,
   soundModeById,
   SUBDIV,
-  tonesInclude,
+  toneAxisLabel,
+  toneAxisOn,
   TOTAL_STEPS,
   toStrudel,
   type Articulation,
-  type ChordInterval,
   type SheetState,
+  type ToneAxisId,
 } from "./sheet";
 import { loadSheetState, saveStoredSheet } from "./persist";
 import {
@@ -270,8 +270,8 @@ export default function App() {
     update((prev) => paintDegreeSlot(prev, selected, degree));
   };
 
-  const paintTone = (interval: ChordInterval) => {
-    update((prev) => paintToneSlot(prev, selected, interval));
+  const paintTone = (axisId: ToneAxisId) => {
+    update((prev) => paintToneSlot(prev, selected, axisId));
   };
 
   const paintRhythm = (step: number) => {
@@ -601,29 +601,39 @@ export default function App() {
                     </button>
                   );
                 }
-                const interval = TONE_PADS[i - 8]!;
-                const rootDeg = currentDegree;
-                if (rootDeg === null) {
+                const axis = TONE_AXES[i - 8];
+                if (!axis) {
                   return (
                     <div
-                      key={`tone-${interval}`}
+                      key={`tone-idle-${i}`}
                       className="pad tone tone-idle"
                       aria-hidden
                     />
                   );
                 }
-                const on = tonesInclude(sheet.tones[selected], interval);
-                const note = intervalNoteLabel(sheet.key, rootDeg, interval);
+                const rootDeg = currentDegree;
+                if (rootDeg === null) {
+                  return (
+                    <div
+                      key={`tone-${axis.id}`}
+                      className="pad tone tone-idle"
+                      aria-hidden
+                    />
+                  );
+                }
+                const tones = sheet.tones[selected];
+                const on = toneAxisOn(tones, axis);
+                const label = toneAxisLabel(tones, axis);
                 return (
                   <button
-                    key={`tone-${interval}`}
+                    key={`tone-${axis.id}`}
                     type="button"
-                    className={`pad tone ${on ? "on" : ""}`}
-                    onClick={() => paintTone(interval)}
+                    className={`pad tone ${on ? "on" : ""} ${axis.id === "1" ? "tone-root" : ""}`}
+                    onClick={() => paintTone(axis.id)}
                     aria-pressed={on}
-                    aria-label={note}
+                    aria-label={label}
                   >
-                    <span className="pad-label">{note}</span>
+                    <span className="pad-label">{label}</span>
                   </button>
                 );
               })}
