@@ -103,7 +103,7 @@ describe("compileSheet / toStrudel", () => {
     expect(guitarShape("G")).toEqual(["g2", "b2", "d3", "g3", "b3", "g4"]);
   });
 
-  it("strum은 note+late 오픈셰이프·기본 SF·차트 리듬", () => {
+  it("strum은 note+late 오픈셰이프·GM clean·차트 리듬", () => {
     const sheet = createInitialSheet();
     const bar: Articulation[] = Array.from({ length: 16 }, (_, i) => {
       const sub = i % 4;
@@ -118,8 +118,8 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain("a2@2");
     expect(code).toContain("e3@2");
     expect(code).toContain("c4@2");
-    expect(code).toContain('.s("gm_piano")');
-    expect(code).not.toContain("gm_electric_guitar_clean");
+    expect(code).toContain('.s("gm_electric_guitar_clean:5")');
+    expect(code).not.toContain("gm_piano");
     expect(code).toContain(".late(");
     expect(code).toContain(".decay(0.12)");
     expect(code).toContain(".sustain(0.35)");
