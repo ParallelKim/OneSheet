@@ -35,7 +35,7 @@ export const SOUND_MODES: readonly SoundMode[] = [
     id: "strum",
     label: "strum",
     kind: "chart",
-    blurb: "오픈셰이프·짧은 late 쓸기→링 · GM · 차트",
+    blurb: "오픈셰이프·late 쓸기 · 기본 SF · 차트",
   },
   {
     id: "arp",
@@ -74,6 +74,8 @@ export type SheetState = {
 
 const TONE_SAW = { sound: "sawtooth", cutoff: 1400 } as const;
 const TONE_GM = "gm_electric_guitar_clean:5";
+/** strum 테스트용 — GM 기타 바디/저음 색 없음 (GM #0) */
+const TONE_STRUM = "gm_acoustic_grand_piano";
 
 /**
  * 오픈(·바레) 셰이프 — 저→고 절대음.
@@ -517,7 +519,9 @@ function strokeNotes(chord: string, art: AttackArt): string[] {
 
 /**
  * 오픈셰이프 note + late 스트럼.
- * 각 현은 같은 hold 길이로 울리고, onset만 수 ms 어긋남.
+ * - onset만 수 ms 어긋남 → 먼저 친 현이 같은 길이만큼 먼저 끝남
+ * - hold가 길수록 gain↓ (지속∝작아짐)
+ * - 기본 사운드폰트(그랜드) — GM 기타 바디 배제
  */
 function layerStrum(parts: StrudelParts): string {
   const maxVoices = Math.max(
@@ -527,7 +531,6 @@ function layerStrum(parts: StrudelParts): string {
     ),
   );
   const gap = Number((STRUM_GAP_SEC * parts.cps).toFixed(5));
-  const gainPat = timedGain(parts.events);
   const voices: string[] = [];
 
   for (let slot = 0; slot < maxVoices; slot++) {
@@ -542,17 +545,40 @@ function layerStrum(parts: StrudelParts): string {
       })
       .join(" ");
 
-    const clip = parts.events.some((e) => e.art === "X")
-      ? // X는 짧고 D/U는 hold — 이벤트 단위 clip 패턴
-        parts.events
-          .map((e) => {
-            const c = !e.chord || !e.art ? 0 : e.art === "X" ? 0.18 : 0.95;
-            return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
-          })
-          .join(" ")
-      : "0.95";
+    // 지속 시간에 반비례한 gain (긴 hold → 작음) + 저현 살짝 억제
+    const gainPat = parts.events
+      .map((e) => {
+        if (!e.chord || !e.art) {
+          return e.steps === 1 ? "0" : `0@${e.steps}`;
+        }
+        const durScale = Math.min(1, 2 / Math.max(1, e.steps));
+        const stringLift =
+          0.72 + (0.28 * slot) / Math.max(1, maxVoices - 1);
+        const g = Number((e.gain * durScale * stringLift).toFixed(3));
+        return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
+      })
+      .join(" ");
 
-    let line = `note("${toks}").s("${TONE_GM}").gain("${gainPat}").clip("${clip}")`;
+    const clip = parts.events
+      .map((e) => {
+        if (!e.chord || !e.art) {
+          return e.steps === 1 ? "0" : `0@${e.steps}`;
+        }
+        // X 짧게. D/U는 clip1 — late된 현도 동일 길이(먼저 시작=먼저 끝)
+        const c = e.art === "X" ? 0.18 : 1;
+        return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
+      })
+      .join(" ");
+
+    let line = [
+      `note("${toks}")`,
+      `.s("${TONE_STRUM}")`,
+      `.gain("${gainPat}")`,
+      `.clip("${clip}")`,
+      // 울리는 동안 작아짐 (지속∝감쇠)
+      `.decay(0.12)`,
+      `.sustain(0.35)`,
+    ].join("");
     if (slot > 0 && gap > 0) {
       line += `.late(${(slot * gap).toFixed(5)})`;
     }

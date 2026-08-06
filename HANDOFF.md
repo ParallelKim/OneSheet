@@ -15,10 +15,11 @@
 
 ### strum
 
-- Strudel 공식에 기타 오픈 스트럼 예제 없음 → MIDI-guitar 관례(오픈 셰이프) 사용
-- `guitarShape("C")` = `c3 e3 g3 c4 e4` (6현 뮤트)
-- `stack(note(..), note(..).late(Δ), …)` — onset만 ms 단위, 길이는 hold(`clip~0.95`)
-- D=저→고, U=고→저. 임의 `0 4 7…` / `gtr6` dict 폐기
+- 오픈셰이프 절대음 + `stack`/`late`(~12ms)
+- **기본 SF** `gm_acoustic_grand_piano` (GM 기타 바디 배제, 조성 테스트용)
+- 먼저 친 현 = 같은 길이만큼 먼저 끝 (`late`+동일 clip)
+- hold 길수록 gain↓, `.decay`/`.sustain`으로 울리는 동안 작아짐
+- D=저→고, U=고→저
 
 ```bash
 npm test

@@ -103,7 +103,7 @@ describe("compileSheet / toStrudel", () => {
     expect(guitarShape("G")).toEqual(["g2", "b2", "d3", "g3", "b3", "g4"]);
   });
 
-  it("strum은 note+late 오픈셰이프·차트 리듬", () => {
+  it("strum은 note+late 오픈셰이프·기본 SF·차트 리듬", () => {
     const sheet = createInitialSheet();
     const bar: Articulation[] = Array.from({ length: 16 }, (_, i) => {
       const sub = i % 4;
@@ -115,17 +115,17 @@ describe("compileSheet / toStrudel", () => {
 
     const code = toStrudel({ ...sheet, soundMode: "strum" });
     expect(code).toMatch(/^setcps\(/);
-    // Am 오픈: a2 e3 a3 c4 e4 — D는 저→고
     expect(code).toContain("a2@2");
     expect(code).toContain("e3@2");
     expect(code).toContain("c4@2");
-    expect(code).toContain('.s("gm_electric_guitar_clean:5")');
+    expect(code).toContain('.s("gm_acoustic_grand_piano")');
+    expect(code).not.toContain("gm_electric_guitar_clean");
     expect(code).toContain(".late(");
+    expect(code).toContain(".decay(0.12)");
+    expect(code).toContain(".sustain(0.35)");
     expect(code).toContain("note(");
-    // 옛 gtr6 / n-스트럼 아님
     expect(code).not.toContain('dict("gtr6")');
     expect(code).not.toMatch(/\bn\("/);
-    expect(code).not.toContain("[0 1 2 3 4 5]");
   });
 
   it("arp/gm은 차트 리듬·D↓U↑를 반영하고 바디만 다르다", () => {
