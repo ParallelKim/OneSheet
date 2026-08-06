@@ -3,22 +3,34 @@ import {
   ARTICULATIONS,
   artLabel,
   barIndex,
+  barRhythm,
   BEATS,
   BARS,
   BAR_STEPS,
+  TONE_AXES,
+  clearRhythmOverride,
+  defaultTonesForDegree,
   DEGREE_META,
   nextKey,
   nextSoundMode,
-  setBarArticulation,
+  paintDegreeSlot,
+  paintRhythmStep,
+  paintToneSlot,
+  rhythmBarKind,
   SLOTS,
   slotLabel,
   slotRoman,
   soundModeById,
   SUBDIV,
+  toneAxisFaces,
+  toneAxisLabel,
+  toneAxisOn,
+  toneAxisPolarity,
   TOTAL_STEPS,
   toStrudel,
   type Articulation,
   type SheetState,
+  type ToneAxisId,
 } from "./sheet";
 import { loadSheetState, saveStoredSheet } from "./persist";
 import {
@@ -257,27 +269,25 @@ export default function App() {
   }, []);
 
   const paintDegree = (degree: number | null) => {
-    update((prev) => {
-      const degrees = [...prev.degrees];
-      if (degree !== null && degrees[selected] === degree) {
-        degrees[selected] = null;
-      } else {
-        degrees[selected] = degree;
-      }
-      return { ...prev, degrees };
-    });
+    update((prev) => paintDegreeSlot(prev, selected, degree));
+  };
+
+  const paintTone = (axisId: ToneAxisId) => {
+    update((prev) => paintToneSlot(prev, selected, axisId));
   };
 
   const paintRhythm = (step: number) => {
     const bar = barIndex(selected);
     update((prev) => {
-      const current = prev.rhythm[bar]?.[step] ?? "rest";
+      const current = barRhythm(prev, bar)[step] ?? "rest";
       const nextArt = current === brush ? "rest" : brush;
-      return {
-        ...prev,
-        rhythm: setBarArticulation(prev.rhythm, bar, step, nextArt),
-      };
+      return paintRhythmStep(prev, bar, step, nextArt);
     });
+  };
+
+  const resetRhythmLink = () => {
+    const bar = barIndex(selected);
+    update((prev) => clearRhythmOverride(prev, bar));
   };
 
   const selectBar = (bar: number) => {
@@ -289,7 +299,8 @@ export default function App() {
   const currentDegree = sheet.degrees[selected] ?? null;
   const bar = barIndex(selected);
   const beat = (selected % BEATS) + 1;
-  const barRhythm = sheet.rhythm[bar] ?? [];
+  const barRhythmRow = barRhythm(sheet, bar);
+  const rhyKind = rhythmBarKind(sheet, bar);
   const playBar = playSlot !== null ? barIndex(playSlot) : null;
   const playBeat = playSlot !== null ? (playSlot % BEATS) + 1 : null;
   /** 하이라이트할 마디: 재생 중이면 재생 마디, 아니면 선택 마디 */
@@ -350,9 +361,9 @@ export default function App() {
             {Array.from({ length: BARS }, (_, bi) => (
               <div
                 key={bi}
-                className="measure"
+                className={`measure rhy-${rhythmBarKind(sheet, bi)} ${mode === "rhythm" ? "rhy-show" : ""}`}
                 role="group"
-                aria-label={`bar ${bi + 1}`}
+                aria-label={`bar ${bi + 1} ${rhythmBarKind(sheet, bi)}`}
                 onClick={() => selectBar(bi)}
               >
                 {Array.from({ length: BEATS }, (_, qi) => {
@@ -370,7 +381,7 @@ export default function App() {
                       }}
                       aria-label={`bar ${bi + 1} beat ${qi + 1}`}
                     >
-                      <span className="chord-name">{slotLabel(sheet.key, d)}</span>
+                      <span className="chord-name">{slotLabel(sheet.key, d, sheet.tones[i])}</span>
                       <span className="chord-deg">{d !== null ? slotRoman(d) : "·"}</span>
                     </button>
                   );
@@ -415,40 +426,35 @@ export default function App() {
           <span className="tr-icon" aria-hidden>
             <svg
               className="tr-metro"
-              viewBox="0 0 20 20"
+              viewBox="0 0 24 24"
               width="16"
               height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              {/* 본체 + 받침 */}
-              <path
-                fill="currentColor"
-                d="M5.2 16.2 8.4 4.1c.15-.55.9-.55 1.05 0L12.8 16.2H5.2Z"
-              />
-              <rect
-                fill="currentColor"
-                x="3.6"
-                y="15.4"
-                width="12.8"
-                height="2.1"
-                rx="0.4"
-              />
-              {/* 눈금 — on 상태에선 버튼 배경색으로 */}
+              {/* 사다리꼴 본체 (플랫탑) */}
+              <path d="M8 3.5h8l3.2 16.5H4.8L8 3.5Z" />
+              {/* 중앙 눈금대 */}
+              <path d="M12 5.2v12.2" />
               <path
                 className="tr-metro-ticks"
-                fill="none"
-                strokeWidth="1"
-                strokeLinecap="round"
-                d="M9.2 7.2h1.6M8.7 9.4h2.6M8.2 11.6h3.6"
+                d="M10.2 7.2h3.6M10.2 9.4h3.6M10.2 11.6h3.6M10.2 13.8h3.6"
               />
-              {/* 추 — 밖으로 크게 빠져 메트로놈으로 읽히게 */}
-              <path
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                d="M10 4.2 16.4 11.6"
+              {/* 추봉 + 사각 슬라이드 추 */}
+              <path d="M12 5.8 18.6 9.6" />
+              <rect
+                x="16.9"
+                y="8.35"
+                width="3.4"
+                height="2.5"
+                rx="0.35"
+                transform="rotate(28 18.6 9.6)"
+                fill="currentColor"
+                stroke="none"
               />
-              <circle fill="currentColor" cx="16.4" cy="11.6" r="2.2" />
             </svg>
           </span>
           <span className="tr-label">CLICK</span>
@@ -483,24 +489,45 @@ export default function App() {
       </nav>
 
       {mode === "rhythm" && (
-        <div className="brush-row" aria-label="articulation">
-          {ARTICULATIONS.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              className={`brush ${brush === a.id ? "on" : ""}`}
-              onClick={() => setBrush(a.id)}
-            >
-              <span className="brush-mark">{a.label}</span>
-              <span className="brush-hint">{a.hint}</span>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="rhy-meta" aria-label="rhythm source">
+            <span className={`rhy-tag rhy-tag-${rhyKind}`}>
+              {rhyKind === "base" && "BASE · BAR 1"}
+              {rhyKind === "link" && `LINK · ← BAR 1`}
+              {rhyKind === "own" && `OWN · BAR ${bar + 1}`}
+            </span>
+            {rhyKind === "own" && (
+              <button
+                type="button"
+                className="rhy-reset"
+                onClick={resetRhythmLink}
+              >
+                USE BASE
+              </button>
+            )}
+            {rhyKind === "link" && (
+              <span className="rhy-hint">edit to fork</span>
+            )}
+          </div>
+          <div className="brush-row" aria-label="articulation">
+            {ARTICULATIONS.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className={`brush ${brush === a.id ? "on" : ""}`}
+                onClick={() => setBrush(a.id)}
+              >
+                <span className="brush-mark">{a.label}</span>
+                <span className="brush-hint">{a.hint}</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       <div
         ref={padStageRef}
-        className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode}`}
+        className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode} rhy-${rhyKind}`}
         style={{ "--mark-bar": markBar } as CSSProperties}
       >
         <div className="pad-board" ref={padBoardRef}>
@@ -534,7 +561,7 @@ export default function App() {
                     onClick={() => setSelected(i)}
                   >
                     <span className="pad-sub">{(i % BEATS) + 1}</span>
-                    <span className="pad-label">{slotLabel(sheet.key, degree)}</span>
+                    <span className="pad-label">{slotLabel(sheet.key, degree, sheet.tones[i])}</span>
                     <span className="pad-roman">{slotRoman(degree)}</span>
                   </button>
                 );
@@ -544,6 +571,10 @@ export default function App() {
               Array.from({ length: SLOTS }, (_, i) => {
                 if (i < 7) {
                   const meta = DEGREE_META[i]!;
+                  const labelTones =
+                    currentDegree === i
+                      ? (sheet.tones[selected] ?? defaultTonesForDegree(i))
+                      : defaultTonesForDegree(i);
                   return (
                     <button
                       key={meta.roman}
@@ -552,7 +583,9 @@ export default function App() {
                       onClick={() => paintDegree(i)}
                     >
                       <span className="pad-label">{meta.roman}</span>
-                      <span className="pad-roman">{slotLabel(sheet.key, i)}</span>
+                      <span className="pad-roman">
+                        {slotLabel(sheet.key, i, labelTones)}
+                      </span>
                     </button>
                   );
                 }
@@ -564,17 +597,68 @@ export default function App() {
                       className={`pad tool ${currentDegree === null ? "on" : ""}`}
                       onClick={() => paintDegree(null)}
                     >
-                      <span className="pad-label">rest</span>
-                      <span className="pad-roman">—</span>
+                      <span className="pad-label">∅</span>
+                      <span className="pad-roman"> </span>
                     </button>
                   );
                 }
-                return <div key={`ghost-${i}`} className="pad ghost" aria-hidden />;
+                const axis = TONE_AXES[i - 8];
+                if (!axis) {
+                  return (
+                    <div
+                      key={`tone-idle-${i}`}
+                      className="pad tone tone-idle"
+                      aria-hidden
+                    />
+                  );
+                }
+                const rootDeg = currentDegree;
+                if (rootDeg === null) {
+                  return (
+                    <div
+                      key={`tone-${axis.id}`}
+                      className="pad tone tone-idle"
+                      aria-hidden
+                    />
+                  );
+                }
+                const tones = sheet.tones[selected];
+                const on = toneAxisOn(tones, axis);
+                const label = toneAxisLabel(tones, axis);
+                const faces = toneAxisFaces(axis);
+                const polarity = toneAxisPolarity(tones, axis);
+                return (
+                  <button
+                    key={`tone-${axis.id}`}
+                    type="button"
+                    className={[
+                      "pad",
+                      "tone",
+                      "arcana",
+                      on ? "on" : "",
+                      axis.id === "1" ? "tone-root" : "",
+                      faces.polar ? "polar" : "mirror",
+                      faces.polar && polarity === "min" ? "reversed" : "",
+                      faces.polar && polarity === "maj" ? "upright" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => paintTone(axis.id)}
+                    aria-pressed={on}
+                    aria-label={label}
+                  >
+                    <span className="arcana-face">
+                      <span className="arcana-end maj">{faces.maj}</span>
+                      <span className="arcana-rule" aria-hidden />
+                      <span className="arcana-end min">{faces.min}</span>
+                    </span>
+                  </button>
+                );
               })}
 
             {mode === "rhythm" &&
               Array.from({ length: BAR_STEPS }, (_, step) => {
-                const art = barRhythm[step] ?? "rest";
+                const art = barRhythmRow[step] ?? "rest";
                 const beatNo = Math.floor(step / SUBDIV) + 1;
                 const sub = step % SUBDIV;
                 const subMark = ["1", "e", "&", "a"][sub]!;
@@ -582,7 +666,7 @@ export default function App() {
                   <button
                     key={step}
                     type="button"
-                    className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""}`}
+                    className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""} ${rhyKind === "link" ? "rhy-link" : ""} ${rhyKind === "own" ? "rhy-own" : ""} ${rhyKind === "base" ? "rhy-base" : ""}`}
                     onClick={() => paintRhythm(step)}
                   >
                     <span className="pad-sub">

@@ -14,6 +14,7 @@ alwaysApply: true
 
 # OneSheet Identity
 
+- **write simple play loop** — 빈 차트에 쓰고, 바로 듣고, 루프한다.
 - Teenage Engineering에 영감받은 **기타 악보 편집/재생기**.
 - 장난감처럼 만지고, **바로 들어보는** 한 장 차트.
 - README에는 정체성만 둔다. 기술 나열로 정체성을 희석하지 않는다.

@@ -1,38 +1,42 @@
 # OneSheet 핸드오프
 
-작성 시점: 2026-08-06 · 브랜치 `cursor/strudel-playback-4663`
+작성 시점: 2026-08-06 · 브랜치 `cursor/rhythm-inherit-4663`
+
+철학: **write simple play loop** — 빈 차트에서 쓰고, 바로 듣고, 루프한다.
 
 ---
+
+## 기본값
+
+- 코드 슬롯 **비움** (채우지 않은 칸은 쉼)
+- 메트로놈 **off**, 클릭 gain `0.32`
+
+## 화성 (DEG)
+
+- **위 8**: 근음 도수 I…vii° + ∅ (비우기는 ∅만)
+- 같은 근음 재클릭 → 자주 쓰는 구성음 순회 (maj: 3화음→7→maj7→add2→6→sus4 …)
+- 선택 슬롯의 근음 패드 라벨이 현재 심볼로 갱신
+- **아래**: 근음 기준 **상대도수 축** 1…7 (8칸 중 7)
+- 클릭 = **단 → 장(·완전) → 해제** 순회 — **선택 슬롯만**
+- 장·단 쌍 축 = **아르카나**: 가로선 구분, 역방향=단·정방향=장 (단도 없으면 양면 장도)
+- 패드 임시표는 **♭/♯** (내부 id는 `b`/`#`)
+- 스태프/GRID = 구성음 → 심볼 즉시 반영
+
+## 리듬 상속
+
+- BASE / LINK / OWN
 
 ## MODE
 
 | id | 기본 | 축 |
 |----|------|-----|
-| `strum` | ✅ | 오픈셰이프 + late 쓸기 → GM clean |
-| `piano` | | 오픈셰이프 전음 동시 → `gm_piano` |
-
-docs / arp / gm / block 제거. MODE 칩으로 strum ↔ piano.
-
-### strum
-
-- `stack`/`late`(~8ms), late만큼 clip↓
-- 코드마다 5~6음 (C/Am 오픈은 6번줄 뮤트)
-- 피치별 gain: 저현↓ / 1번줄↑ + `hpf`
-- D=저→고, U=고→저
-
-### piano
-
-- `note("a2,e3,a3,c4,e4")` 동시 타건
-- 차트 리듬·오픈셰이프 공유, late 없음
+| `strum` | ✅ | 오픈셰이프 + late |
+| `piano` | | 전음 동시 |
 
 ## Persist
 
-- 시트 편집본 → `localStorage` (`onesheet.sheet.v1`)
-- 로드 시 normalize (옛 MODE → strum)
-- 서버 동기화는 나중
+- `onesheet.sheet.v3`
 
 ```bash
-npm test
-npm run build
-npm run dev
+npm test && npm run build
 ```

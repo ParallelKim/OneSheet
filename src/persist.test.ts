@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createInitialSheet } from "./sheet";
+import { createInitialSheet, type Articulation } from "./sheet";
 import {
   loadSheetState,
   loadStoredSheet,
@@ -42,7 +42,24 @@ describe("normalizeSheet", () => {
     const sheet = normalizeSheet(null);
     expect(sheet.soundMode).toBe("strum");
     expect(sheet.degrees).toHaveLength(16);
-    expect(sheet.rhythm).toHaveLength(4);
+    expect(sheet.tones).toHaveLength(16);
+    expect(sheet.rhythm).toHaveLength(16);
+    expect(sheet.rhythmOverride).toHaveLength(4);
+  });
+
+  it("tones 없으면 degrees에서 기본 구성음", () => {
+    const sheet = normalizeSheet({
+      bpm: 96,
+      key: "C",
+      degrees: [5, 0, 4, 3],
+      rhythm: createInitialSheet().rhythm,
+      rhythmOverride: [null, null, null, null],
+      gain: 0.55,
+      metro: true,
+      soundMode: "strum",
+    });
+    expect(sheet.tones[0]).toEqual(["1", "b3", "5"]);
+    expect(sheet.tones[1]).toEqual(["1", "3", "5"]);
   });
 
   it("옛 soundMode는 strum으로 내린다", () => {
@@ -58,6 +75,33 @@ describe("normalizeSheet", () => {
       normalizeSheet({ ...createInitialSheet(), soundMode: "piano" }).soundMode,
     ).toBe("piano");
   });
+
+  it("v1 rhythm[][]를 base+상속으로 올린다", () => {
+    const bar = createInitialSheet().rhythm;
+    const sheet = normalizeSheet({
+      ...createInitialSheet(),
+      rhythm: [bar, bar, bar, bar],
+    });
+    expect(sheet.rhythm).toEqual(bar);
+    expect(sheet.rhythmOverride.every((r) => r == null)).toBe(true);
+  });
+
+  it("v1에서 다른 마디는 override로 남긴다", () => {
+    const bar = createInitialSheet().rhythm;
+    const own = [...bar];
+    own[0] = "X" as Articulation;
+    const sheet = normalizeSheet({
+      bpm: 96,
+      key: "C",
+      degrees: createInitialSheet().degrees,
+      rhythm: [bar, own, bar, bar],
+      gain: 0.55,
+      metro: true,
+      soundMode: "strum",
+    });
+    expect(sheet.rhythmOverride[1]?.[0]).toBe("X");
+    expect(sheet.rhythmOverride[2]).toBeNull();
+  });
 });
 
 describe("localStorage sheet cache", () => {
@@ -68,7 +112,9 @@ describe("localStorage sheet cache", () => {
     expect(loaded?.bpm).toBe(110);
     expect(loaded?.key).toBe("G");
     expect(loaded?.metro).toBe(false);
-    expect(localStorage.getItem(SHEET_STORAGE_KEY)).toContain('"v":1');
+    expect(loaded?.rhythm).toHaveLength(16);
+    expect(localStorage.getItem(SHEET_STORAGE_KEY)).toContain('"v":3');
+    expect(loaded?.tones).toHaveLength(16);
   });
 
   it("없으면 초기 시트", () => {
@@ -79,5 +125,17 @@ describe("localStorage sheet cache", () => {
   it("깨진 JSON은 null", () => {
     localStorage.setItem(SHEET_STORAGE_KEY, "{not-json");
     expect(loadStoredSheet()).toBeNull();
+  });
+
+  it("v1 키도 읽는다", () => {
+    const bar = createInitialSheet().rhythm;
+    localStorage.setItem(
+      "onesheet.sheet.v1",
+      JSON.stringify({
+        v: 1,
+        sheet: { ...createInitialSheet(), bpm: 100, rhythm: [bar, bar, bar, bar] },
+      }),
+    );
+    expect(loadStoredSheet()?.bpm).toBe(100);
   });
 });
