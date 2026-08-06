@@ -194,7 +194,8 @@ export default function App() {
 
   const cycleSoundMode = useCallback(() => {
     const soundMode = nextSoundMode(sheetRef.current.soundMode);
-    setStatus(soundModeById(soundMode).blurb);
+    const mode = soundModeById(soundMode);
+    setStatus(mode.source ? `${mode.blurb} · ${mode.source}` : mode.blurb);
     update((prev) => ({ ...prev, soundMode }));
   }, [update]);
 
