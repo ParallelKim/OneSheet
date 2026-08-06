@@ -58,10 +58,41 @@ export default function App() {
   const playingRef = useRef(false);
   const staffRef = useRef<HTMLDivElement>(null);
   const padStageRef = useRef<HTMLDivElement>(null);
+  const padBoardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     sheetRef.current = sheet;
   }, [sheet]);
+
+  /** 패드 실측 → --pad-cell-px / --pad-stride-px (항상 width===height 정원) */
+  useEffect(() => {
+    const board = padBoardRef.current;
+    if (!board) return;
+
+    const syncPadMetrics = () => {
+      const pads = board.querySelectorAll<HTMLElement>(".pad-grid > .pad");
+      const first = pads[0];
+      if (!first) return;
+      const a = first.getBoundingClientRect();
+      if (a.width < 2) return;
+      const cell = a.width;
+      const next = pads[1]?.getBoundingClientRect();
+      const below = pads[BEATS]?.getBoundingClientRect();
+      const strideX = next ? next.left - a.left : cell + 8;
+      const strideY = below ? below.top - a.top : strideX;
+      // 한 프레임에 가로·세로가 어긋나면 스킵 (레이아웃 미완료)
+      if (Math.abs(strideX - strideY) > 1) return;
+      board.style.setProperty("--pad-cell-px", `${cell}px`);
+      board.style.setProperty("--pad-stride-px", `${strideX}px`);
+    };
+
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(syncPadMetrics);
+    });
+    ro.observe(board);
+    requestAnimationFrame(syncPadMetrics);
+    return () => ro.disconnect();
+  }, [mode]);
 
   // Strudel 사이클 → LCD/그리드 재생 커서 CSS 변수
   useEffect(() => {
@@ -372,7 +403,7 @@ export default function App() {
         className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode}`}
         style={{ "--mark-bar": markBar } as CSSProperties}
       >
-        <div className="pad-board">
+        <div className="pad-board" ref={padBoardRef}>
           <div className="pad-back" aria-hidden>
             {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
           </div>

@@ -403,9 +403,9 @@ button {
 .pad-back,
 .pad-play,
 .pad-grid {
-  /* cqw는 축과 무관 → width/height/% top 어디에 써도 같은 길이 */
-  --pad-cell: calc((100cqw - 2 * var(--pad-inset) - 3 * var(--pad-gap)) / 4);
-  --pad-stride: calc(var(--pad-cell) + var(--pad-gap));
+  /* JS ResizeObserver가 --pad-cell-px / --pad-stride-px 를 심음 (정원 보장) */
+  --pad-cell: var(--pad-cell-px, calc((100cqw - 2 * var(--pad-inset) - 3 * var(--pad-gap)) / 4));
+  --pad-stride: var(--pad-stride-px, calc(var(--pad-cell) + var(--pad-gap)));
   position: absolute;
   inset: var(--pad-inset);
 }
@@ -449,9 +449,7 @@ button {
 .pad-play-orb {
   position: absolute;
   width: var(--pad-cell);
-  /* height에 같은 % 변수를 쓰면 비정사각 조상에서 타원 → width만 + aspect-ratio */
-  aspect-ratio: 1;
-  height: auto;
+  height: var(--pad-cell);
   border-radius: 50%;
   border: 2px solid var(--fg);
   background: rgba(255, 255, 255, 0.06);

@@ -31,10 +31,11 @@ let epoch = 0;
 const preloadedBodies = new Set<string>();
 
 /**
- * 코드 보이싱이 닿는 MIDI 대역(약 E2–E5).
+ * 코드 보이싱이 닿는 MIDI 대역(약 C3–E5).
  * 존마다 한 번씩 decode해 첫 히트 로딩을 피한다.
+ * (너무 낮은 음은 일부 기타 프리셋에 zone이 없음)
  */
-const PRELOAD_MIDI = Array.from({ length: 13 }, (_, i) => 40 + i * 3);
+const PRELOAD_MIDI = [48, 52, 55, 60, 64, 67, 72];
 
 export function getLastStrudelCode(): string {
   return lastCode;
