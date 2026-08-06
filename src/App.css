@@ -338,8 +338,17 @@ button {
 
 .tr-icon .tr-metro {
   display: block;
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  overflow: visible;
+}
+
+.tr-metro-ticks {
+  stroke: var(--bg);
+}
+
+.tr-btn.on .tr-metro-ticks {
+  stroke: var(--fg);
 }
 
 .tr-btn.loading .tr-icon {

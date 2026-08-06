@@ -408,22 +408,42 @@ export default function App() {
           aria-label="metronome"
         >
           <span className="tr-icon" aria-hidden>
-            <svg className="tr-metro" viewBox="0 0 16 16" width="14" height="14">
+            <svg
+              className="tr-metro"
+              viewBox="0 0 20 20"
+              width="16"
+              height="16"
+            >
+              {/* 본체 + 받침 */}
               <path
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.35"
-                strokeLinejoin="round"
-                d="M3.1 13.8 8 2.4l4.9 11.4H3.1Z"
+                fill="currentColor"
+                d="M5.2 16.2 8.4 4.1c.15-.55.9-.55 1.05 0L12.8 16.2H5.2Z"
               />
+              <rect
+                fill="currentColor"
+                x="3.6"
+                y="15.4"
+                width="12.8"
+                height="2.1"
+                rx="0.4"
+              />
+              {/* 눈금 — on 상태에선 버튼 배경색으로 */}
               <path
+                className="tr-metro-ticks"
                 fill="none"
-                stroke="currentColor"
-                strokeWidth="1.35"
+                strokeWidth="1"
                 strokeLinecap="round"
-                d="M2.2 13.8h11.6M8 3.6l3.1 6.2"
+                d="M9.2 7.2h1.6M8.7 9.4h2.6M8.2 11.6h3.6"
               />
-              <circle fill="currentColor" cx="11.1" cy="9.8" r="1.2" />
+              {/* 추 — 밖으로 크게 빠져 메트로놈으로 읽히게 */}
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                d="M10 4.2 16.4 11.6"
+              />
+              <circle fill="currentColor" cx="16.4" cy="11.6" r="2.2" />
             </svg>
           </span>
           <span className="tr-label">CLICK</span>
