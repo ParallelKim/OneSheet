@@ -5,8 +5,8 @@ import {
   createInitialSheet,
   cyclesPerSecond,
   holdRun,
-  MUTE_SOUND,
   nextSound,
+  previewSoundCode,
   strumN,
   toStrudel,
   type Articulation,
@@ -37,11 +37,10 @@ describe("holdRun", () => {
 });
 
 describe("nextSound", () => {
-  it("clean → drive → dist → saw → clean", () => {
-    expect(nextSound("clean")).toBe("drive");
-    expect(nextSound("drive")).toBe("dist");
-    expect(nextSound("dist")).toBe("saw");
-    expect(nextSound("saw")).toBe("clean");
+  it("clean → crunch → buzz → clean", () => {
+    expect(nextSound("clean")).toBe("crunch");
+    expect(nextSound("crunch")).toBe("buzz");
+    expect(nextSound("buzz")).toBe("clean");
   });
 });
 
@@ -117,25 +116,43 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain(".voicing()");
     expect(code).toContain('.s("gtr');
     expect(code).not.toContain("sawtooth");
+    expect(code).not.toContain("distort");
   });
 
-  it("X는 뮤트 샘플과 짧은 clip", () => {
+  it("X는 같은 SOUND + 짧은 clip (별도 뮤트 샘플 없음)", () => {
     const sheet = createInitialSheet();
     const bar: Articulation[] = Array.from({ length: 16 }, (_, i) =>
       i % 4 === 0 ? "X" : "hold",
     );
     sheet.rhythm = [bar, bar, bar, bar];
     const code = toStrudel(sheet);
-    expect(code).toContain(MUTE_SOUND);
+    expect(code).toContain('.s("gtr');
+    expect(code).not.toContain("gm_electric_guitar_muted");
     expect(code).toContain("[0,1,2]");
     expect(code).toContain("0.12");
   });
 
-  it("파형 프리셋은 cutoff를 붙인다", () => {
-    const sheet = { ...createInitialSheet(), sound: "saw" as const };
+  it("crunch는 dist 샘플 + distort", () => {
+    const sheet = { ...createInitialSheet(), sound: "crunch" as const };
+    const code = toStrudel(sheet);
+    expect(code).toContain('.s("gtr:2');
+    expect(code).toContain('.distort("2.5:0.35")');
+  });
+
+  it("buzz는 sawtooth + cutoff", () => {
+    const sheet = { ...createInitialSheet(), sound: "buzz" as const };
     const code = toStrudel(sheet);
     expect(code).toContain('.s("sawtooth');
-    expect(code).toContain(".cutoff(1600)");
+    expect(code).toContain(".cutoff(1400)");
+  });
+
+  it("미리듣기는 해당 SOUND의 한 코드 스트럼", () => {
+    const crunch = previewSoundCode("crunch");
+    expect(crunch).toContain('.s("gtr:2")');
+    expect(crunch).toContain(".distort(");
+    const buzz = previewSoundCode("buzz");
+    expect(buzz).toContain("sawtooth");
+    expect(buzz).toContain(".cutoff(1400)");
   });
 
   it("rest 구간은 공격이 없다", () => {

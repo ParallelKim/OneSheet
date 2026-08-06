@@ -24,12 +24,13 @@ export type SheetState = {
 };
 
 /**
- * SOUND 축 — 겹치지 않는 4슬롯.
- * clean/drive/dist = dirt-samples 실기타 WAV (docs `gtr`)
- * saw = 신스 (기타가 아님을 이름만으로 알 수 있게)
- * GM nylon/steel/clean·square/tri 는 톤이 겹치거나 예측 불가 → 제거
+ * SOUND 축 — 겹치지 않는 3슬롯. 이름 = 들릴 소리.
+ * clean  = 맑은 전기 (dirt gtr)
+ * crunch = 찌그러진 전기 (gtr dist + distort)
+ * buzz   = 버징 신스 (sawtooth) — 기타 아님
+ * drive/dist 중간톤·GM nylon/steel·square 는 예측 불가로 제거
  */
-export type SoundId = "clean" | "drive" | "dist" | "saw";
+export type SoundId = "clean" | "crunch" | "buzz";
 
 export type SoundKind = "sample" | "synth";
 
@@ -39,25 +40,28 @@ export type SoundPreset = {
   kind: SoundKind;
   /** .s() 이름 */
   sound: string;
+  /** Strudel .distort("amt:post") — crunch만 */
+  distort?: string;
   cutoff?: number;
 };
 
 export const SOUND_PRESETS: readonly SoundPreset[] = [
   { id: "clean", label: "clean", kind: "sample", sound: "gtr" },
-  { id: "drive", label: "drive", kind: "sample", sound: "gtr:1" },
-  { id: "dist", label: "dist", kind: "sample", sound: "gtr:2" },
   {
-    id: "saw",
-    label: "saw",
+    id: "crunch",
+    label: "crunch",
+    kind: "sample",
+    sound: "gtr:2",
+    distort: "2.5:0.35",
+  },
+  {
+    id: "buzz",
+    label: "buzz",
     kind: "synth",
     sound: "sawtooth",
-    cutoff: 1600,
+    cutoff: 1400,
   },
 ] as const;
-
-/** 뮤트(X) — palm mute 샘플 */
-export const MUTE_SOUND = "gm_electric_guitar_muted";
-export const MUTE_FONT = "0280_Aspirin_sf2_file";
 
 /** @deprecated */
 export type GuitarBodyId = SoundId;
@@ -182,12 +186,31 @@ export function nextBody(current: SoundId): SoundId {
 export function soundById(id: string): SoundPreset {
   const found = SOUND_PRESETS.find((v) => v.id === id);
   if (found) return found;
-  // 구 id 호환
-  if (id === "gtr" || id === "nylon" || id === "steel") {
-    return SOUND_PRESETS[0]!;
-  }
-  if (id === "square" || id === "tri") return SOUND_PRESETS[3]!;
+  // 구 id 호환 → 가장 가까운 슬롯
+  if (id === "gtr" || id === "nylon" || id === "steel") return SOUND_PRESETS[0]!;
+  if (id === "drive" || id === "dist") return SOUND_PRESETS[1]!;
+  if (id === "saw" || id === "square" || id === "tri") return SOUND_PRESETS[2]!;
   return SOUND_PRESETS[0]!;
+}
+
+/** SOUND 칩 탭 시 한 번 튕겨 들을 미리듣기 코드 */
+export function previewSoundCode(id: SoundId): string {
+  const preset = soundById(id);
+  const chain = [
+    `n("[0 1 2 3]")`,
+    `.chord("C")`,
+    `.dict("triads")`,
+    `.mode("above:c3")`,
+    `.voicing()`,
+    `.s("${preset.sound}")`,
+    `.gain(0.5)`,
+    `.clip(0.85)`,
+  ];
+  if (preset.distort) chain.push(`.distort("${preset.distort}")`);
+  if (preset.kind === "synth" && preset.cutoff != null) {
+    chain.push(`.cutoff(${preset.cutoff})`);
+  }
+  return `setcps(1)\n${chain.join("")}`;
 }
 
 /** @deprecated soundById */
@@ -378,9 +401,8 @@ function timedSound(events: TimedEvent[], preset: SoundPreset): string {
   return events
     .map((e) => {
       if (!e.chord) return e.steps === 1 ? "~" : `~@${e.steps}`;
-      // X: font/sample은 뮤트 샘플, synth는 같은 파형+짧은 clip
-      const s =
-        e.art === "X" && preset.kind !== "synth" ? MUTE_SOUND : preset.sound;
+      // X도 같은 SOUND — 짧은 clip으로만 뮤트 (별도 샘플 = 예측 불가)
+      const s = preset.sound;
       return e.steps === 1 ? s : `${s}@${e.steps}`;
     })
     .join(" ");
@@ -399,7 +421,7 @@ function timedClip(events: TimedEvent[]): string {
 
 /**
  * SheetState → Strudel 코드.
- * 유저/공식 예제: note/voicing + .s("gtr"|gm_electric_guitar_clean) + mode above:c3
+ * note/voicing + .s(gtr|sawtooth) + mode above:c3 (+ crunch distort)
  */
 export function toStrudel(sheet: SheetState): string {
   const parts = compileSheet(sheet);
@@ -417,6 +439,9 @@ export function toStrudel(sheet: SheetState): string {
       `.gain("${timedGain(parts.events)}")`,
       `.clip("${timedClip(parts.events)}")`,
     ];
+    if (preset.distort) {
+      chain.push(`.distort("${preset.distort}")`);
+    }
     if (preset.kind === "synth" && preset.cutoff != null) {
       chain.push(`.cutoff(${preset.cutoff})`);
     }

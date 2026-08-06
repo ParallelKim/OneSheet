@@ -10,16 +10,3 @@ declare module '@strudel/web' {
     options?: Record<string, unknown>,
   ): Promise<void>
 }
-
-
-declare module '@strudel/soundfonts' {
-  export function registerSoundfonts(): void
-  export function loadSoundfont(url: string): Promise<unknown>
-  export function setSoundfontUrl(url: string): void
-  export function getFontBufferSource(
-    font: string,
-    hap: { note?: string | number; freq?: number },
-    ctx: AudioContext,
-  ): Promise<AudioBufferSourceNode>
-}
-

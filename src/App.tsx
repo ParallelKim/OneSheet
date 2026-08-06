@@ -31,6 +31,7 @@ import {
   hushStrudel,
   initStrudelEngine,
   isEngineReady,
+  previewSound,
   warmOnGesture,
 } from "./engine";
 import { getAudioContext } from "@strudel/web";
@@ -241,11 +242,11 @@ export default function App() {
   }, []);
 
   const cycleSound = useCallback(() => {
-    update((prev) => {
-      const sound = nextSound(prev.sound);
-      void warmOnGesture(sound);
-      return { ...prev, sound };
-    });
+    const sound = nextSound(sheetRef.current.sound);
+    void warmOnGesture(sound);
+    update((prev) => ({ ...prev, sound }));
+    // 정지 중이면 한 번 튕겨서 어떤 소리인지 바로 듣는다
+    if (!playingRef.current) previewSound(sound);
   }, [update]);
 
   const onStop = useCallback(() => {

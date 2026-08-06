@@ -16,21 +16,24 @@ base `main` · PR3 (재생 파이프라인)
 ```
 SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
   degrees[]      64스텝 시퀀스      setcps+n+chord   @strudel/web
-  rhythm[][]     art/clip/gain      .dict.triads     + soundfonts
+  rhythm[][]     art/clip/gain      .dict.triads
   bpm/metro                         .voicing()
-                                    GM guitar s()
+                                    dirt gtr / buzz
 ```
 
 | 파일 | 역할 |
 |------|------|
 | `src/sheet.ts` | 모델 · `compileSheet` · `toStrudel` · 스트럼 n |
-| `src/engine.ts` | init(+registerSoundfonts) / evaluate 큐 / hush |
+| `src/engine.ts` | init / evaluate 큐 / hush / SOUND 미리듣기 |
 | `src/sheet.test.ts` | 변환 단위 테스트 |
 
 - dim 코드 심볼은 `Bo` (`dim` 아님) — triads 딕셔너리
-- 음색: SOUND 4슬롯 — **clean / drive / dist / saw** (이름=소리)
-  - clean·drive·dist = dirt-samples gtr WAV
-  - saw = 신스 (기타 아님)
+- 음색: SOUND 3슬롯 — **clean / crunch / buzz** (이름=소리)
+  - clean = dirt-samples gtr (맑은 전기)
+  - crunch = gtr:2 + distort (찌그러진 전기)
+  - buzz = sawtooth (버징 신스 · 기타 아님)
+  - SOUND 칩 탭 시(정지 중) 한 번 튕겨 미리듣기
+  - X 뮤트는 같은 SOUND + 짧은 clip (별도 GM 없음)
   - `.mode("above:c3")`, 메트로=약한 triangle
 - 주법: D/U/X 스트럼
 - 프리로드: 마운트 엔진 + 첫 pointerdown. Play 비차단

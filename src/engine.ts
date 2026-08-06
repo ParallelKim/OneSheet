@@ -1,4 +1,3 @@
-import { getFontBufferSource, registerSoundfonts } from "@strudel/soundfonts";
 import {
   evaluate,
   getAudioContext,
@@ -7,7 +6,7 @@ import {
   initStrudel,
   samples,
 } from "@strudel/web";
-import { MUTE_FONT, type SoundId } from "./sheet";
+import { previewSoundCode, type SoundId } from "./sheet";
 
 /** initStrudel 반환 타입이 느슨해서 scheduler만 느슨히 잡는다 */
 // deno-lint-ignore no-explicit-any
@@ -27,10 +26,9 @@ let epoch = 0;
 let warmPromise: Promise<void> | null = null;
 let gestureWarmed = false;
 let dirtGtrLoaded = false;
-let muteWarmed = false;
 
-/** 뮤트 폰트 대표 존 */
-const PRELOAD_MIDI = [55, 60, 67];
+/** SOUND 미리듣기 세대 — 연속 탭 시 이전 타이머 무효화 */
+let previewGen = 0;
 
 /** dirt-samples 실기타 WAV (strudel docs 예제와 동일) */
 const DIRT_GTR = {
@@ -118,8 +116,6 @@ export async function initStrudelEngine(): Promise<Repl> {
   if (!boot) {
     boot = initStrudel({
       prebake: async () => {
-        // X 뮤트용 GM + gtr 샘플 맵
-        registerSoundfonts();
         await loadDirtGtr();
       },
     })
@@ -136,24 +132,9 @@ export async function initStrudelEngine(): Promise<Repl> {
   return boot;
 }
 
-async function warmMuteFont(ctx: AudioContext): Promise<void> {
-  if (muteWarmed) return;
-  await Promise.all(
-    PRELOAD_MIDI.map((midi) =>
-      getFontBufferSource(MUTE_FONT, { note: midi }, ctx).catch(
-        (err: unknown) => {
-          console.warn("mute font preload", midi, err);
-          return null;
-        },
-      ),
-    ),
-  );
-  muteWarmed = true;
-}
-
 /**
  * 첫 포인터 제스처에서 호출.
- * 오디오 unlock + gtr/mute 워밍. Play를 막지 않는다.
+ * 오디오 unlock + gtr 워밍. Play를 막지 않는다.
  */
 export function warmOnGesture(_preferred?: SoundId): Promise<void> {
   if (warmPromise) return warmPromise;
@@ -161,9 +142,7 @@ export function warmOnGesture(_preferred?: SoundId): Promise<void> {
     await initStrudelEngine();
     await ensureAudioRunning();
     gestureWarmed = true;
-    const ctx = getAudioContext() as AudioContext;
     await loadDirtGtr();
-    await warmMuteFont(ctx);
   })().catch((err) => {
     console.warn("warmOnGesture failed", err);
     warmPromise = null;
@@ -181,12 +160,48 @@ export async function preloadGuitarSamples(
 }
 
 /**
+ * SOUND 칩 탭 미리듣기 (정지 중만 호출).
+ * 짧은 C 스트럼 후 hush. 연속 탭·Play가 오면 세대/epoch로 무효화.
+ */
+export function previewSound(id: SoundId): void {
+  const my = ++previewGen;
+  const code = previewSoundCode(id);
+  void (async () => {
+    try {
+      await warmOnGesture(id);
+      if (my !== previewGen) return;
+      await ensureAudioRunning();
+      if (my !== previewGen) return;
+      lastCode = code;
+      await evaluate(code);
+      await new Promise((r) => setTimeout(r, 700));
+      if (my !== previewGen) return;
+      // Play가 이미 잡았으면 epoch가 바뀌었을 수 있음 — hush는 재생을 끊지 않게 epoch 확인
+      // preview는 epoch를 올리지 않으므로, 재생 중이 아닐 때만 hush
+      try {
+        hush();
+      } catch {
+        /* ignore */
+      }
+    } catch (err) {
+      console.warn("previewSound failed", err);
+    }
+  })();
+}
+
+/** 미리듣기 취소 (Play/Stop 시) */
+export function cancelPreview(): void {
+  previewGen += 1;
+}
+
+/**
  * Strudel 코드 평가·재생.
  * @returns 이 호출이 여전히 유효한 재생인지 (정지 레이스면 false)
  */
 export async function evaluateStrudel(code: string): Promise<boolean> {
   const my = epoch;
   lastCode = code;
+  cancelPreview();
 
   const run = async (): Promise<boolean> => {
     if (my !== epoch) return false;
@@ -217,6 +232,7 @@ export async function evaluateStrudel(code: string): Promise<boolean> {
 /** 재생 중지. 진행 중/대기 중 evaluate는 epoch로 무효화된다. */
 export function hushStrudel(): void {
   epoch += 1;
+  cancelPreview();
   try {
     hush();
   } catch (err) {
