@@ -576,6 +576,10 @@ export default function App() {
               Array.from({ length: SLOTS }, (_, i) => {
                 if (i < 7) {
                   const meta = DEGREE_META[i]!;
+                  const labelTones =
+                    currentDegree === i
+                      ? (sheet.tones[selected] ?? defaultTonesForDegree(i))
+                      : defaultTonesForDegree(i);
                   return (
                     <button
                       key={meta.roman}
@@ -585,7 +589,7 @@ export default function App() {
                     >
                       <span className="pad-label">{meta.roman}</span>
                       <span className="pad-roman">
-                        {slotLabel(sheet.key, i, defaultTonesForDegree(i))}
+                        {slotLabel(sheet.key, i, labelTones)}
                       </span>
                     </button>
                   );

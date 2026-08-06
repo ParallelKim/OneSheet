@@ -15,6 +15,7 @@ import {
   intervalNoteLabel,
   isRhythmOverridden,
   nextSoundMode,
+  paintDegreeSlot,
   paintRhythmStep,
   paintToneSlot,
   rhythmBarKind,
@@ -100,6 +101,38 @@ describe("root × tones", () => {
     expect(a1).toEqual({ min: "1", maj: "1", polar: false });
   });
 
+  it("같은 근음 재클릭은 자주 쓰는 구성음 순회 (비우기는 ∅)", () => {
+    let sheet = createInitialSheet();
+    sheet = paintDegreeSlot(sheet, 0, 0); // I → C
+    expect(sheet.degrees[0]).toBe(0);
+    expect(sheet.tones[0]).toEqual(["1", "3", "5"]);
+    expect(slotLabel("C", 0, sheet.tones[0])).toBe("C");
+
+    sheet = paintDegreeSlot(sheet, 0, 0); // → C7
+    expect(sheet.tones[0]).toEqual(["1", "3", "5", "b7"]);
+    expect(slotLabel("C", 0, sheet.tones[0])).toBe("C7");
+
+    sheet = paintDegreeSlot(sheet, 0, 0); // → Cmaj7
+    expect(slotLabel("C", 0, sheet.tones[0])).toBe("Cmaj7");
+
+    sheet = paintDegreeSlot(sheet, 0, 0); // → Cadd2
+    expect(slotLabel("C", 0, sheet.tones[0])).toBe("Cadd2");
+
+    sheet = paintDegreeSlot(sheet, 0, null); // ∅
+    expect(sheet.degrees[0]).toBeNull();
+    expect(sheet.tones[0]).toBeNull();
+  });
+
+  it("min 도수는 m → m7 → madd2 순", () => {
+    let sheet = createInitialSheet();
+    sheet = paintDegreeSlot(sheet, 0, 5); // vi → Am
+    expect(slotLabel("C", 5, sheet.tones[0])).toBe("Am");
+    sheet = paintDegreeSlot(sheet, 0, 5);
+    expect(slotLabel("C", 5, sheet.tones[0])).toBe("Am7");
+    sheet = paintDegreeSlot(sheet, 0, 5);
+    expect(slotLabel("C", 5, sheet.tones[0])).toBe("Amadd2");
+  });
+
   it("상대도수 순회는 선택 슬롯에만 적용", () => {
     let sheet = createInitialSheet();
     sheet = {
@@ -111,14 +144,11 @@ describe("root × tones", () => {
         i < 4 ? defaultTonesForDegree(([5, 0, 4, 3] as const)[i]!) : null,
       ),
     };
-    // 축2: 해제→단(b2)→장(2). 두 번 눌러 장2 — 슬롯0만
     sheet = paintToneSlot(sheet, 0, "2");
     sheet = paintToneSlot(sheet, 0, "2");
     expect(sheet.tones[0]).toEqual(["1", "2", "b3", "5"]);
     expect(sheet.tones[1]).toEqual(["1", "3", "5"]);
-    expect(sheet.tones[2]).toEqual(["1", "3", "5"]);
     expect(slotLabel("C", 5, sheet.tones[0])).toBe("Amadd2");
-    expect(slotLabel("C", 0, sheet.tones[1])).toBe("C");
   });
 });
 

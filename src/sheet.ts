@@ -351,6 +351,42 @@ export function defaultTonesForDegree(degree: number): ToneSet {
   return TONES_MAJ;
 }
 
+/** 자주 쓰는 구성음 프리셋 (도수 퀄리티별, 사용 빈도순) */
+const PRESETS_MAJ: readonly ToneSet[] = [
+  TONES_MAJ,
+  ["1", "3", "5", "b7"],
+  ["1", "3", "5", "7"],
+  ["1", "2", "3", "5"],
+  ["1", "3", "5", "6"],
+  ["1", "4", "5"],
+];
+
+const PRESETS_MIN: readonly ToneSet[] = [
+  TONES_MIN,
+  ["1", "b3", "5", "b7"],
+  ["1", "2", "b3", "5"],
+  ["1", "b3", "5", "6"],
+];
+
+const PRESETS_DIM: readonly ToneSet[] = [
+  TONES_DIM,
+  ["1", "b3", "b5", "b7"],
+];
+
+export function degreeTonePresets(degree: number): readonly ToneSet[] {
+  const q = DEGREE_META[degree]?.quality ?? "maj";
+  if (q === "min") return PRESETS_MIN;
+  if (q === "dim") return PRESETS_DIM;
+  return PRESETS_MAJ;
+}
+
+/** 같은 근음 재클릭용 — 다음 자주 쓰는 구성음 */
+export function cycleDegreeTones(degree: number, current: ToneSet): ToneSet {
+  const presets = degreeTonePresets(degree);
+  const idx = presets.findIndex((p) => artsToneEqual(p, current));
+  return [...presets[(idx + 1) % presets.length]!] as ChordInterval[];
+}
+
 const QUARTER_DOWN: Articulation[] = ["D", "hold", "hold", "hold"];
 
 function defaultBarRhythm(): Articulation[] {
@@ -644,7 +680,7 @@ export function toggleChordTone(
   return setToneAxisStep(tones, axis, interval);
 }
 
-/** 도수 칠하기 — 같은 도수면 지움, 아니면 기본 구성음으로 세팅 */
+/** 도수 칠하기 — ∅만 비움. 같은 근음 재클릭은 자주 쓰는 구성음 순회 */
 export function paintDegreeSlot(
   sheet: SheetState,
   slot: number,
@@ -656,8 +692,8 @@ export function paintDegreeSlot(
     degrees[slot] = null;
     tones[slot] = null;
   } else if (degrees[slot] === degree) {
-    degrees[slot] = null;
-    tones[slot] = null;
+    const cur = tones[slot] ?? defaultTonesForDegree(degree);
+    tones[slot] = cycleDegreeTones(degree, cur);
   } else {
     degrees[slot] = degree;
     tones[slot] = defaultTonesForDegree(degree);
