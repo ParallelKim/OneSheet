@@ -135,9 +135,29 @@ describe("rhythm inherit / override", () => {
   });
 });
 
+function loopDegrees(): Array<number | null> {
+  return Array.from({ length: 16 }, (_, i) => [5, 0, 4, 3][i % 4]!);
+}
+
+function sheetWithLoop(): SheetState {
+  const degrees = loopDegrees();
+  return {
+    ...createInitialSheet(),
+    degrees,
+    tones: degrees.map((d) => (d === null ? null : defaultTonesForDegree(d))),
+  };
+}
+
 describe("compileSheet / toStrudel", () => {
-  it("초기 차트는 4분 다운을 @4 이벤트로 만든다", () => {
+  it("초기 시트는 코드 비움·메트로 off", () => {
     const sheet = createInitialSheet();
+    expect(sheet.degrees.every((d) => d === null)).toBe(true);
+    expect(sheet.metro).toBe(false);
+    expect(compileSheet(sheet).hasHits).toBe(false);
+  });
+
+  it("루프 차트는 4분 다운을 @4 이벤트로 만든다", () => {
+    const sheet = sheetWithLoop();
     const parts = compileSheet(sheet);
     expect(parts.totalSteps).toBe(64);
     expect(parts.hasHits).toBe(true);
@@ -147,7 +167,7 @@ describe("compileSheet / toStrudel", () => {
   });
 
   it("D·U· 패턴은 박마다 공격 2개(@2) — 상속으로 전 마디", () => {
-    const sheet = { ...createInitialSheet(), rhythm: duPattern() };
+    const sheet = { ...sheetWithLoop(), rhythm: duPattern() };
     const parts = compileSheet(sheet);
     const hits = parts.events.filter((e) => e.chord !== null);
     expect(hits).toHaveLength(32);
@@ -155,8 +175,7 @@ describe("compileSheet / toStrudel", () => {
   });
 
   it("override 마디만 다른 리듬으로 컴파일", () => {
-    let sheet = createInitialSheet();
-    // bar1만 전부 rest → 그 마디 공격 없음 (degree는 있음)
+    let sheet = sheetWithLoop();
     const restBar = Array.from({ length: 16 }, () => "rest" as Articulation);
     sheet = {
       ...sheet,
@@ -164,7 +183,6 @@ describe("compileSheet / toStrudel", () => {
     };
     const parts = compileSheet(sheet);
     const hits = parts.events.filter((e) => e.chord !== null);
-    // 기본 4분 다운 × 3마디 = 12 (bar1 제외)
     expect(hits).toHaveLength(12);
   });
 
@@ -189,6 +207,7 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain("setcps(");
     expect(code).toContain('note("c6 a5 a5 a5');
     expect(code).toContain('.s("triangle")');
+    expect(code).toContain(".gain(0.32)");
     expect(code).not.toContain("chord(");
   });
 
@@ -203,7 +222,7 @@ describe("compileSheet / toStrudel", () => {
   });
 
   it("strum은 note+late 오픈셰이프·GM clean·차트 리듬", () => {
-    const sheet = { ...createInitialSheet(), rhythm: duPattern() };
+    const sheet = { ...sheetWithLoop(), rhythm: duPattern() };
     const code = toStrudel({ ...sheet, soundMode: "strum" });
     expect(code).toMatch(/^setcps\(/);
     expect(code).toContain("a2@2");
@@ -224,7 +243,7 @@ describe("compileSheet / toStrudel", () => {
   });
 
   it("piano는 오픈셰이프 전음 동시·gm_piano·late 없음", () => {
-    const sheet = createInitialSheet();
+    const sheet = sheetWithLoop();
     const code = toStrudel({ ...sheet, soundMode: "piano", metro: false });
     expect(code).toMatch(/^setcps\(/);
     expect(code).toContain("a2,e3,a3,c4,e4@4");

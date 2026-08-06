@@ -314,10 +314,6 @@ export function defaultTonesForDegree(degree: number): ToneSet {
   return TONES_MAJ;
 }
 
-function tonesFromDegrees(degrees: Array<number | null>): Array<ToneSet | null> {
-  return degrees.map((d) => (d === null ? null : defaultTonesForDegree(d)));
-}
-
 const QUARTER_DOWN: Articulation[] = ["D", "hold", "hold", "hold"];
 
 function defaultBarRhythm(): Articulation[] {
@@ -336,21 +332,16 @@ function artsEqual(a: Articulation[], b: Articulation[]): boolean {
   return true;
 }
 
-function repeatBar(bar: Array<number | null>): Array<number | null> {
-  return Array.from({ length: SLOTS }, (_, i) => bar[i % BEATS] ?? null);
-}
-
 export function createInitialSheet(): SheetState {
-  const degrees = repeatBar([5, 0, 4, 3]);
   return {
     bpm: 96,
     key: "C",
-    degrees,
-    tones: tonesFromDegrees(degrees),
+    degrees: Array.from({ length: SLOTS }, () => null),
+    tones: Array.from({ length: SLOTS }, () => null),
     rhythm: defaultBarRhythm(),
     rhythmOverride: emptyOverrides(),
     gain: 0.55,
-    metro: true,
+    metro: false,
     soundMode: "strum",
   };
 }
@@ -721,7 +712,7 @@ function metroLayer(): string {
   const clicks = Array.from({ length: SLOTS }, (_, i) =>
     i % BEATS === 0 ? "c6" : "a5",
   ).join(" ");
-  return `note("${clicks}").s("triangle").gain(0.12).clip(0.03).cutoff(6000)`;
+  return `note("${clicks}").s("triangle").gain(0.32).clip(0.045).cutoff(6000)`;
 }
 
 function stackBody(layers: string[]): string {
