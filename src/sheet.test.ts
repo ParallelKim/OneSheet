@@ -14,6 +14,7 @@ import {
   isRhythmOverridden,
   nextSoundMode,
   paintRhythmStep,
+  paintToneSlot,
   rhythmBarKind,
   rhythmFromLegacyBars,
   slotLabel,
@@ -71,6 +72,35 @@ describe("root × tones", () => {
   it("3↔b3 토글은 배타", () => {
     const next = toggleChordTone(["1", "3", "5"], "b3");
     expect(next).toEqual(["1", "b3", "5"]);
+  });
+
+  it("2 켜면 add2 / madd2", () => {
+    expect(chordSymbolFromParts("A", ["1", "2", "b3", "5"])).toBe("Amadd2");
+    expect(chordSymbolFromParts("C", ["1", "2", "3", "5"])).toBe("Cadd2");
+    expect(chordSymbolFromParts("G", ["1", "2", "5"])).toBe("Gsus2");
+    expect(chordSymbolFromParts("G", ["1", "2", "3", "5", "b7"])).toBe("G9");
+  });
+
+  it("구성음 토글은 채워진 슬롯 전부에 거울", () => {
+    let sheet = createInitialSheet();
+    sheet = {
+      ...sheet,
+      degrees: Array.from({ length: 16 }, (_, i) =>
+        i < 4 ? ([5, 0, 4, 3] as const)[i]! : null,
+      ),
+      tones: Array.from({ length: 16 }, (_, i) =>
+        i < 4 ? defaultTonesForDegree(([5, 0, 4, 3] as const)[i]!) : null,
+      ),
+    };
+    sheet = paintToneSlot(sheet, 0, "2");
+    expect(sheet.tones.slice(0, 4)).toEqual([
+      ["1", "2", "b3", "5"],
+      ["1", "2", "3", "5"],
+      ["1", "2", "3", "5"],
+      ["1", "2", "3", "5"],
+    ]);
+    expect(slotLabel("C", 5, sheet.tones[0])).toBe("Amadd2");
+    expect(slotLabel("C", 0, sheet.tones[1])).toBe("Cadd2");
   });
 });
 

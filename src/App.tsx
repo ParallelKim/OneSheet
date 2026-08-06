@@ -7,7 +7,7 @@ import {
   BEATS,
   BARS,
   BAR_STEPS,
-  CHORD_INTERVALS,
+  TONE_PADS,
   clearRhythmOverride,
   defaultTonesForDegree,
   DEGREE_META,
@@ -601,7 +601,7 @@ export default function App() {
                     </button>
                   );
                 }
-                const interval = CHORD_INTERVALS[i - 8]!;
+                const interval = TONE_PADS[i - 8]!;
                 const rootDeg = currentDegree;
                 if (rootDeg === null) {
                   return (

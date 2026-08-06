@@ -54,8 +54,10 @@ export type SheetState = {
 };
 
 /** DEG 하위 8칸 — 근음 기준 구성음 */
+/** 저장·심볼·재생용 전체 간격 (dim의 b5 포함) */
 export const CHORD_INTERVALS = [
   "1",
+  "2",
   "b3",
   "3",
   "4",
@@ -65,11 +67,28 @@ export const CHORD_INTERVALS = [
   "7",
 ] as const;
 
+/**
+ * DEG 하단 8패드.
+ * add2(2)를 넣고, b5는 vii° 기본값으로만 둔다 (패드 자리 없음).
+ */
+export const TONE_PADS = [
+  "1",
+  "2",
+  "b3",
+  "3",
+  "4",
+  "5",
+  "b7",
+  "7",
+] as const;
+
 export type ChordInterval = (typeof CHORD_INTERVALS)[number];
+export type TonePadInterval = (typeof TONE_PADS)[number];
 export type ToneSet = readonly ChordInterval[];
 
 const INTERVAL_ST: Record<ChordInterval, number> = {
   "1": 0,
+  "2": 2,
   b3: 3,
   "3": 4,
   "4": 5,
@@ -239,6 +258,13 @@ function decodeChordToTones(sym: string): { root: string; tones: ToneSet } {
   if (suf === "maj7") return { root, tones: ["1", "3", "5", "7"] };
   if (suf === "sus4") return { root, tones: ["1", "4", "5"] };
   if (suf === "7sus4") return { root, tones: ["1", "4", "5", "b7"] };
+  if (suf === "sus2") return { root, tones: ["1", "2", "5"] };
+  if (suf === "7sus2") return { root, tones: ["1", "2", "5", "b7"] };
+  if (suf === "add2" || suf === "add9") return { root, tones: ["1", "2", "3", "5"] };
+  if (suf === "madd2" || suf === "madd9") return { root, tones: ["1", "2", "b3", "5"] };
+  if (suf === "9") return { root, tones: ["1", "2", "3", "5", "b7"] };
+  if (suf === "m9") return { root, tones: ["1", "2", "b3", "5", "b7"] };
+  if (suf === "maj9") return { root, tones: ["1", "2", "3", "5", "7"] };
   if (suf === "5") return { root, tones: ["1", "5"] };
   if (suf === "ø" || suf === "m7b5") return { root, tones: ["1", "b3", "b5", "b7"] };
   if (suf === "mMaj7") return { root, tones: ["1", "b3", "5", "7"] };
@@ -374,31 +400,44 @@ function normTones(tones: ToneSet): ChordInterval[] {
 
 /**
  * 구성음 → 코드 심볼 (오픈셰이프 룩업·표시용).
- * 1·3·5 = G / 1·b3·5 = Gm / 1·b3·b5 = Go / +b7 = 7 …
+ * 1·3·5 = G / +2 = add2 / 1·2·5 = sus2 / +b7 = 7·9 …
  */
 export function chordSymbolFromParts(root: string, tones: ToneSet): string {
   const t = new Set(normTones(tones));
-  const third = t.has("3") ? "maj" : t.has("b3") ? "min" : t.has("4") ? "sus" : "no3";
+  const has2 = t.has("2");
+  const third = t.has("3")
+    ? "maj"
+    : t.has("b3")
+      ? "min"
+      : t.has("4")
+        ? "sus4"
+        : has2
+          ? "sus2"
+          : "no3";
   const fifth = t.has("5") ? "p" : t.has("b5") ? "dim5" : "no5";
   const sev = t.has("7") ? "maj7" : t.has("b7") ? "7" : null;
 
-  if (third === "sus") {
+  if (third === "sus4") {
     if (sev === "7") return `${root}7sus4`;
     return `${root}sus4`;
+  }
+  if (third === "sus2") {
+    if (sev === "7") return `${root}7sus2`;
+    return `${root}sus2`;
   }
   if (third === "min" && fifth === "dim5") {
     return sev === "7" ? `${root}ø` : `${root}o`;
   }
   if (third === "min") {
-    if (sev === "7") return `${root}m7`;
-    if (sev === "maj7") return `${root}mMaj7`;
-    return `${root}m`;
+    if (sev === "7") return has2 ? `${root}m9` : `${root}m7`;
+    if (sev === "maj7") return has2 ? `${root}mMaj9` : `${root}mMaj7`;
+    return has2 ? `${root}madd2` : `${root}m`;
   }
   if (third === "maj") {
-    if (sev === "7") return `${root}7`;
-    if (sev === "maj7") return `${root}maj7`;
+    if (sev === "7") return has2 ? `${root}9` : `${root}7`;
+    if (sev === "maj7") return has2 ? `${root}maj9` : `${root}maj7`;
     if (fifth === "dim5") return `${root}b5`;
-    return root;
+    return has2 ? `${root}add2` : root;
   }
   // no3
   if (t.has("5") || t.has("b5")) return `${root}5`;
@@ -464,6 +503,40 @@ export function tonesInclude(tones: ToneSet | null, interval: ChordInterval): bo
   return tones != null && hasTone(tones, interval);
 }
 
+function applyIntervalExclusivity(
+  set: Set<ChordInterval>,
+  interval: ChordInterval,
+): void {
+  if (interval === "3") set.delete("b3");
+  if (interval === "b3") set.delete("3");
+  if (interval === "5") set.delete("b5");
+  if (interval === "b5") set.delete("5");
+  if (interval === "7") set.delete("b7");
+  if (interval === "b7") set.delete("7");
+}
+
+/** 간격 on/off 고정 (토글이 아님). 근음(1) off는 무시. */
+export function setChordTone(
+  tones: ToneSet,
+  interval: ChordInterval,
+  on: boolean,
+): ToneSet {
+  if (interval === "1") {
+    const n = normTones(tones);
+    return n.length ? n : ["1"];
+  }
+  const set = new Set(normTones(tones));
+  if (!set.has("1")) set.add("1");
+  if (on) {
+    set.add(interval);
+    applyIntervalExclusivity(set, interval);
+  } else {
+    set.delete(interval);
+  }
+  const next = CHORD_INTERVALS.filter((id) => set.has(id));
+  return next.length > 0 ? next : ["1"];
+}
+
 /**
  * 구성음 토글. 근음(1)은 끄면 안 됨 — 끄면 코드 삭제와 같으므로 무시.
  * 3↔b3, 5↔b5, 7↔b7 은 동시에 켜지지 않게 정리.
@@ -472,22 +545,12 @@ export function toggleChordTone(
   tones: ToneSet,
   interval: ChordInterval,
 ): ToneSet {
-  if (interval === "1") return normTones(tones).length ? normTones(tones) : ["1"];
-  const set = new Set(normTones(tones));
-  if (!set.has("1")) set.add("1");
-  if (set.has(interval)) {
-    set.delete(interval);
-  } else {
-    set.add(interval);
-    if (interval === "3") set.delete("b3");
-    if (interval === "b3") set.delete("3");
-    if (interval === "5") set.delete("b5");
-    if (interval === "b5") set.delete("5");
-    if (interval === "7") set.delete("b7");
-    if (interval === "b7") set.delete("7");
+  if (interval === "1") {
+    const n = normTones(tones);
+    return n.length ? n : ["1"];
   }
-  const next = CHORD_INTERVALS.filter((id) => set.has(id));
-  return next.length > 0 ? next : ["1"];
+  const on = !hasTone(tones, interval);
+  return setChordTone(tones, interval, on);
 }
 
 /** 도수 칠하기 — 같은 도수면 지움, 아니면 기본 구성음으로 세팅 */
@@ -511,6 +574,10 @@ export function paintDegreeSlot(
   return { ...sheet, degrees, tones };
 }
 
+/**
+ * 구성음 토글 → 채워진 모든 슬롯에 동일 on/off 적용.
+ * (선택 슬롯 기준 토글 결과를 차트 전체에 거울)
+ */
 export function paintToneSlot(
   sheet: SheetState,
   slot: number,
@@ -519,8 +586,14 @@ export function paintToneSlot(
   const degree = sheet.degrees[slot] ?? null;
   if (degree === null) return sheet;
   const cur = sheet.tones[slot] ?? defaultTonesForDegree(degree);
-  const tones = [...sheet.tones];
-  tones[slot] = toggleChordTone(cur, interval);
+  const nextSelected = toggleChordTone(cur, interval);
+  const wantOn = hasTone(nextSelected, interval);
+  const tones = sheet.tones.map((t, i) => {
+    const d = sheet.degrees[i];
+    if (d === null) return null;
+    const base = t ?? defaultTonesForDegree(d);
+    return setChordTone(base, interval, wantOn);
+  });
   return { ...sheet, tones };
 }
 
