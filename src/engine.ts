@@ -1,9 +1,11 @@
+import { registerSoundfonts } from "@strudel/soundfonts";
 import {
   evaluate,
   getAudioContext,
   hush,
   initAudio,
   initStrudel,
+  samples,
 } from "@strudel/web";
 
 /** initStrudel 반환 타입이 느슨해서 scheduler만 느슨히 잡는다 */
@@ -20,6 +22,18 @@ let lastCode = "";
  * 진행 중이던 evaluate가 끝난 뒤 세트가 다르면 즉시 다시 stop.
  */
 let epoch = 0;
+
+let dirtGtrLoaded = false;
+
+/**
+ * dirt-samples gtr — 단일 WAV만.
+ * 다중 WAV면 n(스트럼)이 샘플 인덱스로 겹쳐 깨진다.
+ */
+const DIRT_GTR = {
+  gtr: ["gtr/0001_cleanC.wav"],
+} as const;
+const DIRT_BASE =
+  "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/";
 
 export function getLastStrudelCode(): string {
   return lastCode;
@@ -72,9 +86,22 @@ export function getAudioState(): string {
   }
 }
 
+async function loadDirtGtr(): Promise<void> {
+  if (dirtGtrLoaded) return;
+  await samples({ ...DIRT_GTR }, DIRT_BASE);
+  dirtGtrLoaded = true;
+}
+
 export async function initStrudelEngine(): Promise<Repl> {
   if (!boot) {
-    boot = initStrudel()
+    boot = initStrudel({
+      prebake: async () => {
+        // GM 실험 모드용 — vite alias로 soundMap 단일화 필요
+        registerSoundfonts();
+        // dirt 실험 모드용 — 맵만 등록, 버퍼는 첫 재생 때 lazy
+        await loadDirtGtr();
+      },
+    })
       .then((repl: Repl) => {
         replRef = repl;
         return repl;

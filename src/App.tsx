@@ -9,10 +9,12 @@ import {
   createInitialSheet,
   DEGREE_META,
   nextKey,
+  nextSoundMode,
   setBarArticulation,
   SLOTS,
   slotLabel,
   slotRoman,
+  soundModeById,
   SUBDIV,
   TOTAL_STEPS,
   toStrudel,
@@ -190,6 +192,12 @@ export default function App() {
     [pushPattern],
   );
 
+  const cycleSoundMode = useCallback(() => {
+    const soundMode = nextSoundMode(sheetRef.current.soundMode);
+    setStatus(soundModeById(soundMode).blurb);
+    update((prev) => ({ ...prev, soundMode }));
+  }, [update]);
+
   const onPlay = useCallback(() => {
     const gate = getPlaybackEpoch();
     try {
@@ -296,6 +304,16 @@ export default function App() {
           >
             <span className="chip-k">KEY</span>
             <span className="chip-v">{sheet.key}</span>
+          </button>
+          <button
+            type="button"
+            className="chip"
+            title={soundModeById(sheet.soundMode).blurb}
+            onClick={cycleSoundMode}
+            aria-label="sound mode"
+          >
+            <span className="chip-k">MODE</span>
+            <span className="chip-v">{soundModeById(sheet.soundMode).label}</span>
           </button>
           <label className="chip tempo-chip">
             <span className="chip-k">BPM</span>

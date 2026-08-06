@@ -5,9 +5,12 @@ import {
   createInitialSheet,
   cyclesPerSecond,
   holdRun,
+  nextSoundMode,
+  SOUND_MODES,
   toStrudel,
   type Articulation,
   type SheetState,
+  type SoundModeId,
 } from "./sheet";
 
 describe("chordFromDegree", () => {
@@ -81,8 +84,10 @@ describe("compileSheet / toStrudel", () => {
     expect(code).not.toContain("chord(");
   });
 
-  it("코드는 블록 보이싱·sawtooth·clip으로 지속", () => {
-    const code = toStrudel(createInitialSheet());
+  it("기본은 block — 동시 보이싱·sawtooth·clip", () => {
+    const sheet = createInitialSheet();
+    expect(sheet.soundMode).toBe("block");
+    const code = toStrudel(sheet);
     expect(code).toMatch(/^setcps\(/);
     expect(code).toContain('chord("Am@4');
     expect(code).toContain('.dict("triads")');
@@ -91,6 +96,51 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain(".clip(0.95)");
     expect(code).not.toContain("gm_");
     expect(code).not.toMatch(/\bn\("/);
+  });
+
+  it("실험 모드는 n 스트럼·음색이 갈린다", () => {
+    const cases: Array<{
+      id: SoundModeId;
+      hasN: boolean;
+      sound: string;
+      clip: string;
+    }> = [
+      { id: "block", hasN: false, sound: "sawtooth", clip: "0.95" },
+      { id: "strum-saw", hasN: true, sound: "sawtooth", clip: "2" },
+      {
+        id: "strum-gm",
+        hasN: true,
+        sound: "gm_electric_guitar_clean:5",
+        clip: "2",
+      },
+      { id: "arp-saw", hasN: true, sound: "sawtooth", clip: "1.2" },
+      { id: "dirt", hasN: true, sound: "gtr", clip: "1" },
+    ];
+
+    for (const c of cases) {
+      const code = toStrudel({ ...createInitialSheet(), soundMode: c.id });
+      expect(code).toContain(`.s("${c.sound}")`);
+      expect(code).toContain(`.clip(${c.clip})`);
+      if (c.hasN) {
+        expect(code).toMatch(/\bn\("/);
+        expect(code).toContain("[0 1 2 3]");
+        expect(code).toContain('.mode("above:c3")');
+      } else {
+        expect(code).not.toMatch(/\bn\("/);
+      }
+    }
+  });
+
+  it("MODE 칩은 SOUND_MODES를 순환한다", () => {
+    expect(SOUND_MODES[0]!.id).toBe("block");
+    let id: SoundModeId = "block";
+    const seen = new Set<SoundModeId>();
+    for (let i = 0; i < SOUND_MODES.length; i++) {
+      seen.add(id);
+      id = nextSoundMode(id);
+    }
+    expect(seen.size).toBe(SOUND_MODES.length);
+    expect(id).toBe("block");
   });
 
   it("rest 구간은 공격이 없다", () => {
