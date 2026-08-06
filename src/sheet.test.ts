@@ -6,7 +6,7 @@ import {
   cyclesPerSecond,
   holdRun,
   MUTE_SOUND,
-  nextBody,
+  nextSound,
   strumN,
   toStrudel,
   type Articulation,
@@ -36,11 +36,14 @@ describe("holdRun", () => {
   });
 });
 
-describe("nextBody", () => {
-  it("nylon → steel → clean → nylon", () => {
-    expect(nextBody("nylon")).toBe("steel");
-    expect(nextBody("steel")).toBe("clean");
-    expect(nextBody("clean")).toBe("nylon");
+describe("nextSound", () => {
+  it("steel → nylon → clean → saw → square → tri → steel", () => {
+    expect(nextSound("steel")).toBe("nylon");
+    expect(nextSound("nylon")).toBe("clean");
+    expect(nextSound("clean")).toBe("saw");
+    expect(nextSound("saw")).toBe("square");
+    expect(nextSound("square")).toBe("tri");
+    expect(nextSound("tri")).toBe("steel");
   });
 });
 
@@ -64,10 +67,9 @@ describe("compileSheet / toStrudel", () => {
     expect(parts.totalSteps).toBe(64);
     expect(parts.hasHits).toBe(true);
     expect(parts.cps).toBeCloseTo(cyclesPerSecond(96));
-    // 16박 × D··· → 이벤트 16개, 각 steps=4
     expect(parts.events.filter((e) => e.chord !== null)).toHaveLength(16);
     expect(parts.events.every((e) => e.chord === null || e.steps === 4)).toBe(true);
-    expect(parts.openSound).toBe("gm_acoustic_guitar_steel");
+    expect(parts.preset.id).toBe("clean");
   });
 
   it("D·U· 패턴은 박마다 공격 2개(@2)", () => {
@@ -109,15 +111,15 @@ describe("compileSheet / toStrudel", () => {
     expect(code).not.toContain("chord(");
   });
 
-  it("코드 재생은 스트럼 n·기타 샘플·voicing을 포함한다", () => {
+  it("코드 재생은 스트럼 n·기타 음역·voicing을 포함한다", () => {
     const code = toStrudel(createInitialSheet());
     expect(code).toMatch(/^setcps\(/);
     expect(code).toContain('n("[[0 1 2 3]@1 ~@3]@4');
     expect(code).toContain('chord("Am@4');
     expect(code).toContain('.dict("triads")');
+    expect(code).toContain('.mode("above:c3")');
     expect(code).toContain(".voicing()");
-    expect(code).toContain("gm_acoustic_guitar_steel");
-    expect(code).not.toContain("sawtooth");
+    expect(code).toContain("gm_electric_guitar_clean:5");
     expect(code).toContain('.s("square")');
   });
 
@@ -131,6 +133,13 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain(MUTE_SOUND);
     expect(code).toContain("[0,1,2]");
     expect(code).toContain("0.12");
+  });
+
+  it("파형 프리셋은 cutoff를 붙인다", () => {
+    const sheet = { ...createInitialSheet(), sound: "saw" as const };
+    const code = toStrudel(sheet);
+    expect(code).toContain('.s("sawtooth');
+    expect(code).toContain(".cutoff(1600)");
   });
 
   it("rest 구간은 공격이 없다", () => {

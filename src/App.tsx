@@ -6,15 +6,15 @@ import {
   BEATS,
   BARS,
   BAR_STEPS,
-  bodyById,
   createInitialSheet,
   DEGREE_META,
-  nextBody,
   nextKey,
+  nextSound,
   setBarArticulation,
   SLOTS,
   slotLabel,
   slotRoman,
+  soundById,
   SUBDIV,
   TOTAL_STEPS,
   toStrudel,
@@ -30,7 +30,8 @@ import {
   getPlaybackEpoch,
   hushStrudel,
   initStrudelEngine,
-  preloadGuitarSamples,
+  isEngineReady,
+  warmOnGesture,
 } from "./engine";
 import { getAudioContext } from "@strudel/web";
 import "./App.css";
@@ -68,6 +69,23 @@ export default function App() {
   useEffect(() => {
     sheetRef.current = sheet;
   }, [sheet]);
+
+  // 엔진은 마운트 직후 백그라운드 기동 (Play를 기다리지 않음)
+  useEffect(() => {
+    void initStrudelEngine().catch((err) => console.warn("engine boot", err));
+  }, []);
+
+  // 첫 포인터에서 오디오 unlock + 샘플 워밍 (Play와 분리)
+  useEffect(() => {
+    const onFirstPointer = () => {
+      void warmOnGesture(sheetRef.current.sound);
+    };
+    window.addEventListener("pointerdown", onFirstPointer, {
+      once: true,
+      passive: true,
+    });
+    return () => window.removeEventListener("pointerdown", onFirstPointer);
+  }, []);
 
   /** 패드 실측 → --pad-cell-px / --pad-stride-px (항상 width===height 정원) */
   useEffect(() => {
@@ -175,13 +193,17 @@ export default function App() {
 
   const onPlay = useCallback(() => {
     const gate = getPlaybackEpoch();
-    setEngine("loading");
-    setStatus("");
-    // 클릭 스택에서 즉시 resume 시작 (await 전에 제스처 묶기)
     try {
       void (getAudioContext() as AudioContext).resume();
     } catch {
-      /* 엔진 미기동 시 컨텍스트 없음 → 아래에서 생성 */
+      /* ignore */
+    }
+    void warmOnGesture(sheetRef.current.sound);
+
+    // 샘플 워밍은 Play를 막지 않음. 엔진 미기동일 때만 짧은 LOAD.
+    if (!isEngineReady()) {
+      setEngine("loading");
+      setStatus("");
     }
 
     void (async () => {
@@ -192,16 +214,6 @@ export default function App() {
           return;
         }
         await initStrudelEngine();
-        if (getPlaybackEpoch() !== gate) {
-          setEngine((e) => (e === "error" ? e : "ready"));
-          return;
-        }
-        await preloadGuitarSamples(sheetRef.current.body, gate);
-        if (getPlaybackEpoch() !== gate) {
-          setEngine((e) => (e === "error" ? e : "ready"));
-          return;
-        }
-        await ensureAudioRunning();
         if (getPlaybackEpoch() !== gate) {
           setEngine((e) => (e === "error" ? e : "ready"));
           return;
@@ -228,8 +240,12 @@ export default function App() {
     })();
   }, []);
 
-  const cycleBody = useCallback(() => {
-    update((prev) => ({ ...prev, body: nextBody(prev.body) }));
+  const cycleSound = useCallback(() => {
+    update((prev) => {
+      const sound = nextSound(prev.sound);
+      void warmOnGesture(sound);
+      return { ...prev, sound };
+    });
   }, [update]);
 
   const onStop = useCallback(() => {
@@ -295,11 +311,11 @@ export default function App() {
           <button
             type="button"
             className="chip"
-            onClick={cycleBody}
-            aria-label="sound body"
+            onClick={cycleSound}
+            aria-label="sound"
           >
             <span className="chip-k">SOUND</span>
-            <span className="chip-v">{bodyById(sheet.body).label}</span>
+            <span className="chip-v">{soundById(sheet.sound).label}</span>
           </button>
           <label className="chip tempo-chip">
             <span className="chip-k">BPM</span>

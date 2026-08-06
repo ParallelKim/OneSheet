@@ -17,48 +17,95 @@ export type SheetState = {
   degrees: Array<number | null>;
   /** 4 bars × 16 sixteenths */
   rhythm: Articulation[][];
-  /** 기타 바디 (GM soundfont). 주법(D/U/X)과 축이 다름 */
-  body: GuitarBodyId;
+  /** SOUND 칩 순회 프리셋 */
+  sound: SoundId;
   gain: number;
   metro: boolean;
 };
 
-export type GuitarBodyId = "nylon" | "steel" | "clean";
+/**
+ * SOUND 축: GM 기타(전용 뱅크) + 파형.
+ * strudel recipes는 clean + mode("above:c3")를 기타 예제로 씀.
+ * steel/nylon은 LK 전용 프리셋(:5) — 기본 0번 뱅크는 기타감이 약함.
+ */
+export type SoundId =
+  | "steel"
+  | "nylon"
+  | "clean"
+  | "saw"
+  | "square"
+  | "tri";
 
-/** GM 기타 바디. 파형(신스) 대신 실제 기타 샘플 */
-export const GUITAR_BODIES: readonly {
-  id: GuitarBodyId;
+export type SoundKind = "font" | "synth";
+
+export type SoundPreset = {
+  id: SoundId;
   label: string;
+  kind: SoundKind;
+  /** .s() 에 넣는 이름 (font는 bank 포함 가능) */
   sound: string;
-  /** soundfonts 패키지 기본(n=0) 프리셋 파일명 */
-  font: string;
-}[] = [
-  {
-    id: "nylon",
-    label: "nylon",
-    sound: "gm_acoustic_guitar_nylon",
-    font: "0240_JCLive_sf2_file",
-  },
+  /** soundfont 파일 (프리로드용). synth면 null */
+  font: string | null;
+  cutoff?: number;
+};
+
+export const SOUND_PRESETS: readonly SoundPreset[] = [
   {
     id: "steel",
     label: "steel",
-    sound: "gm_acoustic_guitar_steel",
-    font: "0253_Acoustic_Guitar_sf2_file",
+    kind: "font",
+    sound: "gm_acoustic_guitar_steel:5",
+    font: "0250_LK_AcousticSteel_SF2_file",
+  },
+  {
+    id: "nylon",
+    label: "nylon",
+    kind: "font",
+    sound: "gm_acoustic_guitar_nylon:5",
+    font: "0240_LK_Godin_Nylon_SF2_file",
   },
   {
     id: "clean",
     label: "clean",
-    sound: "gm_electric_guitar_clean",
-    font: "0270_Aspirin_sf2_file",
+    kind: "font",
+    sound: "gm_electric_guitar_clean:5",
+    font: "0270_Stratocaster_sf2_file",
+  },
+  {
+    id: "saw",
+    label: "saw",
+    kind: "synth",
+    sound: "sawtooth",
+    font: null,
+    cutoff: 1600,
+  },
+  {
+    id: "square",
+    label: "square",
+    kind: "synth",
+    sound: "square",
+    font: null,
+    cutoff: 2400,
+  },
+  {
+    id: "tri",
+    label: "tri",
+    kind: "synth",
+    sound: "triangle",
+    font: null,
+    cutoff: 2200,
   },
 ] as const;
 
-/** 뮤트(X) 전용 — palm mute 감 */
-export const MUTE_SOUND = "gm_electric_guitar_muted";
-export const MUTE_FONT = "0280_Aspirin_sf2_file";
+/** 뮤트(X) — LesPaul 뮤트 뱅크 */
+export const MUTE_SOUND = "gm_electric_guitar_muted:4";
+export const MUTE_FONT = "0280_LesPaul_sf2_file";
 
-/** @deprecated VoiceId → GuitarBodyId. 구 상태 호환용 별칭 */
-export type VoiceId = GuitarBodyId;
+/** @deprecated */
+export type GuitarBodyId = SoundId;
+export type VoiceId = SoundId;
+export const GUITAR_BODIES = SOUND_PRESETS;
+
 
 export const BARS = 4;
 export const BEATS = 4;
@@ -122,7 +169,7 @@ export function createInitialSheet(): SheetState {
     key: "C",
     degrees: repeatBar([5, 0, 4, 3]), // vi I V IV
     rhythm: defaultRhythm(),
-    body: "steel",
+    sound: "clean",
     gain: 0.55,
     metro: true,
   };
@@ -163,19 +210,29 @@ export function nextKey(current: string): string {
   return KEY_LIST[((i < 0 ? 0 : i) + 1) % KEY_LIST.length]!;
 }
 
-export function nextBody(current: GuitarBodyId): GuitarBodyId {
-  const i = GUITAR_BODIES.findIndex((b) => b.id === current);
-  const next = GUITAR_BODIES[((i < 0 ? 0 : i) + 1) % GUITAR_BODIES.length]!;
+export function nextSound(current: SoundId): SoundId {
+  const i = SOUND_PRESETS.findIndex((b) => b.id === current);
+  const next = SOUND_PRESETS[((i < 0 ? 0 : i) + 1) % SOUND_PRESETS.length]!;
   return next.id;
 }
 
-export function bodyById(id: GuitarBodyId) {
-  return GUITAR_BODIES.find((v) => v.id === id) ?? GUITAR_BODIES[0]!;
+/** @deprecated nextSound */
+export function nextBody(current: SoundId): SoundId {
+  return nextSound(current);
 }
 
-/** @deprecated bodyById 사용 */
-export function voiceById(id: GuitarBodyId) {
-  return bodyById(id);
+export function soundById(id: SoundId): SoundPreset {
+  return SOUND_PRESETS.find((v) => v.id === id) ?? SOUND_PRESETS[0]!;
+}
+
+/** @deprecated soundById */
+export function bodyById(id: SoundId) {
+  return soundById(id);
+}
+
+/** @deprecated soundById */
+export function voiceById(id: SoundId) {
+  return soundById(id);
 }
 
 export function barIndex(slot: number): number {
@@ -245,12 +302,12 @@ export type StrudelParts = {
   events: TimedEvent[];
   totalSteps: number;
   metro: boolean;
-  openSound: string;
+  preset: SoundPreset;
 };
 
 /** 리듬 그리드를 길이 가중 이벤트로 펼친다 */
 export function compileSheet(sheet: SheetState): StrudelParts {
-  const body = bodyById(sheet.body);
+  const preset = soundById(sheet.sound);
   const events: TimedEvent[] = [];
 
   for (let bar = 0; bar < BARS; bar++) {
@@ -305,7 +362,7 @@ export function compileSheet(sheet: SheetState): StrudelParts {
     events,
     totalSteps,
     metro: sheet.metro,
-    openSound: body.sound,
+    preset,
   };
 }
 
@@ -352,11 +409,13 @@ function timedGain(events: TimedEvent[]): string {
     .join(" ");
 }
 
-function timedSound(events: TimedEvent[], openSound: string): string {
+function timedSound(events: TimedEvent[], preset: SoundPreset): string {
   return events
     .map((e) => {
       if (!e.chord) return e.steps === 1 ? "~" : `~@${e.steps}`;
-      const s = e.art === "X" ? MUTE_SOUND : openSound;
+      // font: X는 뮤트 샘플. synth: 같은 파형 유지(짧은 clip으로 구분)
+      const s =
+        preset.kind === "font" && e.art === "X" ? MUTE_SOUND : preset.sound;
       return e.steps === 1 ? s : `${s}@${e.steps}`;
     })
     .join(" ");
@@ -375,30 +434,33 @@ function timedClip(events: TimedEvent[]): string {
 
 /**
  * SheetState → Strudel 코드.
- * `Am@4 C@4 …` 가중 시퀀스 = 한 사이클(4마디) 안에서 박이 진행된다.
- * n()으로 D/U 스트럼·X 동시타를 붙인다.
+ * 공식 recipes: n().chord().mode("above:c3").voicing().s("gm_electric_guitar_clean")
  */
 export function toStrudel(sheet: SheetState): string {
   const parts = compileSheet(sheet);
   const layers: string[] = [];
+  const preset = parts.preset;
 
   if (parts.hasHits) {
-    layers.push(
-      [
-        `n("${timedN(parts.events)}")`,
-        `.chord("${timedChord(parts.events)}")`,
-        `.dict("triads")`,
-        `.voicing()`,
-        `.s("${timedSound(parts.events, parts.openSound)}")`,
-        `.gain("${timedGain(parts.events)}")`,
-        `.clip("${timedClip(parts.events)}")`,
-      ].join(""),
-    );
+    const chain = [
+      `n("${timedN(parts.events)}")`,
+      `.chord("${timedChord(parts.events)}")`,
+      `.dict("triads")`,
+      // 기타 음역 — 기본 anchor(c5)는 피아노처럼 들림
+      `.mode("above:c3")`,
+      `.voicing()`,
+      `.s("${timedSound(parts.events, preset)}")`,
+      `.gain("${timedGain(parts.events)}")`,
+      `.clip("${timedClip(parts.events)}")`,
+    ];
+    if (preset.kind === "synth" && preset.cutoff != null) {
+      chain.push(`.cutoff(${preset.cutoff})`);
+    }
+    layers.push(chain.join(""));
   }
 
   if (parts.metro) {
     // 4분마다 클릭. 마디 첫 박은 높은 음(강세), 나머지는 낮은 음.
-    // square + 짧은 clip = 코드 레이어 위에서도 들리는 메트로 클릭.
     const clicks = Array.from({ length: SLOTS }, (_, i) =>
       i % BEATS === 0 ? "c6" : "a5",
     ).join(" ");
