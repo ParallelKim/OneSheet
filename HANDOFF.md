@@ -1,6 +1,6 @@
 # OneSheet 핸드오프
 
-작성 시점: 2026-08-05 · 브랜치 `cursor/strudel-playback-4663`  
+작성 시점: 2026-08-06 · 브랜치 `cursor/strudel-playback-4663`  
 base `main` · PR3 (재생 파이프라인)
 
 ---
@@ -15,29 +15,23 @@ base `main` · PR3 (재생 파이프라인)
 
 ```
 SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
-  degrees[]      64스텝 시퀀스      setcps+n+chord   @strudel/web
-  rhythm[][]     art/clip/gain      .dict.triads     + soundfonts
+  degrees[]      64스텝 시퀀스      setcps+chord      @strudel/web
+  rhythm[][]     clip/gain          .dict.triads
   bpm/metro                         .voicing()
-                                    GM guitar s()
+                                    sawtooth (단일)
 ```
 
 | 파일 | 역할 |
 |------|------|
-| `src/sheet.ts` | 모델 · `compileSheet` · `toStrudel` · 스트럼 n |
-| `src/engine.ts` | init(+registerSoundfonts) / evaluate 큐 / hush / 미리듣기 |
+| `src/sheet.ts` | 모델 · `compileSheet` · `toStrudel` |
+| `src/engine.ts` | init / evaluate 큐 / hush · AudioContext resume |
 | `src/sheet.test.ts` | 변환 단위 테스트 |
 
 - dim 코드 심볼은 `Bo` (`dim` 아님) — triads 딕셔너리
-- 음색: SOUND 3슬롯 — **steel / clean / nylon** (GM `:5` 뱅크 고정)
-  - steel=`LK_AcousticSteel`, clean=`Stratocaster`, nylon=`LK_Godin_Nylon`
-  - 뱅크 0(Aspirin 등)은 얇음 → 쓰지 않음. 프리로드 font = 재생 `:n`
-  - X = `gm_electric_guitar_muted:4` (LesPaul) + 짧은 clip
-  - hold(링) = 공격 steps에 포함 + n 패턴 `~` + clip 0.95
-  - `.mode("above:c3")`, 메트로=약한 triangle
-  - SOUND 칩 탭 시(정지 중) 미리듣기
-- 주법: D/U/X 스트럼
-- 프리로드: 마운트 엔진 + 첫 pointerdown. Play 비차단
-- AudioContext: Play pointerdown에서 즉시 resume
+- 음색: **단일 sawtooth** (GM/SOUND 톤 순회·dirt 샘플 보류)
+  - hold = 이벤트 `@길이`로 지속 (고무줄 pluck 아님)
+  - D/U/X는 gain·길이만 (스트럼 n 분리는 보류)
+- AudioContext: Play에서 명시 resume
 - 재생 중 편집 → `evaluateStrudel` 재평가 (직렬 큐)
 - **플레이헤드**: Guitar Pro식 세로 커서(`--play-phase`) + 마디 밴드(`--mark-bar`). 선택은 셀 배경·글자 반전.
 
@@ -50,9 +44,9 @@ npm run dev
 
 ## UI (요약)
 
-LCD: 얇은 한 줄 차트 · transport · 4×4(차트/도수/리듬)  
+LCD: KEY · BPM · transport · 4×4(차트/도수/리듬)  
 리듬 셀: D/U/X/hold/rest
 
 ## 다음
 
-- 조성 UX · 바디(nylon/steel) UI · 아르페지오 프리셋
+- 스트럼(D/U) 설득력 · 조성 UX · 음색은 지속이 되는 축부터

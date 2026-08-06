@@ -9,12 +9,10 @@ import {
   createInitialSheet,
   DEGREE_META,
   nextKey,
-  nextSound,
   setBarArticulation,
   SLOTS,
   slotLabel,
   slotRoman,
-  soundById,
   SUBDIV,
   TOTAL_STEPS,
   toStrudel,
@@ -31,8 +29,6 @@ import {
   hushStrudel,
   initStrudelEngine,
   isEngineReady,
-  previewSound,
-  warmOnGesture,
 } from "./engine";
 import { getAudioContext } from "@strudel/web";
 import "./App.css";
@@ -76,10 +72,12 @@ export default function App() {
     void initStrudelEngine().catch((err) => console.warn("engine boot", err));
   }, []);
 
-  // 첫 포인터에서 오디오 unlock + 샘플 워밍 (Play와 분리)
+  // 첫 포인터에서 오디오 unlock
   useEffect(() => {
     const onFirstPointer = () => {
-      void warmOnGesture(sheetRef.current.sound);
+      void ensureAudioRunning().catch((err) =>
+        console.warn("audio unlock", err),
+      );
     };
     window.addEventListener("pointerdown", onFirstPointer, {
       once: true,
@@ -199,9 +197,7 @@ export default function App() {
     } catch {
       /* ignore */
     }
-    void warmOnGesture(sheetRef.current.sound);
 
-    // 샘플 워밍은 Play를 막지 않음. 엔진 미기동일 때만 짧은 LOAD.
     if (!isEngineReady()) {
       setEngine("loading");
       setStatus("");
@@ -240,14 +236,6 @@ export default function App() {
       }
     })();
   }, []);
-
-  const cycleSound = useCallback(() => {
-    const sound = nextSound(sheetRef.current.sound);
-    void warmOnGesture(sound);
-    update((prev) => ({ ...prev, sound }));
-    // 정지 중이면 한 번 튕겨서 어떤 소리인지 바로 듣는다
-    if (!playingRef.current) previewSound(sound);
-  }, [update]);
 
   const onStop = useCallback(() => {
     hushStrudel();
@@ -308,15 +296,6 @@ export default function App() {
           >
             <span className="chip-k">KEY</span>
             <span className="chip-v">{sheet.key}</span>
-          </button>
-          <button
-            type="button"
-            className="chip"
-            onClick={cycleSound}
-            aria-label="sound"
-          >
-            <span className="chip-k">SOUND</span>
-            <span className="chip-v">{soundById(sheet.sound).label}</span>
           </button>
           <label className="chip tempo-chip">
             <span className="chip-k">BPM</span>
