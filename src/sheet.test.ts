@@ -5,6 +5,7 @@ import {
   createInitialSheet,
   cyclesPerSecond,
   holdRun,
+  MUTE_SOUND,
   nextSound,
   previewSoundCode,
   strumN,
@@ -37,10 +38,10 @@ describe("holdRun", () => {
 });
 
 describe("nextSound", () => {
-  it("clean → crunch → buzz → clean", () => {
-    expect(nextSound("clean")).toBe("crunch");
-    expect(nextSound("crunch")).toBe("buzz");
-    expect(nextSound("buzz")).toBe("clean");
+  it("steel → clean → nylon → steel", () => {
+    expect(nextSound("steel")).toBe("clean");
+    expect(nextSound("clean")).toBe("nylon");
+    expect(nextSound("nylon")).toBe("steel");
   });
 });
 
@@ -58,15 +59,15 @@ describe("strumN", () => {
 });
 
 describe("compileSheet / toStrudel", () => {
-  it("초기 차트는 dirt-samples clean(gtr) 기본", () => {
+  it("초기 차트는 GM steel 기본", () => {
     const sheet = createInitialSheet();
     const parts = compileSheet(sheet);
     expect(parts.totalSteps).toBe(64);
     expect(parts.hasHits).toBe(true);
     expect(parts.cps).toBeCloseTo(cyclesPerSecond(96));
     expect(parts.events.filter((e) => e.chord !== null)).toHaveLength(16);
-    expect(parts.preset.id).toBe("clean");
-    expect(parts.preset.sound).toBe("gtr");
+    expect(parts.preset.id).toBe("steel");
+    expect(parts.preset.sound).toBe("gm_acoustic_guitar_steel");
   });
 
   it("D·U· 패턴은 박마다 공격 2개(@2)", () => {
@@ -106,7 +107,7 @@ describe("compileSheet / toStrudel", () => {
     expect(code).not.toContain("chord(");
   });
 
-  it("코드 재생은 gtr 샘플·기타 음역·voicing을 포함한다", () => {
+  it("코드 재생은 GM steel·기타 음역·voicing을 포함한다", () => {
     const code = toStrudel(createInitialSheet());
     expect(code).toMatch(/^setcps\(/);
     expect(code).toContain('n("[[0 1 2 3]@1 ~@3]@4');
@@ -114,45 +115,48 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain('.dict("triads")');
     expect(code).toContain('.mode("above:c3")');
     expect(code).toContain(".voicing()");
-    expect(code).toContain('.s("gtr');
+    expect(code).toContain("gm_acoustic_guitar_steel");
+    expect(code).not.toContain('.s("gtr');
     expect(code).not.toContain("sawtooth");
-    expect(code).not.toContain("distort");
   });
 
-  it("X는 같은 SOUND + 짧은 clip (별도 뮤트 샘플 없음)", () => {
+  it("X는 뮤트 샘플과 짧은 clip", () => {
     const sheet = createInitialSheet();
     const bar: Articulation[] = Array.from({ length: 16 }, (_, i) =>
       i % 4 === 0 ? "X" : "hold",
     );
     sheet.rhythm = [bar, bar, bar, bar];
     const code = toStrudel(sheet);
-    expect(code).toContain('.s("gtr');
-    expect(code).not.toContain("gm_electric_guitar_muted");
+    expect(code).toContain(MUTE_SOUND);
     expect(code).toContain("[0,1,2]");
     expect(code).toContain("0.12");
   });
 
-  it("crunch는 dist 샘플 + distort", () => {
-    const sheet = { ...createInitialSheet(), sound: "crunch" as const };
+  it("hold 링은 공격 길이에 포함되고 n에 ~ 링이 붙는다", () => {
+    const sheet = createInitialSheet();
+    // 기본 리듬 = D + hold×3 → steps=4, strum [[0 1 2 3]@1 ~@3]@4
+    const parts = compileSheet(sheet);
+    const first = parts.events.find((e) => e.chord !== null);
+    expect(first?.steps).toBe(4);
+    expect(first?.art).toBe("D");
     const code = toStrudel(sheet);
-    expect(code).toContain('.s("gtr:2');
-    expect(code).toContain('.distort("2.5:0.35")');
+    expect(code).toContain("[[0 1 2 3]@1 ~@3]@4");
+    expect(code).toContain("0.95"); // open clip (링)
   });
 
-  it("buzz는 sawtooth + cutoff", () => {
-    const sheet = { ...createInitialSheet(), sound: "buzz" as const };
-    const code = toStrudel(sheet);
-    expect(code).toContain('.s("sawtooth');
-    expect(code).toContain(".cutoff(1400)");
+  it("clean / nylon 프리셋이 GM 심볼을 쓴다", () => {
+    expect(toStrudel({ ...createInitialSheet(), sound: "clean" })).toContain(
+      "gm_electric_guitar_clean",
+    );
+    expect(toStrudel({ ...createInitialSheet(), sound: "nylon" })).toContain(
+      "gm_acoustic_guitar_nylon",
+    );
   });
 
   it("미리듣기는 해당 SOUND의 한 코드 스트럼", () => {
-    const crunch = previewSoundCode("crunch");
-    expect(crunch).toContain('.s("gtr:2")');
-    expect(crunch).toContain(".distort(");
-    const buzz = previewSoundCode("buzz");
-    expect(buzz).toContain("sawtooth");
-    expect(buzz).toContain(".cutoff(1400)");
+    const steel = previewSoundCode("steel");
+    expect(steel).toContain("gm_acoustic_guitar_steel");
+    expect(steel).toContain('n("[0 1 2 3]")');
   });
 
   it("rest 구간은 공격이 없다", () => {

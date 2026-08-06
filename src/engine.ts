@@ -1,12 +1,17 @@
+import { getFontBufferSource, registerSoundfonts } from "@strudel/soundfonts";
 import {
   evaluate,
   getAudioContext,
   hush,
   initAudio,
   initStrudel,
-  samples,
 } from "@strudel/web";
-import { previewSoundCode, type SoundId } from "./sheet";
+import {
+  MUTE_FONT,
+  previewSoundCode,
+  soundById,
+  type SoundId,
+} from "./sheet";
 
 /** initStrudel 반환 타입이 느슨해서 scheduler만 느슨히 잡는다 */
 // deno-lint-ignore no-explicit-any
@@ -25,21 +30,13 @@ let epoch = 0;
 
 let warmPromise: Promise<void> | null = null;
 let gestureWarmed = false;
-let dirtGtrLoaded = false;
+const warmedFonts = new Set<string>();
 
 /** SOUND 미리듣기 세대 — 연속 탭 시 이전 타이머 무효화 */
 let previewGen = 0;
 
-/** dirt-samples 실기타 WAV (strudel docs 예제와 동일) */
-const DIRT_GTR = {
-  gtr: [
-    "gtr/0001_cleanC.wav",
-    "gtr/0002_ovrdC.wav",
-    "gtr/0003_distC.wav",
-  ],
-} as const;
-const DIRT_BASE =
-  "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/";
+/** 기타 음역 대표 존 (프리로드) */
+const PRELOAD_MIDI = [48, 55, 60, 67, 72];
 
 export function getLastStrudelCode(): string {
   return lastCode;
@@ -106,17 +103,11 @@ export function getAudioState(): string {
   }
 }
 
-async function loadDirtGtr(): Promise<void> {
-  if (dirtGtrLoaded) return;
-  await samples({ ...DIRT_GTR }, DIRT_BASE);
-  dirtGtrLoaded = true;
-}
-
 export async function initStrudelEngine(): Promise<Repl> {
   if (!boot) {
     boot = initStrudel({
       prebake: async () => {
-        await loadDirtGtr();
+        registerSoundfonts();
       },
     })
       .then((repl: Repl) => {
@@ -132,17 +123,42 @@ export async function initStrudelEngine(): Promise<Repl> {
   return boot;
 }
 
+async function warmFont(font: string, ctx: AudioContext): Promise<void> {
+  if (warmedFonts.has(font)) return;
+  await Promise.all(
+    PRELOAD_MIDI.map((midi) =>
+      getFontBufferSource(font, { note: midi }, ctx).catch((err: unknown) => {
+        console.warn("font preload", font, midi, err);
+        return null;
+      }),
+    ),
+  );
+  warmedFonts.add(font);
+}
+
 /**
  * 첫 포인터 제스처에서 호출.
- * 오디오 unlock + gtr 워밍. Play를 막지 않는다.
+ * 오디오 unlock + 현재/뮤트 폰트 워밍. Play를 막지 않는다.
  */
-export function warmOnGesture(_preferred?: SoundId): Promise<void> {
-  if (warmPromise) return warmPromise;
+export function warmOnGesture(preferred?: SoundId): Promise<void> {
+  if (warmPromise) {
+    // 이미 워밍 중이면 선호 폰트만 추가 큐
+    if (preferred) {
+      void warmPromise.then(async () => {
+        const ctx = getAudioContext() as AudioContext;
+        await warmFont(soundById(preferred).font, ctx);
+      });
+    }
+    return warmPromise;
+  }
   warmPromise = (async () => {
     await initStrudelEngine();
     await ensureAudioRunning();
     gestureWarmed = true;
-    await loadDirtGtr();
+    const ctx = getAudioContext() as AudioContext;
+    const id = preferred ?? "steel";
+    await warmFont(soundById(id).font, ctx);
+    await warmFont(MUTE_FONT, ctx);
   })().catch((err) => {
     console.warn("warmOnGesture failed", err);
     warmPromise = null;
@@ -176,8 +192,6 @@ export function previewSound(id: SoundId): void {
       await evaluate(code);
       await new Promise((r) => setTimeout(r, 700));
       if (my !== previewGen) return;
-      // Play가 이미 잡았으면 epoch가 바뀌었을 수 있음 — hush는 재생을 끊지 않게 epoch 확인
-      // preview는 epoch를 올리지 않으므로, 재생 중이 아닐 때만 hush
       try {
         hush();
       } catch {

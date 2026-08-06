@@ -9,7 +9,11 @@ const root = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    /** @strudel/web dist 번들 대신 소스 — 의존성 그래프 단일화 */
+    /**
+     * @strudel/web dist는 webaudio/superdough를 이미 묶은 번들.
+     * soundfonts가 별도 @strudel/webaudio를 쓰면 soundMap이 둘로 갈라져
+     * gm_* 등록이 재생 쪽에 안 보인다 → 소스 web.mjs로 한 그래프에 묶는다.
+     */
     alias: {
       '@strudel/web': path.resolve(root, 'node_modules/@strudel/web/web.mjs'),
     },
@@ -23,6 +27,6 @@ export default defineConfig({
     ],
   },
   optimizeDeps: {
-    include: ['@strudel/web', 'superdough'],
+    include: ['@strudel/web', '@strudel/soundfonts', 'superdough'],
   },
 })
