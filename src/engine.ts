@@ -5,10 +5,8 @@ import {
   hush,
   initAudio,
   initStrudel,
-  registerVoicings,
   samples,
 } from "@strudel/web";
-import { GTR6_ANCHOR, GTR6_DICT, GTR6_NAME } from "./sheet";
 
 /** initStrudel 반환 타입이 느슨해서 scheduler만 느슨히 잡는다 */
 // deno-lint-ignore no-explicit-any
@@ -94,19 +92,11 @@ async function loadDirtGtr(): Promise<void> {
   dirtGtrLoaded = true;
 }
 
-function registerGtr6Voicings(): void {
-  registerVoicings(GTR6_NAME, GTR6_DICT, {
-    mode: "above",
-    anchor: GTR6_ANCHOR,
-  });
-}
-
 export async function initStrudelEngine(): Promise<Repl> {
   if (!boot) {
     boot = initStrudel({
       prebake: async () => {
         registerSoundfonts();
-        registerGtr6Voicings();
         await loadDirtGtr();
       },
     })

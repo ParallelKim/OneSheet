@@ -4,8 +4,7 @@ import {
   compileSheet,
   createInitialSheet,
   cyclesPerSecond,
-  GTR6_ANCHOR,
-  GTR6_NAME,
+  guitarShape,
   holdRun,
   nextSoundMode,
   SOUND_MODES,
@@ -98,7 +97,13 @@ describe("compileSheet / toStrudel", () => {
     expect(code).not.toMatch(/\bn\("/);
   });
 
-  it("strum은 6현 짧은 쓸기→링·차트 리듬", () => {
+  it("오픈 C/Am 셰이프는 절대음·뮤트 현 제외", () => {
+    expect(guitarShape("C")).toEqual(["c3", "e3", "g3", "c4", "e4"]);
+    expect(guitarShape("Am")).toEqual(["a2", "e3", "a3", "c4", "e4"]);
+    expect(guitarShape("G")).toEqual(["g2", "b2", "d3", "g3", "b3", "g4"]);
+  });
+
+  it("strum은 note+late 오픈셰이프·차트 리듬", () => {
     const sheet = createInitialSheet();
     const bar: Articulation[] = Array.from({ length: 16 }, (_, i) => {
       const sub = i % 4;
@@ -110,17 +115,17 @@ describe("compileSheet / toStrudel", () => {
 
     const code = toStrudel({ ...sheet, soundMode: "strum" });
     expect(code).toMatch(/^setcps\(/);
-    expect(code).toContain('chord("Am@2');
-    // 6현 · 첫 스텝에 몰기
-    expect(code).toContain("[[0 1 2 3 4 5] ~@1]@2");
-    expect(code).toContain("[[5 4 3 2 1 0] ~@1]@2");
-    expect(code).toContain(`.dict("${GTR6_NAME}")`);
-    expect(code).toContain(`.mode("above:${GTR6_ANCHOR}")`);
+    // Am 오픈: a2 e3 a3 c4 e4 — D는 저→고
+    expect(code).toContain("a2@2");
+    expect(code).toContain("e3@2");
+    expect(code).toContain("c4@2");
     expect(code).toContain('.s("gm_electric_guitar_clean:5")');
-    // hold=2 → clip 12 (2*6) — 마이크로 공격이 hold만큼 울리게
-    expect(code).toContain("12@2");
-    // 도수 4음 펼침이 아님
-    expect(code).not.toContain("[0 1 2 3]@2");
+    expect(code).toContain(".late(");
+    expect(code).toContain("note(");
+    // 옛 gtr6 / n-스트럼 아님
+    expect(code).not.toContain('dict("gtr6")');
+    expect(code).not.toMatch(/\bn\("/);
+    expect(code).not.toContain("[0 1 2 3 4 5]");
   });
 
   it("arp/gm은 차트 리듬·D↓U↑를 반영하고 바디만 다르다", () => {

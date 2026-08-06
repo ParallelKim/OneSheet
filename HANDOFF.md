@@ -4,27 +4,21 @@
 
 ---
 
-## 제품
-
-기타 차트 편집/재생기. UI는 런치패드 렌즈, 소리는 Strudel.
-
----
-
 ## MODE
 
-| id | 축 | 리듬 |
-|----|-----|------|
-| `block` | 한꺼번에 (동시) + saw | ✅ |
-| `strum` | **6현 짧은 쓸기→링** + GM | ✅ |
-| `arp` | 한 음씩 펼침 (아르페지오) + saw | ✅ |
-| `gm` | 한 음씩 펼침 + GM | ✅ |
-| `docs` | recipes 원문 | ❌ |
+| id | 축 |
+|----|-----|
+| `block` | 한꺼번에 + saw |
+| `strum` | **오픈셰이프 note + late 쓸기→링** + GM |
+| `arp` / `gm` | recipes식 한 음씩 펼침 |
+| `docs` | recipes 원문 |
 
-`strum` 요지:
-- 기타는 **6현**. n = **현 인덱스** 0..5 (스케일 도수 아님)
-- 스트로크 = 짧은 delay로 전현을 친 뒤 **같이 지속** (아르페지오 ≠ 스트로크)
-- dict `gtr6`: R–3–5를 옥타브에 펼친 6음 (연속 도수 클러스터 금지)
-- `~`는 재공격만 막음. 링은 `clip`(steps×6)
+### strum
+
+- Strudel 공식에 기타 오픈 스트럼 예제 없음 → MIDI-guitar 관례(오픈 셰이프) 사용
+- `guitarShape("C")` = `c3 e3 g3 c4 e4` (6현 뮤트)
+- `stack(note(..), note(..).late(Δ), …)` — onset만 ms 단위, 길이는 hold(`clip~0.95`)
+- D=저→고, U=고→저. 임의 `0 4 7…` / `gtr6` dict 폐기
 
 ```bash
 npm test
