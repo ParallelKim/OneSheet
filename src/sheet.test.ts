@@ -59,7 +59,7 @@ describe("strumN", () => {
 });
 
 describe("compileSheet / toStrudel", () => {
-  it("초기 차트는 GM steel 기본", () => {
+  it("초기 차트는 GM steel:5 (LK) 기본", () => {
     const sheet = createInitialSheet();
     const parts = compileSheet(sheet);
     expect(parts.totalSteps).toBe(64);
@@ -67,7 +67,8 @@ describe("compileSheet / toStrudel", () => {
     expect(parts.cps).toBeCloseTo(cyclesPerSecond(96));
     expect(parts.events.filter((e) => e.chord !== null)).toHaveLength(16);
     expect(parts.preset.id).toBe("steel");
-    expect(parts.preset.sound).toBe("gm_acoustic_guitar_steel");
+    expect(parts.preset.sound).toBe("gm_acoustic_guitar_steel:5");
+    expect(parts.preset.font).toBe("0250_LK_AcousticSteel_SF2_file");
   });
 
   it("D·U· 패턴은 박마다 공격 2개(@2)", () => {
@@ -107,7 +108,7 @@ describe("compileSheet / toStrudel", () => {
     expect(code).not.toContain("chord(");
   });
 
-  it("코드 재생은 GM steel·기타 음역·voicing을 포함한다", () => {
+  it("코드 재생은 GM steel:5·기타 음역·voicing을 포함한다", () => {
     const code = toStrudel(createInitialSheet());
     expect(code).toMatch(/^setcps\(/);
     expect(code).toContain('n("[[0 1 2 3]@1 ~@3]@4');
@@ -115,12 +116,12 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain('.dict("triads")');
     expect(code).toContain('.mode("above:c3")');
     expect(code).toContain(".voicing()");
-    expect(code).toContain("gm_acoustic_guitar_steel");
+    expect(code).toContain("gm_acoustic_guitar_steel:5");
     expect(code).not.toContain('.s("gtr');
     expect(code).not.toContain("sawtooth");
   });
 
-  it("X는 뮤트 샘플과 짧은 clip", () => {
+  it("X는 뮤트 뱅크:4와 짧은 clip", () => {
     const sheet = createInitialSheet();
     const bar: Articulation[] = Array.from({ length: 16 }, (_, i) =>
       i % 4 === 0 ? "X" : "hold",
@@ -128,6 +129,7 @@ describe("compileSheet / toStrudel", () => {
     sheet.rhythm = [bar, bar, bar, bar];
     const code = toStrudel(sheet);
     expect(code).toContain(MUTE_SOUND);
+    expect(MUTE_SOUND).toBe("gm_electric_guitar_muted:4");
     expect(code).toContain("[0,1,2]");
     expect(code).toContain("0.12");
   });
@@ -144,18 +146,18 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain("0.95"); // open clip (링)
   });
 
-  it("clean / nylon 프리셋이 GM 심볼을 쓴다", () => {
+  it("clean / nylon 프리셋이 LK·Strat 뱅크를 쓴다", () => {
     expect(toStrudel({ ...createInitialSheet(), sound: "clean" })).toContain(
-      "gm_electric_guitar_clean",
+      "gm_electric_guitar_clean:5",
     );
     expect(toStrudel({ ...createInitialSheet(), sound: "nylon" })).toContain(
-      "gm_acoustic_guitar_nylon",
+      "gm_acoustic_guitar_nylon:5",
     );
   });
 
   it("미리듣기는 해당 SOUND의 한 코드 스트럼", () => {
     const steel = previewSoundCode("steel");
-    expect(steel).toContain("gm_acoustic_guitar_steel");
+    expect(steel).toContain("gm_acoustic_guitar_steel:5");
     expect(steel).toContain('n("[0 1 2 3]")');
   });
 

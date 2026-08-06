@@ -28,9 +28,10 @@ SheetState  →  compileSheet()  →  toStrudel()  →  evaluateStrudel()
 | `src/sheet.test.ts` | 변환 단위 테스트 |
 
 - dim 코드 심볼은 `Bo` (`dim` 아님) — triads 딕셔너리
-- 음색: SOUND 3슬롯 — **steel / clean / nylon** (GM, 이름=바디)
-  - dirt `gtr` 다중 WAV는 스트럼 `n`과 샘플 인덱스가 충돌 → 사용 안 함
-  - X = `gm_electric_guitar_muted` + 짧은 clip
+- 음색: SOUND 3슬롯 — **steel / clean / nylon** (GM `:5` 뱅크 고정)
+  - steel=`LK_AcousticSteel`, clean=`Stratocaster`, nylon=`LK_Godin_Nylon`
+  - 뱅크 0(Aspirin 등)은 얇음 → 쓰지 않음. 프리로드 font = 재생 `:n`
+  - X = `gm_electric_guitar_muted:4` (LesPaul) + 짧은 clip
   - hold(링) = 공격 steps에 포함 + n 패턴 `~` + clip 0.95
   - `.mode("above:c3")`, 메트로=약한 triangle
   - SOUND 칩 탭 시(정지 중) 미리듣기

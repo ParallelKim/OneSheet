@@ -25,11 +25,11 @@ export type SheetState = {
 
 /**
  * SOUND 축 — GM 기타 3바디. 이름 = 들릴 소리.
- * n()+chord()+voicing() 스트럼과 맞음 (음높이별 샘플).
+ * n()+chord()+voicing() 스트럼과 맞음.
  *
- * dirt-samples `gtr` 다중 WAV는 n이 샘플 인덱스로 겹쳐
- * 스트럼(0..3)이 깨지거나 묵음 → 쓰지 않음.
- * (공식 예제도 gtr는 단일 WAV + note() 피치시프트)
+ * 중요: gm_* 는 SF2 뱅크 배열. voicing() 후 n이 지워지면 기본 0번.
+ * 0번(Aspirin 등)은 기타감이 약함/얇음 → LK/Strat :5 로 고정.
+ * (38fa3c5와 동일)
  */
 export type SoundId = "steel" | "clean" | "nylon";
 
@@ -39,9 +39,9 @@ export type SoundPreset = {
   id: SoundId;
   label: string;
   kind: SoundKind;
-  /** .s() 이름 */
+  /** .s() 이름 — `:n` 으로 SF2 뱅크 고정 */
   sound: string;
-  /** 프리로드용 soundfont 키 */
+  /** 프리로드용 soundfont 키 (sound :n 과 동일 파일) */
   font: string;
 };
 
@@ -50,28 +50,28 @@ export const SOUND_PRESETS: readonly SoundPreset[] = [
     id: "steel",
     label: "steel",
     kind: "font",
-    sound: "gm_acoustic_guitar_steel",
-    font: "0250_Aspirin_sf2_file",
+    sound: "gm_acoustic_guitar_steel:5",
+    font: "0250_LK_AcousticSteel_SF2_file",
   },
   {
     id: "clean",
     label: "clean",
     kind: "font",
-    sound: "gm_electric_guitar_clean",
-    font: "0270_Aspirin_sf2_file",
+    sound: "gm_electric_guitar_clean:5",
+    font: "0270_Stratocaster_sf2_file",
   },
   {
     id: "nylon",
     label: "nylon",
     kind: "font",
-    sound: "gm_acoustic_guitar_nylon",
-    font: "0240_Aspirin_sf2_file",
+    sound: "gm_acoustic_guitar_nylon:5",
+    font: "0240_LK_Godin_Nylon_SF2_file",
   },
 ] as const;
 
-/** 뮤트(X) — palm mute 샘플 (짧은 clip과 짝) */
-export const MUTE_SOUND = "gm_electric_guitar_muted";
-export const MUTE_FONT = "0280_Aspirin_sf2_file";
+/** 뮤트(X) — LesPaul 뮤트 뱅크 */
+export const MUTE_SOUND = "gm_electric_guitar_muted:4";
+export const MUTE_FONT = "0280_LesPaul_sf2_file";
 
 /** @deprecated */
 export type GuitarBodyId = SoundId;
