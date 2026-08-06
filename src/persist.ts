@@ -2,22 +2,26 @@ import {
   ARTICULATIONS,
   BARS,
   BAR_STEPS,
+  CHORD_INTERVALS,
   createInitialSheet,
+  defaultTonesForDegree,
   KEY_LIST,
   rhythmFromLegacyBars,
   SLOTS,
   SOUND_MODES,
   type Articulation,
+  type ChordInterval,
   type SheetState,
   type SoundModeId,
+  type ToneSet,
 } from "./sheet";
 
-/** v2: rhythm base + overrides. v1도 읽어 마이그레이션. */
-export const SHEET_STORAGE_KEY = "onesheet.sheet.v2";
-const LEGACY_STORAGE_KEY = "onesheet.sheet.v1";
+/** v3: tones[]. v1/v2도 읽어 마이그레이션. */
+export const SHEET_STORAGE_KEY = "onesheet.sheet.v3";
+const LEGACY_KEYS = ["onesheet.sheet.v2", "onesheet.sheet.v1"] as const;
 
 type StoredBlob = {
-  v: 1 | 2;
+  v: 1 | 2 | 3;
   sheet: unknown;
 };
 
@@ -62,11 +66,21 @@ function normalizeBarArts(row: unknown): Articulation[] {
   );
 }
 
+function normalizeToneSet(raw: unknown, degree: number | null): ToneSet | null {
+  if (degree === null) return null;
+  if (!Array.isArray(raw)) return defaultTonesForDegree(degree);
+  const tones = CHORD_INTERVALS.filter((id) =>
+    raw.includes(id),
+  ) as ChordInterval[];
+  if (tones.length === 0) return defaultTonesForDegree(degree);
+  if (!tones.includes("1")) return ["1", ...tones];
+  return tones;
+}
+
 function normalizeRhythmFields(
   o: Record<string, unknown>,
   base: SheetState,
 ): Pick<SheetState, "rhythm" | "rhythmOverride"> {
-  // v2: rhythm = Articulation[], rhythmOverride = (Articulation[]|null)[]
   if (Array.isArray(o.rhythm) && !Array.isArray(o.rhythm[0])) {
     const rhythm = normalizeBarArts(o.rhythm);
     const ovIn = Array.isArray(o.rhythmOverride) ? o.rhythmOverride : [];
@@ -79,7 +93,6 @@ function normalizeRhythmFields(
     return { rhythm, rhythmOverride };
   }
 
-  // v1 legacy: rhythm = Articulation[][]
   if (Array.isArray(o.rhythm) && Array.isArray(o.rhythm[0])) {
     const legacy = o.rhythm as unknown[];
     const rows = Array.from({ length: BARS }, (_, bar) =>
@@ -115,9 +128,24 @@ export function normalizeSheet(raw: unknown): SheetState {
     normalizeDegree(degreesIn[i]),
   );
 
+  const tonesIn = Array.isArray(o.tones) ? o.tones : [];
+  const tones = Array.from({ length: SLOTS }, (_, i) =>
+    normalizeToneSet(tonesIn[i], degrees[i] ?? null),
+  );
+
   const { rhythm, rhythmOverride } = normalizeRhythmFields(o, base);
 
-  return { bpm, key, degrees, rhythm, rhythmOverride, gain, metro, soundMode };
+  return {
+    bpm,
+    key,
+    degrees,
+    tones,
+    rhythm,
+    rhythmOverride,
+    gain,
+    metro,
+    soundMode,
+  };
 }
 
 function readBlob(key: string): StoredBlob | null {
@@ -126,7 +154,9 @@ function readBlob(key: string): StoredBlob | null {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StoredBlob;
-    if (!parsed || (parsed.v !== 1 && parsed.v !== 2)) return null;
+    if (!parsed || (parsed.v !== 1 && parsed.v !== 2 && parsed.v !== 3)) {
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -134,7 +164,10 @@ function readBlob(key: string): StoredBlob | null {
 }
 
 export function loadStoredSheet(): SheetState | null {
-  const blob = readBlob(SHEET_STORAGE_KEY) ?? readBlob(LEGACY_STORAGE_KEY);
+  const blob =
+    readBlob(SHEET_STORAGE_KEY) ??
+    LEGACY_KEYS.map(readBlob).find((b) => b != null) ??
+    null;
   if (!blob) return null;
   return normalizeSheet(blob.sheet);
 }
@@ -142,7 +175,7 @@ export function loadStoredSheet(): SheetState | null {
 export function saveStoredSheet(sheet: SheetState): void {
   try {
     if (typeof localStorage === "undefined") return;
-    const blob: StoredBlob = { v: 2, sheet };
+    const blob: StoredBlob = { v: 3, sheet };
     localStorage.setItem(SHEET_STORAGE_KEY, JSON.stringify(blob));
   } catch (err) {
     console.warn("sheet cache save failed", err);

@@ -1,10 +1,9 @@
 /**
  * 차트 = 4행(마디) × 4열(박).
  * 리듬 = 1마디 기본(rhythm) + 이후 마디 override(또는 상속).
- * 셀: D / U / X(뮤트) / hold(링) / rest(쉼).
+ * 화성 = 근음 도수(위) × 구성음 토글(아래). 퀄리티는 결과.
  *
- * soundMode: 차트 리듬·오픈셰이프를 공유하고, 타격 축만 바꾼다.
- * strum = 짧은 쓸기 후 링 / piano = 전음 동시.
+ * soundMode: strum = 쓸기 / piano = 동시.
  */
 
 export type Articulation = "D" | "U" | "X" | "hold" | "rest";
@@ -34,7 +33,13 @@ export type SoundModeId = (typeof SOUND_MODES)[number]["id"];
 export type SheetState = {
   bpm: number;
   key: string;
+  /** 슬롯 근음 도수 0–6. null = 쉼 */
   degrees: Array<number | null>;
+  /**
+   * 슬롯 구성음(근음 기준 간격). degrees[i]==null 이면 null.
+   * 예: Maj = 1·3·5, min = 1·b3·5
+   */
+  tones: Array<ToneSet | null>;
   /** 기본 리듬 = 1마디(bar 0). 16분음표 × 16 */
   rhythm: Articulation[];
   /**
@@ -47,6 +52,36 @@ export type SheetState = {
   metro: boolean;
   soundMode: SoundModeId;
 };
+
+/** DEG 하위 8칸 — 근음 기준 구성음 */
+export const CHORD_INTERVALS = [
+  "1",
+  "b3",
+  "3",
+  "4",
+  "b5",
+  "5",
+  "b7",
+  "7",
+] as const;
+
+export type ChordInterval = (typeof CHORD_INTERVALS)[number];
+export type ToneSet = readonly ChordInterval[];
+
+const INTERVAL_ST: Record<ChordInterval, number> = {
+  "1": 0,
+  b3: 3,
+  "3": 4,
+  "4": 5,
+  b5: 6,
+  "5": 7,
+  b7: 10,
+  "7": 11,
+};
+
+const TONES_MAJ: ToneSet = ["1", "3", "5"];
+const TONES_MIN: ToneSet = ["1", "b3", "5"];
+const TONES_DIM: ToneSet = ["1", "b3", "b5"];
 
 /** strum — GM clean 기타 */
 const TONE_STRUM = "gm_electric_guitar_clean:5";
@@ -160,17 +195,74 @@ function dimShape(root: string): string[] {
 
 /**
  * 코드 심볼 → 기타 지판 음 (저→고).
- * 오픈 테이블 우선, 없으면 E/Em 바레 이조, dim은 감3화음.
+ * 오픈 테이블 우선, 없으면 구성음 간격으로 쌓기.
  */
 export function guitarShape(chord: string): string[] {
   const hit = OPEN_SHAPES[chord];
   if (hit) return [...hit];
-  const { root, quality } = parseChordSymbol(chord);
-  if (quality === "dim") return dimShape(root);
-  const base = quality === "min" ? OPEN_SHAPES.Em! : OPEN_SHAPES.E!;
-  const semitones = (PC[root]! - PC.E! + 12) % 12;
-  if (semitones === 0) return [...base];
-  return transposeNotes(base, semitones);
+  const { root, tones } = decodeChordToTones(chord);
+  if (tones === TONES_DIM || decodeIsDim(chord)) {
+    return dimShape(root);
+  }
+  const baseQ = hasTone(tones, "b3") ? "min" : "maj";
+  // 단순 triad/open 계열은 E/Em 바레
+  if (
+    artsToneEqual(tones, TONES_MAJ) ||
+    artsToneEqual(tones, TONES_MIN)
+  ) {
+    const base = baseQ === "min" ? OPEN_SHAPES.Em! : OPEN_SHAPES.E!;
+    const semitones = (PC[root]! - PC.E! + 12) % 12;
+    if (semitones === 0) return [...base];
+    return transposeNotes(base, semitones);
+  }
+  return buildIntervalShape(root, tones);
+}
+
+function decodeIsDim(chord: string): boolean {
+  return /o$|dim$/.test(chord) && !chord.includes("7");
+}
+
+function artsToneEqual(a: ToneSet, b: ToneSet): boolean {
+  const na = normTones(a);
+  const nb = normTones(b);
+  return na.length === nb.length && na.every((t, i) => t === nb[i]);
+}
+
+function decodeChordToTones(sym: string): { root: string; tones: ToneSet } {
+  const m = sym.match(/^([A-G][#b]?)(.*)$/);
+  const root = m?.[1] ?? "C";
+  const suf = m?.[2] ?? "";
+  if (suf === "m") return { root, tones: TONES_MIN };
+  if (suf === "o" || suf === "dim") return { root, tones: TONES_DIM };
+  if (suf === "m7") return { root, tones: ["1", "b3", "5", "b7"] };
+  if (suf === "7") return { root, tones: ["1", "3", "5", "b7"] };
+  if (suf === "maj7") return { root, tones: ["1", "3", "5", "7"] };
+  if (suf === "sus4") return { root, tones: ["1", "4", "5"] };
+  if (suf === "7sus4") return { root, tones: ["1", "4", "5", "b7"] };
+  if (suf === "5") return { root, tones: ["1", "5"] };
+  if (suf === "ø" || suf === "m7b5") return { root, tones: ["1", "b3", "b5", "b7"] };
+  if (suf === "mMaj7") return { root, tones: ["1", "b3", "5", "7"] };
+  if (suf === "b5") return { root, tones: ["1", "3", "b5"] };
+  return { root, tones: TONES_MAJ };
+}
+
+function buildIntervalShape(root: string, tones: ToneSet): string[] {
+  const pc = PC[root] ?? 0;
+  let midi = 45 + ((pc - 9 + 12) % 12);
+  if (midi < 40) midi += 12;
+  const sts = normTones(tones).map((id) => INTERVAL_ST[id]);
+  const notes: number[] = [];
+  let prev = midi - 1;
+  for (const st of sts) {
+    let n = midi + st;
+    while (n <= prev) n += 12;
+    notes.push(n);
+    prev = n;
+  }
+  if (notes.length >= 2 && notes.length <= 4) {
+    notes.push(notes[0]! + 12);
+  }
+  return notes.map(midiToNote);
 }
 
 export const BARS = 4;
@@ -205,14 +297,26 @@ export const MAJOR_KEYS: Record<string, readonly string[]> = {
 export const KEY_LIST = Object.keys(MAJOR_KEYS);
 
 export const DEGREE_META = [
-  { roman: "I", quality: "maj" },
-  { roman: "ii", quality: "min" },
-  { roman: "iii", quality: "min" },
-  { roman: "IV", quality: "maj" },
-  { roman: "V", quality: "maj" },
-  { roman: "vi", quality: "min" },
-  { roman: "vii°", quality: "dim" },
+  { roman: "I", quality: "maj" as const },
+  { roman: "ii", quality: "min" as const },
+  { roman: "iii", quality: "min" as const },
+  { roman: "IV", quality: "maj" as const },
+  { roman: "V", quality: "maj" as const },
+  { roman: "vi", quality: "min" as const },
+  { roman: "vii°", quality: "dim" as const },
 ] as const;
+
+/** 도수 기본 구성음 (키 다이아토닉 퀄리티) */
+export function defaultTonesForDegree(degree: number): ToneSet {
+  const q = DEGREE_META[degree]?.quality ?? "maj";
+  if (q === "min") return TONES_MIN;
+  if (q === "dim") return TONES_DIM;
+  return TONES_MAJ;
+}
+
+function tonesFromDegrees(degrees: Array<number | null>): Array<ToneSet | null> {
+  return degrees.map((d) => (d === null ? null : defaultTonesForDegree(d)));
+}
 
 const QUARTER_DOWN: Articulation[] = ["D", "hold", "hold", "hold"];
 
@@ -237,10 +341,12 @@ function repeatBar(bar: Array<number | null>): Array<number | null> {
 }
 
 export function createInitialSheet(): SheetState {
+  const degrees = repeatBar([5, 0, 4, 3]);
   return {
     bpm: 96,
     key: "C",
-    degrees: repeatBar([5, 0, 4, 3]),
+    degrees,
+    tones: tonesFromDegrees(degrees),
     rhythm: defaultBarRhythm(),
     rhythmOverride: emptyOverrides(),
     gain: 0.55,
@@ -263,26 +369,168 @@ export function scaleOf(key: string): readonly string[] {
   return MAJOR_KEYS[key] ?? MAJOR_KEYS.C!;
 }
 
-export function chordFromDegree(key: string, degree: number): string {
-  const root = scaleOf(key)[degree] ?? "C";
-  const q = DEGREE_META[degree]?.quality ?? "maj";
-  if (q === "maj") return root;
-  if (q === "min") return `${root}m`;
-  return `${root}o`;
+export function rootFromDegree(key: string, degree: number): string {
+  return scaleOf(key)[degree] ?? "C";
 }
 
-export function slotLabel(key: string, degree: number | null): string {
-  if (degree === null) return "—";
-  const q = DEGREE_META[degree]?.quality ?? "maj";
-  const root = scaleOf(key)[degree] ?? "C";
-  if (q === "maj") return root;
-  if (q === "min") return `${root}m`;
-  return `${root}dim`;
+function hasTone(tones: ToneSet, id: ChordInterval): boolean {
+  return tones.includes(id);
+}
+
+function normTones(tones: ToneSet): ChordInterval[] {
+  return CHORD_INTERVALS.filter((id) => tones.includes(id));
+}
+
+/**
+ * 구성음 → 코드 심볼 (오픈셰이프 룩업·표시용).
+ * 1·3·5 = G / 1·b3·5 = Gm / 1·b3·b5 = Go / +b7 = 7 …
+ */
+export function chordSymbolFromParts(root: string, tones: ToneSet): string {
+  const t = new Set(normTones(tones));
+  const third = t.has("3") ? "maj" : t.has("b3") ? "min" : t.has("4") ? "sus" : "no3";
+  const fifth = t.has("5") ? "p" : t.has("b5") ? "dim5" : "no5";
+  const sev = t.has("7") ? "maj7" : t.has("b7") ? "7" : null;
+
+  if (third === "sus") {
+    if (sev === "7") return `${root}7sus4`;
+    return `${root}sus4`;
+  }
+  if (third === "min" && fifth === "dim5") {
+    return sev === "7" ? `${root}ø` : `${root}o`;
+  }
+  if (third === "min") {
+    if (sev === "7") return `${root}m7`;
+    if (sev === "maj7") return `${root}mMaj7`;
+    return `${root}m`;
+  }
+  if (third === "maj") {
+    if (sev === "7") return `${root}7`;
+    if (sev === "maj7") return `${root}maj7`;
+    if (fifth === "dim5") return `${root}b5`;
+    return root;
+  }
+  // no3
+  if (t.has("5") || t.has("b5")) return `${root}5`;
+  return root;
+}
+
+export function chordFromDegree(key: string, degree: number): string {
+  return chordSymbolFromParts(rootFromDegree(key, degree), defaultTonesForDegree(degree));
+}
+
+/** 슬롯 → 재생·표시용 코드 심볼 */
+export function chordFromSlot(
+  key: string,
+  degree: number | null,
+  tones: ToneSet | null,
+): string | null {
+  if (degree === null) return null;
+  const t = tones && tones.length > 0 ? tones : defaultTonesForDegree(degree);
+  return chordSymbolFromParts(rootFromDegree(key, degree), t);
+}
+
+export function slotLabel(
+  key: string,
+  degree: number | null,
+  tones?: ToneSet | null,
+): string {
+  const sym = chordFromSlot(key, degree, tones ?? null);
+  if (!sym) return "—";
+  // dim 표기 정리
+  if (sym.endsWith("o")) return `${sym.slice(0, -1)}dim`;
+  if (sym.endsWith("ø")) return `${sym.slice(0, -1)}m7b5`;
+  return sym;
 }
 
 export function slotRoman(degree: number | null): string {
   if (degree === null) return "";
   return DEGREE_META[degree]?.roman ?? "";
+}
+
+/** 근음+간격 → 화면용 음이름 (G, Bb …) */
+export function intervalNoteLabel(
+  key: string,
+  degree: number,
+  interval: ChordInterval,
+): string {
+  const root = rootFromDegree(key, degree);
+  const pc = ((PC[root] ?? 0) + INTERVAL_ST[interval]) % 12;
+  return pitchClassLabel(pc, key);
+}
+
+/** 키의 임시표 취향에 맞춘 피치클래스 라벨 */
+function pitchClassLabel(pc: number, key: string): string {
+  const flatKeys = new Set(["F", "Bb", "Eb", "Ab", "Db", "Gb"]);
+  const flats = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+  const sharps = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const table = flatKeys.has(key) || key === "C" ? flats : sharps;
+  // C는 보통 플랫 표기(Bb)가 기타 차트에 익숙
+  if (key === "C") return flats[pc]!;
+  return table[pc]!;
+}
+
+export function tonesInclude(tones: ToneSet | null, interval: ChordInterval): boolean {
+  return tones != null && hasTone(tones, interval);
+}
+
+/**
+ * 구성음 토글. 근음(1)은 끄면 안 됨 — 끄면 코드 삭제와 같으므로 무시.
+ * 3↔b3, 5↔b5, 7↔b7 은 동시에 켜지지 않게 정리.
+ */
+export function toggleChordTone(
+  tones: ToneSet,
+  interval: ChordInterval,
+): ToneSet {
+  if (interval === "1") return normTones(tones).length ? normTones(tones) : ["1"];
+  const set = new Set(normTones(tones));
+  if (!set.has("1")) set.add("1");
+  if (set.has(interval)) {
+    set.delete(interval);
+  } else {
+    set.add(interval);
+    if (interval === "3") set.delete("b3");
+    if (interval === "b3") set.delete("3");
+    if (interval === "5") set.delete("b5");
+    if (interval === "b5") set.delete("5");
+    if (interval === "7") set.delete("b7");
+    if (interval === "b7") set.delete("7");
+  }
+  const next = CHORD_INTERVALS.filter((id) => set.has(id));
+  return next.length > 0 ? next : ["1"];
+}
+
+/** 도수 칠하기 — 같은 도수면 지움, 아니면 기본 구성음으로 세팅 */
+export function paintDegreeSlot(
+  sheet: SheetState,
+  slot: number,
+  degree: number | null,
+): SheetState {
+  const degrees = [...sheet.degrees];
+  const tones = [...sheet.tones];
+  if (degree === null) {
+    degrees[slot] = null;
+    tones[slot] = null;
+  } else if (degrees[slot] === degree) {
+    degrees[slot] = null;
+    tones[slot] = null;
+  } else {
+    degrees[slot] = degree;
+    tones[slot] = defaultTonesForDegree(degree);
+  }
+  return { ...sheet, degrees, tones };
+}
+
+export function paintToneSlot(
+  sheet: SheetState,
+  slot: number,
+  interval: ChordInterval,
+): SheetState {
+  const degree = sheet.degrees[slot] ?? null;
+  if (degree === null) return sheet;
+  const cur = sheet.tones[slot] ?? defaultTonesForDegree(degree);
+  const tones = [...sheet.tones];
+  tones[slot] = toggleChordTone(cur, interval);
+  return { ...sheet, tones };
 }
 
 export function nextKey(current: string): string {
@@ -423,15 +671,17 @@ export function compileSheet(sheet: SheetState): StrudelParts {
       const art = barRhythmRow[step] ?? "rest";
       const beat = Math.floor(step / SUBDIV);
       const degree = sheet.degrees[bar * BEATS + beat] ?? null;
+      const toneSet = sheet.tones[bar * BEATS + beat] ?? null;
+      const chord = chordFromSlot(sheet.key, degree, toneSet);
 
-      if (isAttack(art) && degree !== null) {
+      if (isAttack(art) && chord !== null) {
         const holds = holdRun(barRhythmRow, step);
         const steps = art === "X" ? 1 : 1 + holds;
         const base = sheet.gain;
         const gain =
           art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
         events.push({
-          chord: chordFromDegree(sheet.key, degree),
+          chord,
           steps,
           gain: Number(gain.toFixed(3)),
           art: art as AttackArt,
@@ -449,7 +699,8 @@ export function compileSheet(sheet: SheetState): StrudelParts {
         const a2 = barRhythmRow[step] ?? "rest";
         const b2 = Math.floor(step / SUBDIV);
         const d2 = sheet.degrees[bar * BEATS + b2] ?? null;
-        if (isAttack(a2) && d2 !== null) break;
+        const t2 = sheet.tones[bar * BEATS + b2] ?? null;
+        if (isAttack(a2) && chordFromSlot(sheet.key, d2, t2) !== null) break;
         span += 1;
         step += 1;
       }

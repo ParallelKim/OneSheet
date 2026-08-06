@@ -669,6 +669,30 @@ button {
   box-shadow: none;
 }
 
+.pad.tone {
+  justify-content: center;
+}
+
+.pad.tone .pad-label {
+  font-size: clamp(0.85rem, 3.6vw, 1.05rem);
+}
+
+.pad.tone-idle {
+  opacity: 0.22;
+  pointer-events: none;
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.mode-degree .pad-grid .pad.tone {
+  background: var(--fill-2);
+}
+
+.mode-degree .pad-grid .pad.tone.on {
+  background: var(--fg);
+  color: var(--bg);
+}
+
 .pad-sub,
 .pad-roman {
   font-size: 0.55rem;

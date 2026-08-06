@@ -7,20 +7,27 @@ import {
   BEATS,
   BARS,
   BAR_STEPS,
+  CHORD_INTERVALS,
   clearRhythmOverride,
+  defaultTonesForDegree,
   DEGREE_META,
+  intervalNoteLabel,
   nextKey,
   nextSoundMode,
+  paintDegreeSlot,
   paintRhythmStep,
+  paintToneSlot,
   rhythmBarKind,
   SLOTS,
   slotLabel,
   slotRoman,
   soundModeById,
   SUBDIV,
+  tonesInclude,
   TOTAL_STEPS,
   toStrudel,
   type Articulation,
+  type ChordInterval,
   type SheetState,
 } from "./sheet";
 import { loadSheetState, saveStoredSheet } from "./persist";
@@ -260,15 +267,11 @@ export default function App() {
   }, []);
 
   const paintDegree = (degree: number | null) => {
-    update((prev) => {
-      const degrees = [...prev.degrees];
-      if (degree !== null && degrees[selected] === degree) {
-        degrees[selected] = null;
-      } else {
-        degrees[selected] = degree;
-      }
-      return { ...prev, degrees };
-    });
+    update((prev) => paintDegreeSlot(prev, selected, degree));
+  };
+
+  const paintTone = (interval: ChordInterval) => {
+    update((prev) => paintToneSlot(prev, selected, interval));
   };
 
   const paintRhythm = (step: number) => {
@@ -376,7 +379,7 @@ export default function App() {
                       }}
                       aria-label={`bar ${bi + 1} beat ${qi + 1}`}
                     >
-                      <span className="chord-name">{slotLabel(sheet.key, d)}</span>
+                      <span className="chord-name">{slotLabel(sheet.key, d, sheet.tones[i])}</span>
                       <span className="chord-deg">{d !== null ? slotRoman(d) : "·"}</span>
                     </button>
                   );
@@ -561,7 +564,7 @@ export default function App() {
                     onClick={() => setSelected(i)}
                   >
                     <span className="pad-sub">{(i % BEATS) + 1}</span>
-                    <span className="pad-label">{slotLabel(sheet.key, degree)}</span>
+                    <span className="pad-label">{slotLabel(sheet.key, degree, sheet.tones[i])}</span>
                     <span className="pad-roman">{slotRoman(degree)}</span>
                   </button>
                 );
@@ -579,7 +582,9 @@ export default function App() {
                       onClick={() => paintDegree(i)}
                     >
                       <span className="pad-label">{meta.roman}</span>
-                      <span className="pad-roman">{slotLabel(sheet.key, i)}</span>
+                      <span className="pad-roman">
+                        {slotLabel(sheet.key, i, defaultTonesForDegree(i))}
+                      </span>
                     </button>
                   );
                 }
@@ -591,12 +596,36 @@ export default function App() {
                       className={`pad tool ${currentDegree === null ? "on" : ""}`}
                       onClick={() => paintDegree(null)}
                     >
-                      <span className="pad-label">rest</span>
-                      <span className="pad-roman">—</span>
+                      <span className="pad-label">∅</span>
+                      <span className="pad-roman"> </span>
                     </button>
                   );
                 }
-                return <div key={`ghost-${i}`} className="pad ghost" aria-hidden />;
+                const interval = CHORD_INTERVALS[i - 8]!;
+                const rootDeg = currentDegree;
+                if (rootDeg === null) {
+                  return (
+                    <div
+                      key={`tone-${interval}`}
+                      className="pad tone tone-idle"
+                      aria-hidden
+                    />
+                  );
+                }
+                const on = tonesInclude(sheet.tones[selected], interval);
+                const note = intervalNoteLabel(sheet.key, rootDeg, interval);
+                return (
+                  <button
+                    key={`tone-${interval}`}
+                    type="button"
+                    className={`pad tone ${on ? "on" : ""}`}
+                    onClick={() => paintTone(interval)}
+                    aria-pressed={on}
+                    aria-label={note}
+                  >
+                    <span className="pad-label">{note}</span>
+                  </button>
+                );
               })}
 
             {mode === "rhythm" &&

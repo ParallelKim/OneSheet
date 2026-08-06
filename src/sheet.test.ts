@@ -2,18 +2,23 @@ import { describe, expect, it } from "vitest";
 import {
   barRhythm,
   chordFromDegree,
+  chordSymbolFromParts,
   clearRhythmOverride,
   compileSheet,
   createInitialSheet,
   cyclesPerSecond,
+  defaultTonesForDegree,
   guitarShape,
   holdRun,
+  intervalNoteLabel,
   isRhythmOverridden,
   nextSoundMode,
   paintRhythmStep,
   rhythmBarKind,
   rhythmFromLegacyBars,
+  slotLabel,
   SOUND_MODES,
+  toggleChordTone,
   toStrudel,
   type Articulation,
   type SheetState,
@@ -41,6 +46,31 @@ describe("chordFromDegree", () => {
     expect(chordFromDegree("G", 0)).toBe("G");
     expect(chordFromDegree("G", 4)).toBe("D");
     expect(chordFromDegree("F", 6)).toBe("Eo");
+  });
+});
+
+describe("root × tones", () => {
+  it("V + 기본 Maj 구성음은 G B D", () => {
+    expect(defaultTonesForDegree(4)).toEqual(["1", "3", "5"]);
+    expect(chordSymbolFromParts("G", ["1", "3", "5"])).toBe("G");
+    expect(intervalNoteLabel("C", 4, "1")).toBe("G");
+    expect(intervalNoteLabel("C", 4, "3")).toBe("B");
+    expect(intervalNoteLabel("C", 4, "5")).toBe("D");
+  });
+
+  it("iii 근음 + Maj 구성음 = E (Don't Look Back…)", () => {
+    expect(chordSymbolFromParts("E", ["1", "3", "5"])).toBe("E");
+    expect(slotLabel("C", 2, ["1", "3", "5"])).toBe("E");
+  });
+
+  it("IV 근음 + min 구성음 = Fm", () => {
+    expect(chordSymbolFromParts("F", ["1", "b3", "5"])).toBe("Fm");
+    expect(slotLabel("C", 3, ["1", "b3", "5"])).toBe("Fm");
+  });
+
+  it("3↔b3 토글은 배타", () => {
+    const next = toggleChordTone(["1", "3", "5"], "b3");
+    expect(next).toEqual(["1", "b3", "5"]);
   });
 });
 
@@ -142,6 +172,7 @@ describe("compileSheet / toStrudel", () => {
     const sheet: SheetState = {
       ...createInitialSheet(),
       degrees: Array(16).fill(null),
+      tones: Array(16).fill(null),
       metro: false,
     };
     expect(toStrudel(sheet)).toBe("silence");
@@ -151,6 +182,7 @@ describe("compileSheet / toStrudel", () => {
     const sheet: SheetState = {
       ...createInitialSheet(),
       degrees: Array(16).fill(null),
+      tones: Array(16).fill(null),
       metro: true,
     };
     const code = toStrudel(sheet);

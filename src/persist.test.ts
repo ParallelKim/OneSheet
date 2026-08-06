@@ -42,8 +42,24 @@ describe("normalizeSheet", () => {
     const sheet = normalizeSheet(null);
     expect(sheet.soundMode).toBe("strum");
     expect(sheet.degrees).toHaveLength(16);
+    expect(sheet.tones).toHaveLength(16);
     expect(sheet.rhythm).toHaveLength(16);
     expect(sheet.rhythmOverride).toHaveLength(4);
+  });
+
+  it("tones 없으면 degrees에서 기본 구성음", () => {
+    const sheet = normalizeSheet({
+      bpm: 96,
+      key: "C",
+      degrees: [5, 0, 4, 3],
+      rhythm: createInitialSheet().rhythm,
+      rhythmOverride: [null, null, null, null],
+      gain: 0.55,
+      metro: true,
+      soundMode: "strum",
+    });
+    expect(sheet.tones[0]).toEqual(["1", "b3", "5"]);
+    expect(sheet.tones[1]).toEqual(["1", "3", "5"]);
   });
 
   it("옛 soundMode는 strum으로 내린다", () => {
@@ -97,7 +113,8 @@ describe("localStorage sheet cache", () => {
     expect(loaded?.key).toBe("G");
     expect(loaded?.metro).toBe(false);
     expect(loaded?.rhythm).toHaveLength(16);
-    expect(localStorage.getItem(SHEET_STORAGE_KEY)).toContain('"v":2');
+    expect(localStorage.getItem(SHEET_STORAGE_KEY)).toContain('"v":3');
+    expect(loaded?.tones).toHaveLength(16);
   });
 
   it("없으면 초기 시트", () => {
