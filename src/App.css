@@ -377,6 +377,8 @@ button {
 .chip {
   --chip-row-h: 1.35rem;
   --chip-type: 0.72rem;
+  /* Bold 페이스 없음 → Pretendard로 폴백되지 않게 스택에서 제외 */
+  --font-chip: "Geist Pixel", system-ui, sans-serif;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -388,13 +390,11 @@ button {
   min-width: 0;
   min-height: calc(var(--chip-row-h) + 12px);
   box-sizing: border-box;
-  /*
-   * Pretendard — Regular+Bold 있음.
-   * Geist Pixel은 400만 있어 weight:700이 다른 폰트로 폴백되며 깨짐.
-   */
-  font-family: var(--font-ui);
+  font-family: var(--font-chip);
   font-size: var(--chip-type);
+  font-weight: 400;
   line-height: 1;
+  font-synthesis: none;
 }
 
 .key-chip {
@@ -414,8 +414,11 @@ button {
   color: var(--fg);
   font-family: inherit;
   font-size: var(--chip-type);
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1;
+  text-shadow:
+    0.45px 0 0 currentColor,
+    -0.45px 0 0 currentColor;
 }
 
 .key-step:active {
@@ -461,12 +464,15 @@ button {
   padding: 0;
   overflow: hidden;
   font-family: inherit;
-  font-weight: 700;
+  font-weight: 400;
   font-size: var(--key-reel-h);
   line-height: var(--key-reel-h);
   color: var(--fg);
   white-space: nowrap;
   text-align: center;
+  text-shadow:
+    0.45px 0 0 currentColor,
+    -0.45px 0 0 currentColor;
 }
 
 .tempo-chip {
@@ -487,10 +493,10 @@ button {
 .chip .key-step,
 .chip .key-reel,
 .chip .key-reel-item {
-  font-family: var(--font-ui);
+  font-family: var(--font-chip);
 }
 
-/* 라벨+값: 같은 폰트·크기, 값은 bold만 */
+/* 라벨+값: 같은 Geist Pixel·크기, 값은 emph(가짜 bold)만 */
 .chip-pair {
   display: inline-flex;
   align-items: baseline;
@@ -502,21 +508,23 @@ button {
 .chip-v {
   display: inline-block;
   font-size: inherit;
+  font-weight: 400;
   line-height: 1;
   letter-spacing: 0.02em;
   box-sizing: border-box;
 }
 
 .chip-k {
-  font-weight: 400;
   color: var(--muted);
 }
 
 .chip-v {
-  font-weight: 700;
   color: var(--fg);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  text-shadow:
+    0.45px 0 0 currentColor,
+    -0.45px 0 0 currentColor;
 }
 
 .transport,
