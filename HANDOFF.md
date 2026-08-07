@@ -53,6 +53,8 @@
 | `strum` | ✅ | 오픈셰이프 + late |
 | `piano` | | 선택 구성음만 동시 (오픈 6현 아님) |
 
+보이스(sample·gainMul·ADSR·clip·hpf)는 **`SOUND_MODE_VOICE`** (`src/sheet.ts`). 모드마다 따로 — sheet.gain만 공유.
+
 ## Transport / 오디오
 
 - PLAY: UI 위상 선부착 → 패턴 로드 → 스케줄러 start (사이클 0). 스트럼 폰트 워밍·latency 0.14

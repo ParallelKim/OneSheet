@@ -24,7 +24,9 @@ import {
   shiftKey,
   slotLabel,
   SOUND_MODES,
+  SOUND_MODE_VOICE,
   TONE_AXES,
+  soundModeVoice,
   toneAxisFaces,
   toStrudel,
   type Articulation,
@@ -384,6 +386,23 @@ describe("compileSheet / toStrudel", () => {
     expect(id).toBe("strum");
     expect(nextSoundMode("strum")).toBe("piano");
     expect(nextSoundMode("piano")).toBe("strum");
+  });
+
+  it("MODE마다 SOUND_MODE_VOICE 항목이 있다", () => {
+    for (const m of SOUND_MODES) {
+      const v = soundModeVoice(m.id);
+      expect(v).toBe(SOUND_MODE_VOICE[m.id]);
+      expect(v.sample.length).toBeGreaterThan(0);
+      expect(v.gainMul).toBeGreaterThan(0);
+      expect(v.muteClip).toBeGreaterThan(0);
+    }
+    expect(SOUND_MODE_VOICE.piano.sample).toBe("gm_piano:1");
+    expect(SOUND_MODE_VOICE.strum.sample).toBe(
+      "gm_electric_guitar_clean:5",
+    );
+    expect(SOUND_MODE_VOICE.piano.gainMul).not.toBe(
+      SOUND_MODE_VOICE.strum.gainMul,
+    );
   });
 
   it("rest 구간은 공격이 없다", () => {

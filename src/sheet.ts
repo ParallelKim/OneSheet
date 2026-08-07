@@ -30,6 +30,62 @@ export const SOUND_MODES: readonly SoundMode[] = [
 
 export type SoundModeId = (typeof SOUND_MODES)[number]["id"];
 
+/**
+ * 모드별 보이스 설정 — sample·gain·ADSR·clip.
+ * 새 MODE 추가 시 SOUND_MODES + 여기 + layer* 만 맞추면 된다.
+ * (스트럼의 pitchGain/late 등은 레이어 전용 보정으로 남김)
+ */
+export type SoundModeVoice = {
+  sample: string;
+  /** sheet.gain 에 곱하는 배율 */
+  gainMul: number;
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+  /** art === "X" 일 때 clip */
+  muteClip: number;
+  /** 고정 clip (있으면). 스트럼처럼 길이·late로 계산하면 생략 */
+  clip?: number;
+  hpf?: number;
+};
+
+export const SOUND_MODE_VOICE: Record<SoundModeId, SoundModeVoice> = {
+  strum: {
+    sample: "gm_electric_guitar_clean:5",
+    gainMul: 1.25,
+    attack: 0.003,
+    decay: 0.1,
+    sustain: 0.28,
+    release: 0.045,
+    muteClip: 0.18,
+    hpf: 180,
+  },
+  piano: {
+    sample: "gm_piano:1", // FluidR3
+    gainMul: 1.35,
+    attack: 0.006,
+    decay: 0.22,
+    sustain: 0.5,
+    release: 0.18,
+    muteClip: 0.16,
+    clip: 0.9,
+  },
+};
+
+export function soundModeVoice(id: SoundModeId): SoundModeVoice {
+  return SOUND_MODE_VOICE[id];
+}
+
+function voiceAdsr(v: SoundModeVoice): string {
+  return [
+    `.attack(${v.attack})`,
+    `.decay(${v.decay})`,
+    `.sustain(${v.sustain})`,
+    `.release(${v.release})`,
+  ].join("");
+}
+
 export type SheetState = {
   bpm: number;
   key: string;
@@ -109,11 +165,6 @@ const INTERVAL_ST: Record<ChordInterval, number> = {
 const TONES_MAJ: ToneSet = ["1", "3", "5"];
 const TONES_MIN: ToneSet = ["1", "b3", "5"];
 const TONES_DIM: ToneSet = ["1", "b3", "b5"];
-
-/** strum — GM clean 기타 */
-const TONE_STRUM = "gm_electric_guitar_clean:5";
-/** piano — 전음 동시, GM 피아노 */
-const TONE_PIANO = "gm_piano:1"; // FluidR3
 
 /**
  * 오픈(·바레) 셰이프 — 저→고 절대음.
@@ -1018,6 +1069,7 @@ function pianoEventNotes(e: TimedEvent): string[] {
  * piano — 선택 구성음만 동시. 기타 오픈셰이프/6현 금지.
  */
 function layerPiano(parts: StrudelParts): string {
+  const voice = soundModeVoice("piano");
   const maxVoices = Math.max(
     1,
     ...parts.events.map((e) => pianoEventNotes(e).length),
@@ -1037,8 +1089,7 @@ function layerPiano(parts: StrudelParts): string {
       .map((e) => {
         const notes = pianoEventNotes(e);
         if (!notes[slot]) return e.steps === 1 ? "0" : `0@${e.steps}`;
-        // guitar pitchGain/√N 공유하지 않음 — 구성음 동시타에 맞게 따로
-        const g = Number((e.gain * 1.35).toFixed(3));
+        const g = Number((e.gain * voice.gainMul).toFixed(3));
         return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
       })
       .join(" ");
@@ -1047,7 +1098,7 @@ function layerPiano(parts: StrudelParts): string {
       .map((e) => {
         const notes = pianoEventNotes(e);
         if (!notes[slot]) return e.steps === 1 ? "0" : `0@${e.steps}`;
-        const c = e.art === "X" ? 0.16 : 0.9;
+        const c = e.art === "X" ? voice.muteClip : (voice.clip ?? 0.9);
         return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
       })
       .join(" ");
@@ -1055,13 +1106,10 @@ function layerPiano(parts: StrudelParts): string {
     voices.push(
       [
         `note("${toks}")`,
-        `.s("${TONE_PIANO}")`,
+        `.s("${voice.sample}")`,
         `.gain("${gainPat}")`,
         `.clip("${clip}")`,
-        `.attack(0.006)`,
-        `.decay(0.22)`,
-        `.sustain(0.5)`,
-        `.release(0.18)`,
+        voiceAdsr(voice),
       ].join(""),
     );
   }
@@ -1107,6 +1155,7 @@ function pitchGain(midi: number): number {
 }
 
 function layerStrum(parts: StrudelParts): string {
+  const voice = soundModeVoice("strum");
   const maxVoices = Math.max(
     1,
     ...parts.events.map((e) =>
@@ -1139,7 +1188,12 @@ function layerStrum(parts: StrudelParts): string {
         if (!n) return e.steps === 1 ? "0" : `0@${e.steps}`;
         const durScale = Math.min(1, 2 / Math.max(1, e.steps));
         const g = Number(
-          (e.gain * durScale * pitchGain(noteMidi(n)) * 1.25).toFixed(3),
+          (
+            e.gain *
+            durScale *
+            pitchGain(noteMidi(n)) *
+            voice.gainMul
+          ).toFixed(3),
         );
         return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
       })
@@ -1152,7 +1206,8 @@ function layerStrum(parts: StrudelParts): string {
           return e.steps === 1 ? "0" : `0@${e.steps}`;
         }
         if (e.art === "X") {
-          return e.steps === 1 ? "0.18" : `0.18@${e.steps}`;
+          const m = voice.muteClip;
+          return e.steps === 1 ? String(m) : `${m}@${e.steps}`;
         }
         const dur = e.steps / total;
         const room = Math.max(0.55, (dur - lateAmt) / dur);
@@ -1163,14 +1218,11 @@ function layerStrum(parts: StrudelParts): string {
 
     let line = [
       `note("${toks}")`,
-      `.s("${TONE_STRUM}")`,
+      `.s("${voice.sample}")`,
       `.gain("${gainPat}")`,
       `.clip("${clip}")`,
-      `.hpf(180)`,
-      `.attack(0.003)`,
-      `.decay(0.1)`,
-      `.sustain(0.28)`,
-      `.release(0.045)`,
+      voice.hpf != null ? `.hpf(${voice.hpf})` : "",
+      voiceAdsr(voice),
     ].join("");
     if (slot > 0 && gap > 0) {
       line += `.late(${lateAmt.toFixed(5)})`;
