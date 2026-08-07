@@ -86,6 +86,14 @@ export default function App() {
   const [status, setStatus] = useState("");
   /** 재생 헤드: 4분 슬롯 0–15 (null = 정지) — 텍스트용 */
   const [playSlot, setPlaySlot] = useState<number | null>(null);
+  /** 키 슬롯머신 롤: dir +1=♯(위로), −1=♭(아래로) */
+  const [keyRoll, setKeyRoll] = useState<{
+    from: string;
+    to: string;
+    dir: 1 | -1;
+    gen: number;
+  } | null>(null);
+  const keyRollGen = useRef(0);
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
   const staffRef = useRef<HTMLDivElement>(null);
@@ -235,6 +243,24 @@ export default function App() {
     update((prev) => ({ ...prev, soundMode }));
   }, [update]);
 
+  const nudgeKey = useCallback(
+    (dir: 1 | -1) => {
+      update((prev) => {
+        const next = shiftKey(prev.key, dir);
+        if (next === prev.key) return prev;
+        keyRollGen.current += 1;
+        setKeyRoll({
+          from: prev.key,
+          to: next,
+          dir,
+          gen: keyRollGen.current,
+        });
+        return { ...prev, key: next };
+      });
+    },
+    [update],
+  );
+
   const onPlay = useCallback(() => {
     const gate = getPlaybackEpoch();
     try {
@@ -340,21 +366,55 @@ export default function App() {
             <button
               type="button"
               className="key-step"
-              onClick={() =>
-                update((prev) => ({ ...prev, key: shiftKey(prev.key, -1) }))
-              }
-              aria-label="key signature flat"
+              onClick={() => nudgeKey(-1)}
+              aria-label="key down flat"
             >
               ♭
             </button>
-            <span className="chip-v">{formatKeyGlyph(sheet.key)}</span>
+            <span className="key-reel" aria-live="polite">
+              {keyRoll ? (
+                <span
+                  key={keyRoll.gen}
+                  className={`key-reel-track ${keyRoll.dir > 0 ? "roll-up" : "roll-down"}`}
+                  onAnimationEnd={() =>
+                    setKeyRoll((cur) =>
+                      cur && cur.gen === keyRoll.gen ? null : cur,
+                    )
+                  }
+                >
+                  {keyRoll.dir > 0 ? (
+                    <>
+                      <span className="key-reel-item">
+                        {formatKeyGlyph(keyRoll.from)}
+                      </span>
+                      <span className="key-reel-item">
+                        {formatKeyGlyph(keyRoll.to)}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="key-reel-item">
+                        {formatKeyGlyph(keyRoll.to)}
+                      </span>
+                      <span className="key-reel-item">
+                        {formatKeyGlyph(keyRoll.from)}
+                      </span>
+                    </>
+                  )}
+                </span>
+              ) : (
+                <span className="key-reel-track">
+                  <span className="key-reel-item">
+                    {formatKeyGlyph(sheet.key)}
+                  </span>
+                </span>
+              )}
+            </span>
             <button
               type="button"
               className="key-step"
-              onClick={() =>
-                update((prev) => ({ ...prev, key: shiftKey(prev.key, 1) }))
-              }
-              aria-label="key signature sharp"
+              onClick={() => nudgeKey(1)}
+              aria-label="key up sharp"
             >
               ♯
             </button>

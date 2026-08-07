@@ -55,12 +55,13 @@ describe("chordFromDegree", () => {
   });
 });
 
-describe("circle of fifths key", () => {
-  it("♯/♭ 한 칸은 5도권 조표 이동", () => {
-    expect(shiftKey("C", 1)).toBe("G");
-    expect(shiftKey("C", -1)).toBe("F");
-    expect(shiftKey("G", -1)).toBe("C");
-    expect(shiftKey("F", 1)).toBe("C");
+describe("chromatic key steps", () => {
+  it("♯/♭ 한 칸은 반음 키 단위", () => {
+    expect(shiftKey("C", 1)).toBe("Db");
+    expect(shiftKey("C", -1)).toBe("B");
+    expect(shiftKey("Db", -1)).toBe("C");
+    expect(shiftKey("F", 1)).toBe("F#");
+    expect(shiftKey("G", -1)).toBe("F#");
   });
 
   it("12조를 한 바퀴 돈다", () => {
@@ -75,6 +76,7 @@ describe("circle of fifths key", () => {
     expect(seen.has("F#")).toBe(true);
     expect(seen.has("Db")).toBe(true);
     expect(seen.has("Eb")).toBe(true);
+    expect(seen.has("B")).toBe(true);
   });
 
   it("F#·Db 다이아토닉 근음", () => {

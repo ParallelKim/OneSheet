@@ -341,8 +341,7 @@ export const MAJOR_KEYS: Record<string, readonly string[]> = {
 };
 
 /**
- * 5도권 (시계방향 = 조표 ♯·완전5도 위).
- * C→G→…→F#→Db→…→F→C — 메이저 12조 전부.
+ * 5도권 (참고·레거시). UI 순회는 KEY_CHROMATIC을 쓴다.
  */
 export const CIRCLE_OF_FIFTHS = [
   "C",
@@ -359,19 +358,38 @@ export const CIRCLE_OF_FIFTHS = [
   "F",
 ] as const;
 
-export type MajorKey = (typeof CIRCLE_OF_FIFTHS)[number];
+/**
+ * 반음 키 단위 순 (낮→높).
+ * ♭ = −1, ♯ = +1 — 표기는 보유 12조 철자(Db·F# 등).
+ */
+export const KEY_CHROMATIC = [
+  "C",
+  "Db",
+  "D",
+  "Eb",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "Ab",
+  "A",
+  "Bb",
+  "B",
+] as const;
 
-export const KEY_LIST: readonly string[] = CIRCLE_OF_FIFTHS;
+export type MajorKey = (typeof KEY_CHROMATIC)[number];
 
-/** 조표처럼 5도권으로 steps칸 이동 (+ = ♯쪽, − = ♭쪽) */
+export const KEY_LIST: readonly string[] = KEY_CHROMATIC;
+
+/** 반음 키 단위로 steps칸 이동 (+ = ♯·위, − = ♭·아래) */
 export function shiftKey(current: string, steps: number): string {
-  const i = CIRCLE_OF_FIFTHS.indexOf(current as MajorKey);
+  const i = KEY_CHROMATIC.indexOf(current as MajorKey);
   const from = i < 0 ? 0 : i;
-  const n = CIRCLE_OF_FIFTHS.length;
-  return CIRCLE_OF_FIFTHS[((from + steps) % n + n) % n]!;
+  const n = KEY_CHROMATIC.length;
+  return KEY_CHROMATIC[((from + steps) % n + n) % n]!;
 }
 
-/** @deprecated shiftKey(current, 1) — 5도권 ♯쪽 */
+/** @deprecated shiftKey(current, 1) */
 export function nextKey(current: string): string {
   return shiftKey(current, 1);
 }
