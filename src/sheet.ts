@@ -881,6 +881,8 @@ export function cyclesPerSecond(bpm: number): number {
 
 export type TimedEvent = {
   chord: string | null;
+  /** 슬롯 구성음 — piano 보이싱용. chord만 있으면 decode */
+  tones: ToneSet | null;
   steps: number;
   gain: number;
   art: AttackArt | null;
@@ -915,12 +917,13 @@ export function compileSheet(sheet: SheetState): StrudelParts {
           art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
         events.push({
           chord,
+          tones: toneSet ?? defaultTonesForDegree(degree!),
           steps,
           gain: Number(gain.toFixed(3)),
           art: art as AttackArt,
         });
         if (art === "X" && holds > 0) {
-          events.push({ chord: null, steps: holds, gain: 0, art: null });
+          events.push({ chord: null, tones: null, steps: holds, gain: 0, art: null });
         }
         step += 1 + holds;
         continue;
@@ -937,7 +940,7 @@ export function compileSheet(sheet: SheetState): StrudelParts {
         span += 1;
         step += 1;
       }
-      events.push({ chord: null, steps: span, gain: 0, art: null });
+      events.push({ chord: null, tones: null, steps: span, gain: 0, art: null });
     }
   }
 
@@ -977,31 +980,54 @@ function strokeNotes(chord: string, art: AttackArt): string[] {
 }
 
 /**
- * piano — 오픈셰이프 전음 동시.
- * 쉼표 코드+@는 미니노테이션에서 마지막 음에만 붙어 깨지므로
- * strum과 같이 보이스 스택( gap=0 )으로 낸다.
+ * piano 보이싱: 선택한 구성음만 (오픈 6현 아님).
+ * 근음 부근(C3–C4)에서 한 번씩만 쌓는다.
+ */
+export function pianoToneNotes(root: string, tones: ToneSet): string[] {
+  const pc = PC[root] ?? 0;
+  let rootMidi = 48 + ((pc - 0 + 12) % 12); // C3=48 근처
+  if (rootMidi > 59) rootMidi -= 12;
+  const sts = normTones(tones).map((id) => INTERVAL_ST[id]);
+  const midis: number[] = [];
+  let prev = rootMidi - 1;
+  for (const st of sts) {
+    let n = rootMidi + st;
+    while (n <= prev) n += 12;
+    if (n > 76) n -= 12;
+    midis.push(n);
+    prev = n;
+  }
+  return midis.map(midiToNote);
+}
+
+function pianoEventNotes(e: TimedEvent): string[] {
+  if (!e.chord || !e.art) return [];
+  const { root, tones: decoded } = decodeChordToTones(e.chord);
+  const tones =
+    e.tones && e.tones.length > 0 ? e.tones : decoded;
+  const notes = pianoToneNotes(root, tones);
+  if (e.art === "X") {
+    // 뮤트: 중음만 짧게
+    if (notes.length <= 2) return notes;
+    return notes.slice(1, Math.min(3, notes.length));
+  }
+  return notes;
+}
+
+/**
+ * piano — 선택 구성음만 동시. 기타 오픈셰이프/6현 금지.
  */
 function layerPiano(parts: StrudelParts): string {
   const maxVoices = Math.max(
     1,
-    ...parts.events.map((e) =>
-      e.chord && e.art
-        ? (e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord))
-            .length
-        : 0,
-    ),
+    ...parts.events.map((e) => pianoEventNotes(e).length),
   );
   const voices: string[] = [];
 
   for (let slot = 0; slot < maxVoices; slot++) {
     const toks = parts.events
       .map((e) => {
-        if (!e.chord || !e.art) {
-          return e.steps === 1 ? "~" : `~@${e.steps}`;
-        }
-        const notes =
-          e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord);
-        const n = notes[slot];
+        const n = pianoEventNotes(e)[slot];
         if (!n) return e.steps === 1 ? "~" : `~@${e.steps}`;
         return e.steps === 1 ? n : `${n}@${e.steps}`;
       })
@@ -1009,27 +1035,22 @@ function layerPiano(parts: StrudelParts): string {
 
     const gainPat = parts.events
       .map((e) => {
-        if (!e.chord || !e.art) {
-          return e.steps === 1 ? "0" : `0@${e.steps}`;
-        }
-        const notes =
-          e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord);
+        const notes = pianoEventNotes(e);
         if (!notes[slot]) return e.steps === 1 ? "0" : `0@${e.steps}`;
         const durScale = Math.min(1, 2 / Math.max(1, e.steps));
-        const g = Number((e.gain * durScale * 0.38).toFixed(3));
+        const voiceN = Math.max(1, notes.length);
+        const g = Number(
+          ((e.gain * durScale * 0.55) / Math.sqrt(voiceN)).toFixed(3),
+        );
         return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
       })
       .join(" ");
 
     const clip = parts.events
       .map((e) => {
-        if (!e.chord || !e.art) {
-          return e.steps === 1 ? "0" : `0@${e.steps}`;
-        }
-        const notes =
-          e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord);
+        const notes = pianoEventNotes(e);
         if (!notes[slot]) return e.steps === 1 ? "0" : `0@${e.steps}`;
-        const c = e.art === "X" ? 0.18 : 0.92;
+        const c = e.art === "X" ? 0.16 : 0.9;
         return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
       })
       .join(" ");
@@ -1040,10 +1061,10 @@ function layerPiano(parts: StrudelParts): string {
         `.s("${TONE_PIANO}")`,
         `.gain("${gainPat}")`,
         `.clip("${clip}")`,
-        `.attack(0.004)`,
-        `.decay(0.12)`,
-        `.sustain(0.32)`,
-        `.release(0.05)`,
+        `.attack(0.008)`,
+        `.decay(0.18)`,
+        `.sustain(0.35)`,
+        `.release(0.12)`,
       ].join(""),
     );
   }

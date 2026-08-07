@@ -18,6 +18,7 @@ import {
   paintDegreeSlot,
   paintRhythmStep,
   paintToneSlot,
+  pianoToneNotes,
   rhythmBarKind,
   rhythmFromLegacyBars,
   shiftKey,
@@ -361,22 +362,19 @@ describe("compileSheet / toStrudel", () => {
     expect(high / low).toBeGreaterThan(3);
   });
 
-  it("piano는 오픈셰이프 전음 동시(보이스 스택)·gm_piano·late 없음", () => {
+  it("piano는 선택 구성음만·오픈셰이프/6현 아님", () => {
     const sheet = sheetWithLoop();
     const code = toStrudel({ ...sheet, soundMode: "piano", metro: false });
     expect(code).toMatch(/^setcps\(/);
-    expect(code).toContain("a2@4");
-    expect(code).toContain("e3@4");
-    expect(code).toContain("c4@4");
-    expect(code).toContain("c3@4");
-    expect(code).toContain("g2@4");
     expect(code).toContain('.s("gm_piano:1")');
     expect(code).toContain("stack(");
     expect(code).not.toContain(".late(");
     expect(code).not.toContain("gm_electric_guitar_clean");
-    expect(code).not.toContain("sawtooth");
-    // 쉼표 코드@steps 함정 금지 (마지막 음에만 @ 붙음)
-    expect(code).not.toMatch(/[a-g][#b]?\d,[a-g].*@\d/);
+    // Am 오픈(a2…e4 5~6음)이 아니라 구성음 3음 근처
+    expect(code).not.toContain("a2@4");
+    expect(code).not.toContain("g2@4");
+    expect(pianoToneNotes("A", ["1", "b3", "5"])).toEqual(["a3", "c4", "e4"]);
+    expect(pianoToneNotes("C", ["1", "3", "5"])).toEqual(["c3", "e3", "g3"]);
   });
 
   it("MODE는 strum→piano 순환", () => {

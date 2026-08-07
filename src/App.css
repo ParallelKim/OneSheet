@@ -470,24 +470,30 @@ button {
   font-size: 0.6rem;
   color: var(--muted);
   line-height: 1;
-  display: inline-flex;
-  align-items: center;
 }
 
 .chip-v {
-  --chip-v-h: 0.78rem;
-  display: inline-flex;
-  align-items: center;
-  height: var(--chip-v-h);
   font-size: 0.72rem;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
 }
 
-.key-chip,
-.chip {
-  align-items: center;
+/* MODE: 라벨 위 · 값 아래 (가로로 어긋나지 않게) */
+.mode-chip {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  min-height: 2.1rem;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.mode-chip .chip-k,
+.mode-chip .chip-v {
+  display: block;
+  height: auto;
 }
 
 .transport,
