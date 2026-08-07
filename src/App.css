@@ -376,6 +376,7 @@ button {
 
 .chip {
   --chip-row-h: 1.35rem;
+  --chip-type: 0.72rem;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -387,7 +388,13 @@ button {
   min-width: 0;
   min-height: calc(var(--chip-row-h) + 12px);
   box-sizing: border-box;
+  /*
+   * Pretendard — Regular+Bold 있음.
+   * Geist Pixel은 400만 있어 weight:700이 다른 폰트로 폴백되며 깨짐.
+   */
   font-family: var(--font-ui);
+  font-size: var(--chip-type);
+  line-height: 1;
 }
 
 .key-chip {
@@ -405,8 +412,9 @@ button {
   border-radius: calc(var(--radius) - 2px);
   background: var(--fill);
   color: var(--fg);
-  font-family: var(--font-ui);
-  font-size: 0.78rem;
+  font-family: inherit;
+  font-size: var(--chip-type);
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -417,7 +425,7 @@ button {
 
 /* 키 릴 — 고정폭 + 뷰포트 정확히 1행 (두 키가 동시에 비치지 않게) */
 .key-reel {
-  --key-reel-h: 0.78rem;
+  --key-reel-h: var(--chip-type);
   --key-reel-w: 2.75ch;
   display: inline-block;
   vertical-align: middle;
@@ -452,7 +460,7 @@ button {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  font-family: var(--font-ui);
+  font-family: inherit;
   font-weight: 700;
   font-size: var(--key-reel-h);
   line-height: var(--key-reel-h);
@@ -473,7 +481,16 @@ button {
   accent-color: var(--fg);
 }
 
-/* 라벨+값: 같은 베이스라인 (piano 디센더에 center가 깨지지 않게) */
+.chip,
+.chip .chip-k,
+.chip .chip-v,
+.chip .key-step,
+.chip .key-reel,
+.chip .key-reel-item {
+  font-family: var(--font-ui);
+}
+
+/* 라벨+값: 같은 폰트·크기, 값은 bold만 */
 .chip-pair {
   display: inline-flex;
   align-items: baseline;
@@ -484,20 +501,20 @@ button {
 .chip-k,
 .chip-v {
   display: inline-block;
+  font-size: inherit;
   line-height: 1;
+  letter-spacing: 0.02em;
   box-sizing: border-box;
 }
 
 .chip-k {
-  font-size: 0.6rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 400;
   color: var(--muted);
 }
 
 .chip-v {
-  font-size: 0.72rem;
   font-weight: 700;
+  color: var(--fg);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
