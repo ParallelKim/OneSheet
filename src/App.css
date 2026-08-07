@@ -487,12 +487,98 @@ button {
   accent-color: var(--fg);
 }
 
+/* BPM / VOL 노브 초안 — 세로 드래그, 원형은 표시 */
+.knob-chip {
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: 5px 8px;
+  min-height: 0;
+  user-select: none;
+  touch-action: none;
+  cursor: ns-resize;
+}
+
+.knob-chip:active {
+  transform: none;
+}
+
+.knob-chip.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.param-knob {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.param-knob-k {
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.param-knob-dial {
+  position: relative;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--fill);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  display: grid;
+  place-items: center;
+}
+
+.param-knob-rotator {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.param-knob-tick {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 2px;
+  height: 6px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--fg);
+}
+
+.param-knob-v {
+  position: relative;
+  z-index: 1;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  color: var(--fg);
+  line-height: 1;
+  text-shadow:
+    0.45px 0 0 currentColor,
+    -0.45px 0 0 currentColor;
+  pointer-events: none;
+}
+
+.knob-chip.is-dragging .param-knob-dial {
+  border-color: var(--fg);
+  background: var(--fill-2);
+}
+
 .chip,
 .chip .chip-k,
 .chip .chip-v,
 .chip .key-step,
 .chip .key-reel,
-.chip .key-reel-item {
+.chip .key-reel-item,
+.knob-chip {
   font-family: var(--font-chip);
 }
 

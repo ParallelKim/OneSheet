@@ -48,6 +48,7 @@ import {
   warmPianoFont,
 } from "./engine";
 import { KeyReel } from "./KeyReel";
+import { ParamKnob } from "./ParamKnob";
 import "./App.css";
 
 type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
@@ -374,6 +375,23 @@ export default function App() {
               ♯
             </button>
           </div>
+          <ParamKnob
+            label="BPM"
+            value={sheet.bpm}
+            min={70}
+            max={140}
+            step={1}
+            onChange={(bpm) => update((prev) => ({ ...prev, bpm }))}
+          />
+          <ParamKnob
+            label="VOL"
+            value={sheet.gain}
+            min={0.05}
+            max={1}
+            step={0.01}
+            format={(v) => String(Math.round(v * 100))}
+            onChange={(gain) => update((prev) => ({ ...prev, gain }))}
+          />
           <button
             type="button"
             className="chip"
@@ -385,18 +403,6 @@ export default function App() {
               <span className="chip-v">{soundModeById(sheet.soundMode).label}</span>
             </span>
           </button>
-          <label className="chip tempo-chip">
-            <span className="chip-k">BPM</span>
-            <input
-              type="range"
-              min={70}
-              max={140}
-              step={1}
-              value={sheet.bpm}
-              onChange={(e) => update((prev) => ({ ...prev, bpm: Number(e.target.value) }))}
-            />
-            <span className="chip-v">{sheet.bpm}</span>
-          </label>
           <p className={`pos ${playing ? "playing" : ""}`} aria-label="position">
             <span className="pos-bar">|{posBar + 1}|</span>
             <span className="pos-beat">{posBeat}</span>
