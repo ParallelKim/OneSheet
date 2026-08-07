@@ -512,16 +512,16 @@ export default function App() {
                 className="tr-metro-ticks"
                 d="M10.2 7.2h3.6M10.2 9.4h3.6M10.2 11.6h3.6M10.2 13.8h3.6"
               />
-              {/* 추봉 + 사각 슬라이드 추 */}
-              <path d="M12 5.8 18.6 9.6" />
+              {/* 추봉 — 하단 피벗 고정, 위가 기울어짐 */}
+              <path d="M12 17.4 16.6 5.8" />
               <rect
                 className="tr-metro-bob"
-                x="16.9"
-                y="8.35"
+                x="14.55"
+                y="7.85"
                 width="3.4"
                 height="2.5"
                 rx="0.35"
-                transform="rotate(28 18.6 9.6)"
+                transform="rotate(-20 16.25 9.1)"
                 fill="currentColor"
                 stroke="none"
               />
