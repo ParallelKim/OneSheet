@@ -357,6 +357,7 @@ const CHORD_PRESETS: readonly ToneSet[] = [
   TONES_MIN,
   ["1", "3", "5", "b7"],
   ["1", "b3", "5", "b7"],
+  ["1", "2", "3", "5"],
   ["1", "4", "5"],
 ];
 

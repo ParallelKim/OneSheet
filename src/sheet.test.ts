@@ -116,6 +116,9 @@ describe("root × tones", () => {
     sheet = paintDegreeSlot(sheet, 0, 0); // → Cm7
     expect(slotLabel("C", 0, sheet.tones[0])).toBe("Cm7");
 
+    sheet = paintDegreeSlot(sheet, 0, 0); // → Cadd2
+    expect(slotLabel("C", 0, sheet.tones[0])).toBe("Cadd2");
+
     sheet = paintDegreeSlot(sheet, 0, 0); // → Csus4
     expect(slotLabel("C", 0, sheet.tones[0])).toBe("Csus4");
 
