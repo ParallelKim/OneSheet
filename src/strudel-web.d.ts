@@ -2,7 +2,10 @@ declare module "@strudel/web" {
   export function initStrudel(
     options?: Record<string, unknown>,
   ): Promise<unknown>;
-  export function evaluate(code: string): Promise<unknown>;
+  export function evaluate(
+    code: string,
+    autoplay?: boolean,
+  ): Promise<unknown>;
   export function hush(): void;
   export function getAudioContext(): AudioContext;
   export function initAudio(
@@ -18,6 +21,9 @@ declare module "@strudel/web" {
     dictionary: Record<string, string[]>,
     options?: Record<string, unknown>,
   ): void;
+  export function getSuperdoughAudioController(): {
+    output?: { destinationGain?: GainNode | null };
+  };
 }
 
 declare module "@strudel/soundfonts" {

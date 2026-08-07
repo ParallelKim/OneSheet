@@ -371,6 +371,31 @@ button {
   min-width: 0;
 }
 
+.key-chip {
+  gap: 4px;
+}
+
+.key-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--fill);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.key-step:active {
+  transform: scale(0.94);
+  background: var(--fill-2);
+}
+
 .tempo-chip {
   flex: 1;
 }

@@ -11,7 +11,10 @@
 - 코드 슬롯 **비움** (채우지 않은 칸은 쉼)
 - 메트로놈 **off**, 클릭 gain `0.32`
 
-## 화성 (DEG)
+## 조성
+
+- 5도권 12조: `C G D A E B F# Db Ab Eb Bb F`
+- KEY **♭ / ♯** = 조표처럼 한 칸 (완전5도 ↓/↑)
 
 - **위 8**: 근음 도수 I…vii° + ∅ (비우기는 ∅만)
 - 같은 근음 재클릭 → 공통 순회: maj → min → 7 → m7 → add2 → sus4 (세부 구성음은 패드로)
@@ -33,9 +36,19 @@
 | `strum` | ✅ | 오픈셰이프 + late |
 | `piano` | | 전음 동시 |
 
-## Persist
+## Transport / 오디오
 
-- `onesheet.sheet.v3`
+- PLAY: UI 위상 선부착 → 패턴 로드 → 스케줄러 start (사이클 0). 스트럼 폰트 워밍·latency 0.14
+- STOP: epoch↑ + 마스터 gain duck(~30ms) + hush — 스케줄만 끊지 않고 잔향도 짧게 죽임
+- 편집 중 재생: syncStart 없이 핫스왑
+
+## Share (SheetDoc)
+
+휴대용 채보 포맷 `SheetDoc` v1 — URL / 파일 / 서버 공통.
+
+- 쿼리: `?s=<base64url(JSON)>` (우선 로드, 편집 시 `replaceState` 동기화)
+- 필드: `v,bpm,key,metro,mode,gain?,deg[16],ton[16],rhy,ov[3]`
+- 코드: `src/sheetDoc.ts`, 쿼리 어댑터 `src/shareQuery.ts`
 
 ```bash
 npm test && npm run build

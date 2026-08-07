@@ -11,12 +11,13 @@ import {
   clearRhythmOverride,
   defaultTonesForDegree,
   DEGREE_META,
-  nextKey,
+  formatKeyGlyph,
   nextSoundMode,
   paintDegreeSlot,
   paintRhythmStep,
   paintToneSlot,
   rhythmBarKind,
+  shiftKey,
   SLOTS,
   slotLabel,
   slotRoman,
@@ -33,6 +34,7 @@ import {
   type ToneAxisId,
 } from "./sheet";
 import { loadSheetState, saveStoredSheet } from "./persist";
+import { readSheetFromSearch, syncSheetQuery } from "./shareQuery";
 import {
   ensureAudioRunning,
   evaluateStrudel,
@@ -62,8 +64,21 @@ function playColHold(posInRow: number, hold = 0.7): number {
   return i + (frac - hold) / (1 - hold);
 }
 
+function loadInitialSheet(): SheetState {
+  try {
+    const fromUrl = readSheetFromSearch(window.location.search);
+    if (fromUrl) {
+      saveStoredSheet(fromUrl);
+      return fromUrl;
+    }
+  } catch (err) {
+    console.warn("share query load failed", err);
+  }
+  return loadSheetState();
+}
+
 export default function App() {
-  const [sheet, setSheet] = useState<SheetState>(loadSheetState);
+  const [sheet, setSheet] = useState<SheetState>(loadInitialSheet);
   const [selected, setSelected] = useState(0);
   const [mode, setMode] = useState<Mode>("chart");
   const [brush, setBrush] = useState<Articulation>("D");
@@ -84,6 +99,12 @@ export default function App() {
   // 편집본 localStorage 캐시 (배포/새로고침 유지)
   useEffect(() => {
     saveStoredSheet(sheet);
+  }, [sheet]);
+
+  // 공유용 ?s= 동기화 (같은 포맷으로 파일/서버도 열 예정)
+  useEffect(() => {
+    const id = window.setTimeout(() => syncSheetQuery(sheet), 160);
+    return () => window.clearTimeout(id);
   }, [sheet]);
 
   // 엔진은 마운트 직후 백그라운드 기동 (Play를 기다리지 않음)
@@ -240,15 +261,17 @@ export default function App() {
           return;
         }
         const code = toStrudel(sheetRef.current);
-        const ok = await evaluateStrudel(code);
+        // UI 위상을 0에 붙인 뒤 스케줄러 start — 첫 코드 잘림 완화
+        playingRef.current = true;
+        setEngine("playing");
+        setStatus("");
+        const ok = await evaluateStrudel(code, { syncStart: true });
         if (!ok || getPlaybackEpoch() !== gate) {
           playingRef.current = false;
           setEngine((e) => (e === "error" ? e : "ready"));
           setStatus("");
           return;
         }
-        playingRef.current = true;
-        setEngine("playing");
         setStatus(
           getAudioState() === "running" ? "" : "audio locked — tap PLAY",
         );
@@ -312,14 +335,30 @@ export default function App() {
     <div className="app">
       <section className="lcd" aria-label="lcd">
         <div className="lcd-meta">
-          <button
-            type="button"
-            className="chip"
-            onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
-          >
+          <div className="chip key-chip" role="group" aria-label="key">
             <span className="chip-k">KEY</span>
-            <span className="chip-v">{sheet.key}</span>
-          </button>
+            <button
+              type="button"
+              className="key-step"
+              onClick={() =>
+                update((prev) => ({ ...prev, key: shiftKey(prev.key, -1) }))
+              }
+              aria-label="key signature flat"
+            >
+              ♭
+            </button>
+            <span className="chip-v">{formatKeyGlyph(sheet.key)}</span>
+            <button
+              type="button"
+              className="key-step"
+              onClick={() =>
+                update((prev) => ({ ...prev, key: shiftKey(prev.key, 1) }))
+              }
+              aria-label="key signature sharp"
+            >
+              ♯
+            </button>
+          </div>
           <button
             type="button"
             className="chip"
