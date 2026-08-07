@@ -411,9 +411,9 @@ button {
   background: var(--fill-2);
 }
 
-/* 키 릴 — 최장 글리프(F♯/D♭ 등) 기준 고정폭. 레이아웃 시프트 금지 */
+/* 키 릴 — 고정폭 + 뷰포트 정확히 1행 (두 키가 동시에 비치지 않게) */
 .key-reel {
-  --key-reel-h: 1.15em;
+  --key-reel-h: 0.78rem;
   --key-reel-w: 2.75ch;
   display: inline-block;
   vertical-align: middle;
@@ -422,36 +422,38 @@ button {
   max-width: var(--key-reel-w);
   height: var(--key-reel-h);
   overflow: hidden;
+  contain: paint;
   font-variant-numeric: tabular-nums;
   text-align: center;
+  line-height: var(--key-reel-h);
 }
 
 .key-reel-track {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  display: block;
   width: 100%;
-  transform: translateY(calc(var(--key-y, 0) * var(--key-reel-h)));
+  transform: translate3d(0, calc(var(--key-y, 0) * var(--key-reel-h)), 0);
   transition: none;
+  will-change: transform;
 }
 
 .key-reel-track.is-moving {
-  transition: transform 0.36s cubic-bezier(0.2, 0.85, 0.25, 1);
+  transition: transform 0.28s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .key-reel-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   box-sizing: border-box;
   width: 100%;
-  flex: 0 0 var(--key-reel-h);
   height: var(--key-reel-h);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
   font-weight: 700;
-  font-size: 0.78rem;
-  line-height: 1;
+  font-size: var(--key-reel-h);
+  line-height: var(--key-reel-h);
   color: var(--fg);
   white-space: nowrap;
+  text-align: center;
 }
 
 .tempo-chip {

@@ -3,21 +3,31 @@ import { formatKeyGlyph } from "./sheet";
 
 type KeyReelProps = {
   value: string;
-  /** +1 = ♯(스트립↑), −1 = ♭(스트립↓) */
+  /** +1 = ♯, −1 = ♭ */
   dir: 1 | -1;
   /** nudge마다 증가 */
   gen: number;
 };
 
+type Phase =
+  | { kind: "idle"; key: string }
+  | {
+      kind: "roll";
+      /** 위→아래 순서의 두 칸 */
+      top: string;
+      bottom: string;
+      /** 0 = top 칸 표시, -1 = bottom 칸 표시 */
+      y: 0 | -1;
+      moving: boolean;
+    };
+
 /**
- * 슬롯/오도미터 릴: 고정 뷰포트 한 칸.
- * 스트립이 한 칸 미끄러져 착지 — 첫 프레임 오표시·종료 스냅 없음.
+ * 오도미터 릴: 뷰포트에는 항상 한 칸만.
+ * ♯ = 새 키가 위에서 내려옴 (스트립 ↓)
+ * ♭ = 새 키가 아래에서 올라옴 (스트립 ↑)
  */
 export function KeyReel({ value, dir, gen }: KeyReelProps) {
-  const [a, setA] = useState(value);
-  const [b, setB] = useState(value);
-  const [y, setY] = useState(0);
-  const [moving, setMoving] = useState(false);
+  const [phase, setPhase] = useState<Phase>({ kind: "idle", key: value });
   const shown = useRef(value);
   const lastGen = useRef(0);
 
@@ -28,48 +38,51 @@ export function KeyReel({ value, dir, gen }: KeyReelProps) {
     const from = shown.current;
     const to = value;
     if (from === to) return;
-
-    if (dir > 0) {
-      setA(from);
-      setB(to);
-      setY(0);
-    } else {
-      setA(to);
-      setB(from);
-      setY(-1);
-    }
-    setMoving(false);
     shown.current = to;
+
+    // ♯(+): [to, from] — 시작 y=-1(from) → y=0(to). 스트립이 아래로, 새 키가 위에서 진입
+    // ♭(−): [from, to] — 시작 y=0(from) → y=-1(to). 스트립이 위로, 새 키가 아래에서 진입
+    const top = dir > 0 ? to : from;
+    const bottom = dir > 0 ? from : to;
+    const y0: 0 | -1 = dir > 0 ? -1 : 0;
+    const y1: 0 | -1 = dir > 0 ? 0 : -1;
+
+    setPhase({ kind: "roll", top, bottom, y: y0, moving: false });
 
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        setMoving(true);
-        setY(dir > 0 ? -1 : 0);
+        setPhase({ kind: "roll", top, bottom, y: y1, moving: true });
       });
     });
     return () => cancelAnimationFrame(id);
   }, [value, dir, gen]);
 
   const settle = () => {
-    const cur = shown.current;
-    setMoving(false);
-    setA(cur);
-    setB(cur);
-    setY(0);
+    setPhase({ kind: "idle", key: shown.current });
   };
+
+  if (phase.kind === "idle") {
+    return (
+      <span className="key-reel" aria-live="polite">
+        <span className="key-reel-track" style={{ ["--key-y" as string]: "0" }}>
+          <span className="key-reel-item">{formatKeyGlyph(phase.key)}</span>
+        </span>
+      </span>
+    );
+  }
 
   return (
     <span className="key-reel" aria-live="polite">
       <span
-        className={`key-reel-track${moving ? " is-moving" : ""}`}
-        style={{ ["--key-y" as string]: String(y) }}
+        className={`key-reel-track${phase.moving ? " is-moving" : ""}`}
+        style={{ ["--key-y" as string]: String(phase.y) }}
         onTransitionEnd={(e) => {
           if (e.propertyName !== "transform") return;
           settle();
         }}
       >
-        <span className="key-reel-item">{formatKeyGlyph(a)}</span>
-        <span className="key-reel-item">{formatKeyGlyph(b)}</span>
+        <span className="key-reel-item">{formatKeyGlyph(phase.top)}</span>
+        <span className="key-reel-item">{formatKeyGlyph(phase.bottom)}</span>
       </span>
     </span>
   );
