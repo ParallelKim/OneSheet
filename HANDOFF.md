@@ -73,12 +73,12 @@
 
 | | |
 |--|--|
-| **쓰기** | **v2** 비트팩 → base64url (첫 바이트 `2`) |
-| **읽기** | v2 바이너리 **또는** v1 JSON (옛 링크) |
-| 필드 | bpm·key·metro·mode·gain·deg[16]·ton[16]·rhy·ov[3] |
+| **쓰기** | **v3** 비트팩 → base64url (첫 바이트 `3`) |
+| **읽기** | v3 / v2 바이너리 **또는** v1 JSON (옛 링크) |
+| 필드 | bpm(40–240)·key·metro·mode·gain·deg[16]·ton[16]·rhy·ov[3] |
 | 코드 | `src/sheetDoc.ts`, 쿼리 `src/shareQuery.ts` |
 
-v2가 JSON v1 대비 대략 1/3 이하 길이 (차트 채움 기준 ~60–90자).
+v3가 JSON v1 대비 대략 1/3 이하 길이 (차트 채움 기준 ~60–90자). v2는 bpm 70–140 오프셋 레거시.
 
 ```bash
 npm test && npm run build

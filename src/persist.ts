@@ -2,6 +2,8 @@ import {
   ARTICULATIONS,
   BARS,
   BAR_STEPS,
+  BPM_MAX,
+  BPM_MIN,
   CHORD_INTERVALS,
   createInitialSheet,
   defaultTonesForDegree,
@@ -116,7 +118,7 @@ export function normalizeSheet(raw: unknown): SheetState {
   if (!raw || typeof raw !== "object") return base;
   const o = raw as Record<string, unknown>;
 
-  const bpm = Math.min(140, Math.max(70, Math.round(asNumber(o.bpm, base.bpm))));
+  const bpm = Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(asNumber(o.bpm, base.bpm))));
   const key =
     typeof o.key === "string" && KEY_SET.has(o.key) ? o.key : base.key;
   const gain = Math.min(1, Math.max(0.05, asNumber(o.gain, base.gain)));

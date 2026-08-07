@@ -13,6 +13,7 @@ import {
   encodeSheetDoc,
   encodeSheetParam,
   encodeSheetV2,
+  encodeSheetV3,
   sheetToDoc,
 } from "./sheetDoc";
 import { readSheetFromSearch, SHARE_QUERY_KEY, sheetToShareUrl } from "./shareQuery";
@@ -67,7 +68,7 @@ describe("SheetDoc v1 (legacy read)", () => {
   });
 });
 
-describe("SheetDoc v2", () => {
+describe("SheetDoc v3", () => {
   it("빈 시트 왕복", () => {
     const sheet = createInitialSheet();
     const again = decodeSheetParam(encodeSheetParam(sheet));
@@ -88,17 +89,25 @@ describe("SheetDoc v2", () => {
     expect(again?.gain).toBeCloseTo(sheet.gain, 2);
   });
 
-  it("쓰기는 v2이며 v1 JSON보다 짧다", () => {
+  it("쓰기는 v3이며 v1 JSON보다 짧다", () => {
     const sheet = richSheet();
-    const v2 = encodeSheetParam(sheet);
+    const v3 = encodeSheetParam(sheet);
     const v1 = encodeSheetDoc(sheetToDoc(sheet));
-    expect(encodeSheetV2(sheet)[0]).toBe(2);
-    expect(v2.startsWith("eyJ")).toBe(false);
-    expect(v2.length).toBeLessThan(v1.length);
-    expect(v2.length).toBeLessThan(120);
+    expect(encodeSheetV3(sheet)[0]).toBe(3);
+    expect(v3.startsWith("eyJ")).toBe(false);
+    expect(v3.length).toBeLessThan(v1.length);
+    expect(v3.length).toBeLessThan(120);
   });
 
-  it("실사용급 차트도 v2가 훨씬 짧다", () => {
+  it("넓은 BPM(40..240)도 왕복한다", () => {
+    for (const bpm of [40, 60, 180, 240] as const) {
+      const sheet = { ...createInitialSheet(), bpm };
+      const again = decodeSheetParam(encodeSheetParam(sheet));
+      expect(again?.bpm).toBe(bpm);
+    }
+  });
+
+  it("실사용급 차트도 v3가 훨씬 짧다", () => {
     // 예전 공유 링크에 가깝게: 16칸 채움 + ov
     const degrees = [0, 0, 4, 4, 5, 5, 2, 2, 3, 3, 4, 4, 0, 0, 5, 4];
     const sheet = {
@@ -135,22 +144,39 @@ describe("SheetDoc v2", () => {
         ),
       ],
     };
-    const v2 = encodeSheetParam(sheet);
+    const v3 = encodeSheetParam(sheet);
     const v1 = encodeSheetDoc(sheetToDoc(sheet));
-    expect(v2.length).toBeLessThan(100);
-    expect(v2.length / v1.length).toBeLessThan(0.35);
-    const again = decodeSheetParam(v2);
+    expect(v3.length).toBeLessThan(100);
+    expect(v3.length / v1.length).toBeLessThan(0.35);
+    const again = decodeSheetParam(v3);
     expect(again?.degrees).toEqual(degrees);
     expect(again?.bpm).toBe(81);
   });
 });
+
+describe("SheetDoc v2 (legacy read)", () => {
+  it("옛 v2 페이로드를 읽는다", () => {
+    const sheet = richSheet();
+    const v2 = bytesToB64ForTest(encodeSheetV2(sheet));
+    const again = decodeSheetParam(v2);
+    expect(again?.bpm).toBe(110);
+    expect(again?.key).toBe("G");
+    expect(again?.degrees[0]).toBe(5);
+  });
+});
+
+function bytesToB64ForTest(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]!);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
 
 describe("share query", () => {
   it("쿼리 키는 s 유지", () => {
     expect(SHARE_QUERY_KEY).toBe("s");
   });
 
-  it("?s= 에서 시트를 읽는다 (v2 쓰기)", () => {
+  it("?s= 에서 시트를 읽는다 (v3 쓰기)", () => {
     const sheet = {
       ...createInitialSheet(),
       degrees: Array.from({ length: 16 }, (_, i) => (i === 0 ? 0 : null)),

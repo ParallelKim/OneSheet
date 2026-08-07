@@ -7,6 +7,8 @@ import {
   BEATS,
   BARS,
   BAR_STEPS,
+  BPM_MAX,
+  BPM_MIN,
   TONE_AXES,
   clearRhythmOverride,
   defaultTonesForDegree,
@@ -374,9 +376,10 @@ export default function App() {
           <ParamKnob
             label="BPM"
             value={sheet.bpm}
-            min={70}
-            max={140}
+            min={BPM_MIN}
+            max={BPM_MAX}
             step={1}
+            turns={4}
             onChange={(bpm) => update((prev) => ({ ...prev, bpm }))}
           />
           <ParamKnob

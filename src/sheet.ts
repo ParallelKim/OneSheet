@@ -367,6 +367,9 @@ function buildIntervalShape(root: string, tones: ToneSet): string[] {
 export const BARS = 4;
 export const BEATS = 4;
 export const SLOTS = BARS * BEATS;
+/** App / persist / share BPM 범위 */
+export const BPM_MIN = 40;
+export const BPM_MAX = 240;
 export const SUBDIV = 4;
 export const BAR_STEPS = BEATS * SUBDIV;
 export const TOTAL_STEPS = BARS * BAR_STEPS;

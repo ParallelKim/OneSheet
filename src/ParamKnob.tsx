@@ -10,12 +10,24 @@ type ParamKnobProps = {
   format?: (value: number) => string
   onChange: (value: number) => void
   disabled?: boolean
+  /**
+   * Full rotations spanning min→max.
+   * `1` (default): limited ~270° sweep.
+   * `>1`: continuous multi-turn dial (e.g. BPM).
+   */
+  turns?: number
+  /**
+   * Vertical px per value unit. Defaults: limited sweep ≈ full range / 110px;
+   * multi-turn ≈ 2.5px/unit for finer control.
+   */
+  dragPxPerUnit?: number
 }
 
 const SWEEP_DEG = 270
 const START_DEG = -135
-/** px of vertical travel ≈ full min→max */
+/** px of vertical travel ≈ full min→max (single-sweep knobs) */
 const DRAG_PX = 110
+const MULTI_DRAG_PX_PER_UNIT = 2.5
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n))
@@ -26,7 +38,7 @@ function snap(n: number, step: number) {
   return Math.round(n / step) * step
 }
 
-/** Vertical drag maps to value; dial rotation is display-only (TE / mobile pattern). */
+/** Vertical drag maps to value; dial rotation follows (TE / mobile pattern). */
 export function ParamKnob({
   label,
   value,
@@ -36,6 +48,8 @@ export function ParamKnob({
   format = (v) => String(Math.round(v)),
   onChange,
   disabled = false,
+  turns = 1,
+  dragPxPerUnit,
 }: ParamKnobProps) {
   const dragRef = useRef<{
     pointerId: number
@@ -44,12 +58,23 @@ export function ParamKnob({
   } | null>(null)
   const [dragging, setDragging] = useState(false)
 
-  const t = max === min ? 0 : (value - min) / (max - min)
-  const rotate = START_DEG + t * SWEEP_DEG
+  const multi = turns > 1
+  const range = max - min
+  const t = range === 0 ? 0 : (value - min) / range
+  const rotate = multi
+    ? t * turns * 360
+    : START_DEG + t * SWEEP_DEG
+
+  const pxPerUnit =
+    dragPxPerUnit ??
+    (multi
+      ? MULTI_DRAG_PX_PER_UNIT
+      : range === 0
+        ? DRAG_PX
+        : DRAG_PX / range)
 
   function commitFromDeltaY(startValue: number, deltaY: number) {
-    const range = max - min
-    const next = snap(startValue - (deltaY / DRAG_PX) * range, step)
+    const next = snap(startValue - deltaY / pxPerUnit, step)
     onChange(clamp(next, min, max))
   }
 
