@@ -47,6 +47,11 @@ export type SoundModeVoice = {
   muteClip: number;
   /** 고정 clip (있으면). 스트럼처럼 길이·late로 계산하면 생략 */
   clip?: number;
+  /**
+   * 스트럼: 이벤트 길이(late 보정 후) 중 소리로 채울 비율.
+   * 1에 가까울수록 다음 어택 직전까지 링. 겹침 방지용으로 1 미만.
+   */
+  clipFill?: number;
   hpf?: number;
 };
 
@@ -55,10 +60,12 @@ export const SOUND_MODE_VOICE: Record<SoundModeId, SoundModeVoice> = {
     sample: "gm_electric_guitar_clean:5",
     gainMul: 1.25,
     attack: 0.003,
-    decay: 0.1,
-    sustain: 0.28,
-    release: 0.045,
+    decay: 0.14,
+    sustain: 0.42,
+    /** 짧게 — clip 끝(=다음 어택)에서 끊김 */
+    release: 0.035,
     muteClip: 0.18,
+    clipFill: 0.985,
     hpf: 180,
   },
   piano: {
@@ -1120,7 +1127,7 @@ function layerPiano(parts: StrudelParts): string {
 /**
  * 오픈셰이프 note + late 스트럼.
  * - 코드마다 5~6음 (C/Am 오픈은 6번줄 뮤트 → 5)
- * - late로 onset만 어긋남. clip을 late만큼 줄여 다음 코드와 안 겹침
+ * - late로 onset만 어긋남. clip은 late만큼만 줄여 다음 어택 직전까지 링
  * - 피치별 gain: 저현↓ / **1번줄(고현)↑** — GM이 고현을 작게 내는 보정
  * - hpf로 저역 머드 컷
  */
@@ -1199,7 +1206,8 @@ function layerStrum(parts: StrudelParts): string {
       })
       .join(" ");
 
-    // late만큼 clip↓ — 바닥을 더 높여 마지막 현(1번줄)이 너무 짧아지지 않게
+    // late만큼만 clip↓ — 나머지는 clipFill로 다음 어택 직전까지 채움 (공백↓)
+    const fill = voice.clipFill ?? 0.985;
     const clip = parts.events
       .map((e) => {
         if (!e.chord || !e.art) {
@@ -1211,7 +1219,7 @@ function layerStrum(parts: StrudelParts): string {
         }
         const dur = e.steps / total;
         const room = Math.max(0.55, (dur - lateAmt) / dur);
-        const c = Number((room * 0.92).toFixed(3));
+        const c = Number((room * fill).toFixed(3));
         return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
       })
       .join(" ");

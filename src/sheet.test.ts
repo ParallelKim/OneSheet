@@ -362,6 +362,11 @@ describe("compileSheet / toStrudel", () => {
     const high = Number(gains[4]!.split(" ")[0]!.split("@")[0]);
     expect(low).toBeGreaterThan(0);
     expect(high / low).toBeGreaterThan(3);
+    // 다음 어택 직전까지 링 — clip이 예전 0.92 공백이 아닌 fill 근처
+    const clips = [...code.matchAll(/\.clip\("([^"]+)"\)/g)].map((m) => m[1]!);
+    const firstClip = Number(clips[0]!.split(" ")[0]!.split("@")[0]);
+    expect(firstClip).toBeGreaterThanOrEqual(0.95);
+    expect(code).toContain(`.sustain(${SOUND_MODE_VOICE.strum.sustain})`);
   });
 
   it("piano는 선택 구성음만·오픈셰이프/6현 아님", () => {
