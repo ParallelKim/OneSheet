@@ -11,7 +11,6 @@ import {
   clearRhythmOverride,
   defaultTonesForDegree,
   DEGREE_META,
-  formatKeyGlyph,
   nextSoundMode,
   paintDegreeSlot,
   paintRhythmStep,
@@ -47,6 +46,7 @@ import {
   isEngineReady,
 } from "./engine";
 import { getAudioContext } from "@strudel/web";
+import { KeyReel } from "./KeyReel";
 import "./App.css";
 
 type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
@@ -86,14 +86,11 @@ export default function App() {
   const [status, setStatus] = useState("");
   /** 재생 헤드: 4분 슬롯 0–15 (null = 정지) — 텍스트용 */
   const [playSlot, setPlaySlot] = useState<number | null>(null);
-  /** 키 슬롯머신 롤: dir +1=♯(위로), −1=♭(아래로) */
-  const [keyRoll, setKeyRoll] = useState<{
-    from: string;
-    to: string;
-    dir: 1 | -1;
-    gen: number;
-  } | null>(null);
-  const keyRollGen = useRef(0);
+  /** 키 릴: dir/gen은 nudge 시에만 갱신 */
+  const [keySpin, setKeySpin] = useState<{ dir: 1 | -1; gen: number }>({
+    dir: 1,
+    gen: 0,
+  });
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
   const staffRef = useRef<HTMLDivElement>(null);
@@ -248,13 +245,7 @@ export default function App() {
       update((prev) => {
         const next = shiftKey(prev.key, dir);
         if (next === prev.key) return prev;
-        keyRollGen.current += 1;
-        setKeyRoll({
-          from: prev.key,
-          to: next,
-          dir,
-          gen: keyRollGen.current,
-        });
+        setKeySpin((s) => ({ dir, gen: s.gen + 1 }));
         return { ...prev, key: next };
       });
     },
@@ -371,45 +362,7 @@ export default function App() {
             >
               ♭
             </button>
-            <span className="key-reel" aria-live="polite">
-              {keyRoll ? (
-                <span
-                  key={keyRoll.gen}
-                  className={`key-reel-track ${keyRoll.dir > 0 ? "roll-up" : "roll-down"}`}
-                  onAnimationEnd={() =>
-                    setKeyRoll((cur) =>
-                      cur && cur.gen === keyRoll.gen ? null : cur,
-                    )
-                  }
-                >
-                  {keyRoll.dir > 0 ? (
-                    <>
-                      <span className="key-reel-item">
-                        {formatKeyGlyph(keyRoll.from)}
-                      </span>
-                      <span className="key-reel-item">
-                        {formatKeyGlyph(keyRoll.to)}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="key-reel-item">
-                        {formatKeyGlyph(keyRoll.to)}
-                      </span>
-                      <span className="key-reel-item">
-                        {formatKeyGlyph(keyRoll.from)}
-                      </span>
-                    </>
-                  )}
-                </span>
-              ) : (
-                <span className="key-reel-track">
-                  <span className="key-reel-item">
-                    {formatKeyGlyph(sheet.key)}
-                  </span>
-                </span>
-              )}
-            </span>
+            <KeyReel value={sheet.key} dir={keySpin.dir} gen={keySpin.gen} />
             <button
               type="button"
               className="key-step"

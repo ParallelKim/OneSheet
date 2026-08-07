@@ -411,13 +411,13 @@ button {
   background: var(--fill-2);
 }
 
-/* 키 슬롯머신 — ♯ 위로 / ♭ 아래로 롤 */
+/* 키 슬롯/오도미터 릴 — 뷰포트 1칸, 스트립이 한 칸 미끄러짐 */
 .key-reel {
-  --key-reel-h: 1.1em;
+  --key-reel-h: 1.15em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.6rem;
+  min-width: 1.75rem;
   height: var(--key-reel-h);
   overflow: hidden;
   font-variant-numeric: tabular-nums;
@@ -427,46 +427,24 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  will-change: transform;
+  transform: translateY(calc(var(--key-y, 0) * var(--key-reel-h)));
+  transition: none;
+}
+
+.key-reel-track.is-moving {
+  transition: transform 0.36s cubic-bezier(0.2, 0.85, 0.25, 1);
 }
 
 .key-reel-item {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 var(--key-reel-h);
   height: var(--key-reel-h);
   font-weight: 700;
   font-size: 0.78rem;
   line-height: 1;
   color: var(--fg);
-}
-
-.key-reel-track.roll-up {
-  animation: key-roll-up 0.32s var(--ease-presence) both;
-}
-
-.key-reel-track.roll-down {
-  /* [to, from] — from이 보이다가 아래로 빠지고 to가 위에서 안착 */
-  transform: translateY(calc(-1 * var(--key-reel-h)));
-  animation: key-roll-down 0.32s var(--ease-presence) both;
-}
-
-@keyframes key-roll-up {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(calc(-1 * var(--key-reel-h)));
-  }
-}
-
-@keyframes key-roll-down {
-  from {
-    transform: translateY(calc(-1 * var(--key-reel-h)));
-  }
-  to {
-    transform: translateY(0);
-  }
 }
 
 .tempo-chip {
@@ -948,13 +926,12 @@ button {
     transition: none !important;
   }
 
-  .tr-btn .spin,
-  .key-reel-track.roll-up,
-  .key-reel-track.roll-down {
+  .tr-btn .spin {
     animation: none !important;
   }
 
-  .key-reel-track.roll-down {
-    transform: none;
+  .key-reel-track,
+  .key-reel-track.is-moving {
+    transition: none !important;
   }
 }
