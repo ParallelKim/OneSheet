@@ -1,8 +1,14 @@
 # OneSheet 핸드오프
 
-작성 시점: 2026-08-06 · 브랜치 `cursor/rhythm-inherit-4663`
+작성 시점: 2026-08-07 · 브랜치 `cursor/session-share-4663`
 
 철학: **write simple play loop** — 심플 & 루프. 모노톤 기본.
+
+## 다음 (이 브랜치)
+
+**세션 공유 / 불러오기** — `SheetDoc` `?s=` 가 이미 포맷·로드·편집 동기화의 뼈대. UI·복제 흐름·파일/클립보드 등 세션 단위로 다듬을 차례.
+
+---
 
 ## UX — 상태 전환
 
@@ -63,11 +69,16 @@
 
 ## Share (SheetDoc)
 
-휴대용 채보 포맷 `SheetDoc` v1 — URL / 파일 / 서버 공통.
+휴대용 채보 포맷 — URL / 파일 / 서버 공통. **쿼리 키 `?s=` 유지.**
 
-- 쿼리: `?s=<base64url(JSON)>` (우선 로드, 편집 시 `replaceState` 동기화)
-- 필드: `v,bpm,key,metro,mode,gain?,deg[16],ton[16],rhy,ov[3]`
-- 코드: `src/sheetDoc.ts`, 쿼리 어댑터 `src/shareQuery.ts`
+| | |
+|--|--|
+| **쓰기** | **v2** 비트팩 → base64url (첫 바이트 `2`) |
+| **읽기** | v2 바이너리 **또는** v1 JSON (옛 링크) |
+| 필드 | bpm·key·metro·mode·gain·deg[16]·ton[16]·rhy·ov[3] |
+| 코드 | `src/sheetDoc.ts`, 쿼리 `src/shareQuery.ts` |
+
+v2가 JSON v1 대비 대략 1/3 이하 길이 (차트 채움 기준 ~60–90자).
 
 ```bash
 npm test && npm run build

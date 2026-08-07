@@ -44,9 +44,9 @@ import {
   hushStrudel,
   initStrudelEngine,
   isEngineReady,
+  unlockAudioOutput,
   warmPianoFont,
 } from "./engine";
-import { getAudioContext } from "@strudel/web";
 import { KeyReel } from "./KeyReel";
 import "./App.css";
 
@@ -118,9 +118,10 @@ export default function App() {
     void initStrudelEngine().catch((err) => console.warn("engine boot", err));
   }, []);
 
-  // 첫 포인터에서 오디오 unlock
+  // 첫 포인터에서 오디오 unlock (iOS: 제스처 안에서 동기)
   useEffect(() => {
     const onFirstPointer = () => {
+      unlockAudioOutput();
       void ensureAudioRunning().catch((err) =>
         console.warn("audio unlock", err),
       );
@@ -258,11 +259,8 @@ export default function App() {
 
   const onPlay = useCallback(() => {
     const gate = getPlaybackEpoch();
-    try {
-      void (getAudioContext() as AudioContext).resume();
-    } catch {
-      /* ignore */
-    }
+    // 제스처 콜스택에서 동기 unlock (async 전에)
+    unlockAudioOutput();
 
     if (!isEngineReady()) {
       setEngine("loading");
@@ -455,13 +453,9 @@ export default function App() {
           type="button"
           className={`tr-btn play ${playing ? "on" : ""} ${loading ? "loading" : ""}`}
           onPointerDown={() => {
-            // click보다 이른 제스처에서 unlock
+            // click보다 이른 제스처에서 unlock (iOS 필수)
             if (playing || loading) return;
-            try {
-              void (getAudioContext() as AudioContext).resume();
-            } catch {
-              /* ignore */
-            }
+            unlockAudioOutput();
           }}
           onClick={() => void (playing || loading ? onStop() : onPlay())}
           aria-label={loading ? "loading" : playing ? "stop" : "play"}

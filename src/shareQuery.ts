@@ -1,6 +1,6 @@
 /**
  * SheetDoc ↔ URL 쿼리 어댑터 (`?s=`).
- * 포맷 본체는 sheetDoc.ts — 파일/서버 어댑터도 같은 문서를 쓴다.
+ * 키 이름은 `s` 고정 — v1/v2는 페이로드로 구분 (sheetDoc.ts).
  */
 
 import {

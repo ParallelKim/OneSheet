@@ -1193,14 +1193,9 @@ function layerStrum(parts: StrudelParts): string {
         }
         const n = strokeNotes(e.chord, e.art)[slot];
         if (!n) return e.steps === 1 ? "0" : `0@${e.steps}`;
-        const durScale = Math.min(1, 2 / Math.max(1, e.steps));
+        // 길이와 무관하게 어택 세기 동일 — 지속은 clip이 담당 (길수록 작게 깎지 않음)
         const g = Number(
-          (
-            e.gain *
-            durScale *
-            pitchGain(noteMidi(n)) *
-            voice.gainMul
-          ).toFixed(3),
+          (e.gain * pitchGain(noteMidi(n)) * voice.gainMul).toFixed(3),
         );
         return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
       })
