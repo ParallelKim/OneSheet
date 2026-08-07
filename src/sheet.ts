@@ -351,7 +351,7 @@ export function defaultTonesForDegree(degree: number): ToneSet {
   return TONES_MAJ;
 }
 
-/** 자주 쓰는 코드만 — 도수 퀄리티 不分, 한 목록 순회 (세부 구성음은 패드로) */
+/** 자주 쓰는 코드만 — 도수 퀄리티 구분 없이 한 목록 순회 (세부 구성음은 패드로) */
 const CHORD_PRESETS: readonly ToneSet[] = [
   TONES_MAJ,
   TONES_MIN,
