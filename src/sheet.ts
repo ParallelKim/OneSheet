@@ -1037,11 +1037,8 @@ function layerPiano(parts: StrudelParts): string {
       .map((e) => {
         const notes = pianoEventNotes(e);
         if (!notes[slot]) return e.steps === 1 ? "0" : `0@${e.steps}`;
-        const durScale = Math.min(1, 2 / Math.max(1, e.steps));
-        const voiceN = Math.max(1, notes.length);
-        const g = Number(
-          ((e.gain * durScale * 0.55) / Math.sqrt(voiceN)).toFixed(3),
-        );
+        // guitar pitchGain/√N 공유하지 않음 — 구성음 동시타에 맞게 따로
+        const g = Number((e.gain * 1.35).toFixed(3));
         return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
       })
       .join(" ");
@@ -1061,10 +1058,10 @@ function layerPiano(parts: StrudelParts): string {
         `.s("${TONE_PIANO}")`,
         `.gain("${gainPat}")`,
         `.clip("${clip}")`,
-        `.attack(0.008)`,
-        `.decay(0.18)`,
-        `.sustain(0.35)`,
-        `.release(0.12)`,
+        `.attack(0.006)`,
+        `.decay(0.22)`,
+        `.sustain(0.5)`,
+        `.release(0.18)`,
       ].join(""),
     );
   }
@@ -1142,7 +1139,7 @@ function layerStrum(parts: StrudelParts): string {
         if (!n) return e.steps === 1 ? "0" : `0@${e.steps}`;
         const durScale = Math.min(1, 2 / Math.max(1, e.steps));
         const g = Number(
-          (e.gain * durScale * pitchGain(noteMidi(n))).toFixed(3),
+          (e.gain * durScale * pitchGain(noteMidi(n)) * 1.25).toFixed(3),
         );
         return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
       })
