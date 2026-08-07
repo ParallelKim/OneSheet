@@ -361,17 +361,22 @@ describe("compileSheet / toStrudel", () => {
     expect(high / low).toBeGreaterThan(3);
   });
 
-  it("piano는 오픈셰이프 전음 동시·gm_piano·late 없음", () => {
+  it("piano는 오픈셰이프 전음 동시(보이스 스택)·gm_piano·late 없음", () => {
     const sheet = sheetWithLoop();
     const code = toStrudel({ ...sheet, soundMode: "piano", metro: false });
     expect(code).toMatch(/^setcps\(/);
-    expect(code).toContain("a2,e3,a3,c4,e4@4");
-    expect(code).toContain("c3,e3,g3,c4,e4@4");
-    expect(code).toContain("g2,b2,d3,g3,b3,g4@4");
-    expect(code).toContain('.s("gm_piano")');
+    expect(code).toContain("a2@4");
+    expect(code).toContain("e3@4");
+    expect(code).toContain("c4@4");
+    expect(code).toContain("c3@4");
+    expect(code).toContain("g2@4");
+    expect(code).toContain('.s("gm_piano:1")');
+    expect(code).toContain("stack(");
     expect(code).not.toContain(".late(");
     expect(code).not.toContain("gm_electric_guitar_clean");
     expect(code).not.toContain("sawtooth");
+    // 쉼표 코드@steps 함정 금지 (마지막 음에만 @ 붙음)
+    expect(code).not.toMatch(/[a-g][#b]?\d,[a-g].*@\d/);
   });
 
   it("MODE는 strum→piano 순환", () => {

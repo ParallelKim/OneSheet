@@ -113,7 +113,7 @@ const TONES_DIM: ToneSet = ["1", "b3", "b5"];
 /** strum — GM clean 기타 */
 const TONE_STRUM = "gm_electric_guitar_clean:5";
 /** piano — 전음 동시, GM 피아노 */
-const TONE_PIANO = "gm_piano";
+const TONE_PIANO = "gm_piano:1"; // FluidR3
 
 /**
  * 오픈(·바레) 셰이프 — 저→고 절대음.
@@ -977,54 +977,78 @@ function strokeNotes(chord: string, art: AttackArt): string[] {
 }
 
 /**
- * piano — 오픈셰이프 전음을 한꺼번에 (쉼표 = 동시).
- * X는 중현만·짧게.
+ * piano — 오픈셰이프 전음 동시.
+ * 쉼표 코드+@는 미니노테이션에서 마지막 음에만 붙어 깨지므로
+ * strum과 같이 보이스 스택( gap=0 )으로 낸다.
  */
 function layerPiano(parts: StrudelParts): string {
-  const toks = parts.events
-    .map((e) => {
-      if (!e.chord || !e.art) {
-        return e.steps === 1 ? "~" : `~@${e.steps}`;
-      }
-      const notes =
-        e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord);
-      const chord = notes.join(",");
-      return e.steps === 1 ? chord : `${chord}@${e.steps}`;
-    })
-    .join(" ");
+  const maxVoices = Math.max(
+    1,
+    ...parts.events.map((e) =>
+      e.chord && e.art
+        ? (e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord))
+            .length
+        : 0,
+    ),
+  );
+  const voices: string[] = [];
 
-  const gainPat = parts.events
-    .map((e) => {
-      if (!e.chord || !e.art) {
-        return e.steps === 1 ? "0" : `0@${e.steps}`;
-      }
-      const durScale = Math.min(1, 2 / Math.max(1, e.steps));
-      // 5~6음 동시 → 헤드룸
-      const g = Number((e.gain * durScale * 0.42).toFixed(3));
-      return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
-    })
-    .join(" ");
+  for (let slot = 0; slot < maxVoices; slot++) {
+    const toks = parts.events
+      .map((e) => {
+        if (!e.chord || !e.art) {
+          return e.steps === 1 ? "~" : `~@${e.steps}`;
+        }
+        const notes =
+          e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord);
+        const n = notes[slot];
+        if (!n) return e.steps === 1 ? "~" : `~@${e.steps}`;
+        return e.steps === 1 ? n : `${n}@${e.steps}`;
+      })
+      .join(" ");
 
-  const clip = parts.events
-    .map((e) => {
-      if (!e.chord || !e.art) {
-        return e.steps === 1 ? "0" : `0@${e.steps}`;
-      }
-      const c = e.art === "X" ? 0.18 : 0.92;
-      return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
-    })
-    .join(" ");
+    const gainPat = parts.events
+      .map((e) => {
+        if (!e.chord || !e.art) {
+          return e.steps === 1 ? "0" : `0@${e.steps}`;
+        }
+        const notes =
+          e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord);
+        if (!notes[slot]) return e.steps === 1 ? "0" : `0@${e.steps}`;
+        const durScale = Math.min(1, 2 / Math.max(1, e.steps));
+        const g = Number((e.gain * durScale * 0.38).toFixed(3));
+        return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
+      })
+      .join(" ");
 
-  return [
-    `note("${toks}")`,
-    `.s("${TONE_PIANO}")`,
-    `.gain("${gainPat}")`,
-    `.clip("${clip}")`,
-    `.attack(0.004)`,
-    `.decay(0.12)`,
-    `.sustain(0.32)`,
-    `.release(0.05)`,
-  ].join("");
+    const clip = parts.events
+      .map((e) => {
+        if (!e.chord || !e.art) {
+          return e.steps === 1 ? "0" : `0@${e.steps}`;
+        }
+        const notes =
+          e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord);
+        if (!notes[slot]) return e.steps === 1 ? "0" : `0@${e.steps}`;
+        const c = e.art === "X" ? 0.18 : 0.92;
+        return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
+      })
+      .join(" ");
+
+    voices.push(
+      [
+        `note("${toks}")`,
+        `.s("${TONE_PIANO}")`,
+        `.gain("${gainPat}")`,
+        `.clip("${clip}")`,
+        `.attack(0.004)`,
+        `.decay(0.12)`,
+        `.sustain(0.32)`,
+        `.release(0.05)`,
+      ].join(""),
+    );
+  }
+
+  return stackBody(voices);
 }
 
 /**

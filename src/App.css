@@ -469,10 +469,25 @@ button {
 .chip-k {
   font-size: 0.6rem;
   color: var(--muted);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 
 .chip-v {
+  --chip-v-h: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  height: var(--chip-v-h);
   font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.key-chip,
+.chip {
+  align-items: center;
 }
 
 .transport,

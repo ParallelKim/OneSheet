@@ -44,6 +44,7 @@ import {
   hushStrudel,
   initStrudelEngine,
   isEngineReady,
+  warmPianoFont,
 } from "./engine";
 import { getAudioContext } from "@strudel/web";
 import { KeyReel } from "./KeyReel";
@@ -237,6 +238,9 @@ export default function App() {
 
   const cycleSoundMode = useCallback(() => {
     const soundMode = nextSoundMode(sheetRef.current.soundMode);
+    if (soundMode === "piano") {
+      void warmPianoFont().catch(() => undefined);
+    }
     update((prev) => ({ ...prev, soundMode }));
   }, [update]);
 
