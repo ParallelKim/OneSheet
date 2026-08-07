@@ -341,15 +341,11 @@ export default function App() {
   const loading = engine === "loading";
   const currentDegree = sheet.degrees[selected] ?? null;
   const bar = barIndex(selected);
-  const beat = (selected % BEATS) + 1;
   const barRhythmRow = barRhythm(sheet, bar);
   const rhyKind = rhythmBarKind(sheet, bar);
   const playBar = playSlot !== null ? barIndex(playSlot) : null;
-  const playBeat = playSlot !== null ? (playSlot % BEATS) + 1 : null;
   /** 하이라이트할 마디: 재생 중이면 재생 마디, 아니면 선택 마디 */
   const markBar = playBar ?? bar;
-  const posBar = playBar ?? bar;
-  const posBeat = playBeat ?? beat;
 
   return (
     <div className="app">
@@ -403,10 +399,6 @@ export default function App() {
               <span className="chip-v">{soundModeById(sheet.soundMode).label}</span>
             </span>
           </button>
-          <p className={`pos ${playing ? "playing" : ""}`} aria-label="position">
-            <span className="pos-bar">|{posBar + 1}|</span>
-            <span className="pos-beat">{posBeat}</span>
-          </p>
         </div>
 
         <div

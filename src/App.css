@@ -104,29 +104,6 @@ button {
   align-items: center;
 }
 
-.pos {
-  margin: 0 0 0 auto;
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  display: flex;
-  align-items: baseline;
-  gap: 0.35rem;
-}
-
-.pos.playing {
-  color: var(--fg);
-}
-
-.pos-bar {
-  font-weight: 700;
-}
-
-.pos-beat {
-  opacity: 0.85;
-}
-
 /* 얇은 한 줄 차트 — 16등분 그리드에 마디/커서/선택 정렬 */
 .staff {
   --play-phase: -1;
