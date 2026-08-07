@@ -369,6 +369,22 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain(`.sustain(${SOUND_MODE_VOICE.strum.sustain})`);
   });
 
+  it("긴 hold 음도 짧은 어택과 같은 gain으로 시작한다", () => {
+    const shortRhy = Array(16).fill("rest") as Articulation[];
+    shortRhy[0] = "D"; // 1스텝
+    const longRhy = Array(16).fill("hold") as Articulation[];
+    longRhy[0] = "D"; // 16스텝
+    const base = sheetWithLoop();
+    const shortCode = toStrudel({ ...base, rhythm: shortRhy, metro: false });
+    const longCode = toStrudel({ ...base, rhythm: longRhy, metro: false });
+    const firstGain = (code: string) => {
+      const m = code.match(/\.gain\("([^"@\s]+)/);
+      return Number(m?.[1]);
+    };
+    expect(firstGain(shortCode)).toBeGreaterThan(0);
+    expect(firstGain(longCode)).toBe(firstGain(shortCode));
+  });
+
   it("piano는 선택 구성음만·오픈셰이프/6현 아님", () => {
     const sheet = sheetWithLoop();
     const code = toStrudel({ ...sheet, soundMode: "piano", metro: false });
