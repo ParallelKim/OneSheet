@@ -69,11 +69,16 @@
 
 ## Share (SheetDoc)
 
-휴대용 채보 포맷 `SheetDoc` v1 — URL / 파일 / 서버 공통.
+휴대용 채보 포맷 — URL / 파일 / 서버 공통. **쿼리 키 `?s=` 유지.**
 
-- 쿼리: `?s=<base64url(JSON)>` (우선 로드, 편집 시 `replaceState` 동기화)
-- 필드: `v,bpm,key,metro,mode,gain?,deg[16],ton[16],rhy,ov[3]`
-- 코드: `src/sheetDoc.ts`, 쿼리 어댑터 `src/shareQuery.ts`
+| | |
+|--|--|
+| **쓰기** | **v2** 비트팩 → base64url (첫 바이트 `2`) |
+| **읽기** | v2 바이너리 **또는** v1 JSON (옛 링크) |
+| 필드 | bpm·key·metro·mode·gain·deg[16]·ton[16]·rhy·ov[3] |
+| 코드 | `src/sheetDoc.ts`, 쿼리 `src/shareQuery.ts` |
+
+v2가 JSON v1 대비 대략 1/3 이하 길이 (차트 채움 기준 ~60–90자).
 
 ```bash
 npm test && npm run build
