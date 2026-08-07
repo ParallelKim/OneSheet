@@ -47,6 +47,44 @@ const WARM_MIDI = [40, 45, 48, 50, 52, 55, 59, 60, 64, 67];
 const MASTER_DUCK_SEC = 0.03;
 const MASTER_OPEN_SEC = 0.012;
 
+type AudioSessionNavigator = Navigator & {
+  audioSession?: { type: string };
+};
+
+/**
+ * iOS: Web Audio 기본 세션이 ambient → 무음 스위치에 막힘.
+ * playback으로 두면 링거 무음이어도 들림 (Safari AudioSession).
+ */
+export function preferPlaybackAudioSession(): void {
+  try {
+    const session = (navigator as AudioSessionNavigator).audioSession;
+    if (session && session.type !== "playback") {
+      session.type = "playback";
+    }
+  } catch {
+    /* AudioSession 미지원 */
+  }
+}
+
+/**
+ * 제스처 콜스택 안에서 동기 호출.
+ * resume + 무음 버퍼 1샘플 — iOS가 출력 경로를 열어 줌.
+ */
+export function unlockAudioOutput(): void {
+  preferPlaybackAudioSession();
+  try {
+    const ctx = getAudioContext() as AudioContext;
+    void ctx.resume();
+    const buf = ctx.createBuffer(1, 1, ctx.sampleRate || 44100);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch (err) {
+    console.warn("unlockAudioOutput failed", err);
+  }
+}
+
 export function getLastStrudelCode(): string {
   return lastCode;
 }
@@ -120,6 +158,7 @@ export function openMaster(fadeSec = MASTER_OPEN_SEC): void {
  * superdough initAudio의 resume 조건이 깨져 있어 여기서 명시 resume.
  */
 export async function ensureAudioRunning(): Promise<void> {
+  preferPlaybackAudioSession();
   const ctx = getAudioContext() as AudioContext;
   if (ctx.state === "suspended") {
     await ctx.resume();
@@ -280,8 +319,11 @@ export async function evaluateStrudel(
         console.warn("scheduler start failed", err);
         return false;
       }
+      // start 이후 gain 그래프가 생겼을 수 있음 — 한 번 더 연다
+      openMaster();
     } else {
       await evaluate(code);
+      openMaster();
     }
 
     if (my !== epoch) {
