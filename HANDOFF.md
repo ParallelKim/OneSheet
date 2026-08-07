@@ -7,9 +7,8 @@
 ## UX — 상태 전환
 
 상태는 점프하지 않고 **전환으로** 바뀐다. 아르카나는 **한** 사례(양극 회전)일 뿐.
-2상태(on/off)도 전환 — 메타포는 기능·UI가 고른다: 뒤집힘 / 밀림 / 점등 / 상승·하강 …
-조사·어휘: **`docs/transition-vocabulary.md`** · 디자인 레퍼런스(TE·Nothing): **`docs/design-references.md`**
-why 없는 motion은 스타일링. 소리(PLAY/STOP)도 같은 축.
+**성격 경계(realm):** 영역 안 순회 ≠ 영역 넘김. 활성↔비활성(∅/`rest`)은 활성 안 프리셋 순회와 분리 (예: 옛 Maj/Min/dim 순회 분리와 같은 논리).
+2상태도 전환 — 메타포는 기능·UI가 고른다. 어휘: **`docs/transition-vocabulary.md`** · 레퍼런스: **`docs/design-references.md`**
 
 ---
 
