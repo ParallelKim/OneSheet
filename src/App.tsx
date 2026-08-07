@@ -34,6 +34,7 @@ import {
   type ToneAxisId,
 } from "./sheet";
 import { loadSheetState, saveStoredSheet } from "./persist";
+import { readSheetFromSearch, syncSheetQuery } from "./shareQuery";
 import {
   ensureAudioRunning,
   evaluateStrudel,
@@ -63,8 +64,21 @@ function playColHold(posInRow: number, hold = 0.7): number {
   return i + (frac - hold) / (1 - hold);
 }
 
+function loadInitialSheet(): SheetState {
+  try {
+    const fromUrl = readSheetFromSearch(window.location.search);
+    if (fromUrl) {
+      saveStoredSheet(fromUrl);
+      return fromUrl;
+    }
+  } catch (err) {
+    console.warn("share query load failed", err);
+  }
+  return loadSheetState();
+}
+
 export default function App() {
-  const [sheet, setSheet] = useState<SheetState>(loadSheetState);
+  const [sheet, setSheet] = useState<SheetState>(loadInitialSheet);
   const [selected, setSelected] = useState(0);
   const [mode, setMode] = useState<Mode>("chart");
   const [brush, setBrush] = useState<Articulation>("D");
@@ -85,6 +99,12 @@ export default function App() {
   // 편집본 localStorage 캐시 (배포/새로고침 유지)
   useEffect(() => {
     saveStoredSheet(sheet);
+  }, [sheet]);
+
+  // 공유용 ?s= 동기화 (같은 포맷으로 파일/서버도 열 예정)
+  useEffect(() => {
+    const id = window.setTimeout(() => syncSheetQuery(sheet), 160);
+    return () => window.clearTimeout(id);
   }, [sheet]);
 
   // 엔진은 마운트 직후 백그라운드 기동 (Play를 기다리지 않음)

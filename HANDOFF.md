@@ -36,9 +36,13 @@
 | `strum` | ✅ | 오픈셰이프 + late |
 | `piano` | | 전음 동시 |
 
-## Persist
+## Share (SheetDoc)
 
-- `onesheet.sheet.v3`
+휴대용 채보 포맷 `SheetDoc` v1 — URL / 파일 / 서버 공통.
+
+- 쿼리: `?s=<base64url(JSON)>` (우선 로드, 편집 시 `replaceState` 동기화)
+- 필드: `v,bpm,key,metro,mode,gain?,deg[16],ton[16],rhy,ov[3]`
+- 코드: `src/sheetDoc.ts`, 쿼리 어댑터 `src/shareQuery.ts`
 
 ```bash
 npm test && npm run build
