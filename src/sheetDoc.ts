@@ -159,10 +159,7 @@ export function docToSheet(doc: unknown): SheetState {
 function bytesToBase64Url(bytes: Uint8Array): string {
   let bin = "";
   for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]!);
-  const b64 =
-    typeof btoa === "function"
-      ? btoa(bin)
-      : Buffer.from(bytes).toString("base64");
+  const b64 = btoa(bin);
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
@@ -170,10 +167,7 @@ function base64UrlToBytes(raw: string): Uint8Array | null {
   try {
     const b64 = raw.replace(/-/g, "+").replace(/_/g, "/");
     const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
-    const bin =
-      typeof atob === "function"
-        ? atob(b64 + pad)
-        : Buffer.from(b64 + pad, "base64").toString("binary");
+    const bin = atob(b64 + pad);
     const out = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
     return out;
