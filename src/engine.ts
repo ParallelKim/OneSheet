@@ -39,8 +39,10 @@ const DIRT_BASE =
 
 /** gm_electric_guitar_clean:5 → Stratocaster */
 const STRUM_FONT = "0270_Stratocaster_sf2_file";
-/** 오픈 기타 음역 — 첫 타격 skip hap(still loading) 방지 */
-const STRUM_WARM_MIDI = [40, 45, 48, 50, 52, 55, 59, 60, 64, 67];
+/** gm_piano → FluidR3 (JCLive보다 로드·디코드 부담이 덜한 편) */
+const PIANO_FONT = "0000_FluidR3_GM_sf2_file";
+/** 오픈 셰이프 음역 — still loading 스킵 방지 */
+const WARM_MIDI = [40, 45, 48, 50, 52, 55, 59, 60, 64, 67];
 
 const MASTER_DUCK_SEC = 0.03;
 const MASTER_OPEN_SEC = 0.012;
@@ -142,25 +144,51 @@ async function loadDirtGtr(): Promise<void> {
   dirtGtrLoaded = true;
 }
 
-/** 사운드폰트 피치 캐시 — 첫 스트럼이 still loading으로 잘리는 것 완화 */
-async function warmStrumFont(): Promise<void> {
+/** 사운드폰트 피치 캐시 — strum 먼저, piano는 백그라운드 */
+async function warmPlaybackFonts(): Promise<void> {
   if (fontsWarmed) return;
   const ctx = getAudioContext() as AudioContext;
-  await Promise.all(
-    STRUM_WARM_MIDI.map(async (midi) => {
+  const warm = async (font: string, midi: number) => {
+    try {
+      const src = await getFontBufferSource(font, { note: midi }, ctx);
       try {
-        const src = await getFontBufferSource(STRUM_FONT, { note: midi }, ctx);
-        try {
-          src.disconnect();
-        } catch {
-          /* ignore */
-        }
+        src.disconnect();
       } catch {
-        /* warm 실패해도 재생은 진행 */
+        /* ignore */
       }
-    }),
-  );
+    } catch {
+      /* warm 실패해도 재생은 진행 */
+    }
+  };
+  // strum만 await — piano SF 전체 로드가 PLAY를 막으며 버벅이는 것 방지
+  await Promise.all(WARM_MIDI.map((midi) => warm(STRUM_FONT, midi)));
   fontsWarmed = true;
+  void Promise.all(WARM_MIDI.map((midi) => warm(PIANO_FONT, midi)));
+}
+
+/** piano 모드 진입 시 호출 — 이미 워밍 중/완료면 즉시 */
+let pianoWarm: Promise<void> | null = null;
+export function warmPianoFont(): Promise<void> {
+  if (!pianoWarm) {
+    pianoWarm = (async () => {
+      const ctx = getAudioContext() as AudioContext;
+      await Promise.all(
+        WARM_MIDI.map(async (midi) => {
+          try {
+            const src = await getFontBufferSource(PIANO_FONT, { note: midi }, ctx);
+            try {
+              src.disconnect();
+            } catch {
+              /* ignore */
+            }
+          } catch {
+            /* ignore */
+          }
+        }),
+      );
+    })();
+  }
+  return pianoWarm;
 }
 
 export async function initStrudelEngine(): Promise<Repl> {
@@ -214,8 +242,17 @@ export async function evaluateStrudel(
     if (my !== epoch) return false;
     await ensureAudioRunning();
     if (my !== epoch) return false;
-    await warmStrumFont();
+    await warmPlaybackFonts();
     if (my !== epoch) return false;
+    if (code.includes("gm_piano")) {
+      await warmPianoFont();
+      if (my !== epoch) return false;
+      if (replRef?.scheduler && typeof replRef.scheduler.latency === "number") {
+        replRef.scheduler.latency = 0.2;
+      }
+    } else if (replRef?.scheduler && typeof replRef.scheduler.latency === "number") {
+      replRef.scheduler.latency = 0.14;
+    }
 
     openMaster();
 

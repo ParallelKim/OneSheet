@@ -18,12 +18,15 @@ import {
   paintDegreeSlot,
   paintRhythmStep,
   paintToneSlot,
+  pianoToneNotes,
   rhythmBarKind,
   rhythmFromLegacyBars,
   shiftKey,
   slotLabel,
   SOUND_MODES,
+  SOUND_MODE_VOICE,
   TONE_AXES,
+  soundModeVoice,
   toneAxisFaces,
   toStrudel,
   type Articulation,
@@ -55,12 +58,13 @@ describe("chordFromDegree", () => {
   });
 });
 
-describe("circle of fifths key", () => {
-  it("♯/♭ 한 칸은 5도권 조표 이동", () => {
-    expect(shiftKey("C", 1)).toBe("G");
-    expect(shiftKey("C", -1)).toBe("F");
-    expect(shiftKey("G", -1)).toBe("C");
-    expect(shiftKey("F", 1)).toBe("C");
+describe("chromatic key steps", () => {
+  it("♯/♭ 한 칸은 반음 키 단위", () => {
+    expect(shiftKey("C", 1)).toBe("Db");
+    expect(shiftKey("C", -1)).toBe("B");
+    expect(shiftKey("Db", -1)).toBe("C");
+    expect(shiftKey("F", 1)).toBe("F#");
+    expect(shiftKey("G", -1)).toBe("F#");
   });
 
   it("12조를 한 바퀴 돈다", () => {
@@ -75,6 +79,7 @@ describe("circle of fifths key", () => {
     expect(seen.has("F#")).toBe(true);
     expect(seen.has("Db")).toBe(true);
     expect(seen.has("Eb")).toBe(true);
+    expect(seen.has("B")).toBe(true);
   });
 
   it("F#·Db 다이아토닉 근음", () => {
@@ -357,19 +362,26 @@ describe("compileSheet / toStrudel", () => {
     const high = Number(gains[4]!.split(" ")[0]!.split("@")[0]);
     expect(low).toBeGreaterThan(0);
     expect(high / low).toBeGreaterThan(3);
+    // 다음 어택 직전까지 링 — clip이 예전 0.92 공백이 아닌 fill 근처
+    const clips = [...code.matchAll(/\.clip\("([^"]+)"\)/g)].map((m) => m[1]!);
+    const firstClip = Number(clips[0]!.split(" ")[0]!.split("@")[0]);
+    expect(firstClip).toBeGreaterThanOrEqual(0.95);
+    expect(code).toContain(`.sustain(${SOUND_MODE_VOICE.strum.sustain})`);
   });
 
-  it("piano는 오픈셰이프 전음 동시·gm_piano·late 없음", () => {
+  it("piano는 선택 구성음만·오픈셰이프/6현 아님", () => {
     const sheet = sheetWithLoop();
     const code = toStrudel({ ...sheet, soundMode: "piano", metro: false });
     expect(code).toMatch(/^setcps\(/);
-    expect(code).toContain("a2,e3,a3,c4,e4@4");
-    expect(code).toContain("c3,e3,g3,c4,e4@4");
-    expect(code).toContain("g2,b2,d3,g3,b3,g4@4");
-    expect(code).toContain('.s("gm_piano")');
+    expect(code).toContain('.s("gm_piano:1")');
+    expect(code).toContain("stack(");
     expect(code).not.toContain(".late(");
     expect(code).not.toContain("gm_electric_guitar_clean");
-    expect(code).not.toContain("sawtooth");
+    // Am 오픈(a2…e4 5~6음)이 아니라 구성음 3음 근처
+    expect(code).not.toContain("a2@4");
+    expect(code).not.toContain("g2@4");
+    expect(pianoToneNotes("A", ["1", "b3", "5"])).toEqual(["a3", "c4", "e4"]);
+    expect(pianoToneNotes("C", ["1", "3", "5"])).toEqual(["c3", "e3", "g3"]);
   });
 
   it("MODE는 strum→piano 순환", () => {
@@ -379,6 +391,23 @@ describe("compileSheet / toStrudel", () => {
     expect(id).toBe("strum");
     expect(nextSoundMode("strum")).toBe("piano");
     expect(nextSoundMode("piano")).toBe("strum");
+  });
+
+  it("MODE마다 SOUND_MODE_VOICE 항목이 있다", () => {
+    for (const m of SOUND_MODES) {
+      const v = soundModeVoice(m.id);
+      expect(v).toBe(SOUND_MODE_VOICE[m.id]);
+      expect(v.sample.length).toBeGreaterThan(0);
+      expect(v.gainMul).toBeGreaterThan(0);
+      expect(v.muteClip).toBeGreaterThan(0);
+    }
+    expect(SOUND_MODE_VOICE.piano.sample).toBe("gm_piano:1");
+    expect(SOUND_MODE_VOICE.strum.sample).toBe(
+      "gm_electric_guitar_clean:5",
+    );
+    expect(SOUND_MODE_VOICE.piano.gainMul).not.toBe(
+      SOUND_MODE_VOICE.strum.gainMul,
+    );
   });
 
   it("rest 구간은 공격이 없다", () => {

@@ -11,7 +11,6 @@ import {
   clearRhythmOverride,
   defaultTonesForDegree,
   DEGREE_META,
-  formatKeyGlyph,
   nextSoundMode,
   paintDegreeSlot,
   paintRhythmStep,
@@ -45,8 +44,10 @@ import {
   hushStrudel,
   initStrudelEngine,
   isEngineReady,
+  warmPianoFont,
 } from "./engine";
 import { getAudioContext } from "@strudel/web";
+import { KeyReel } from "./KeyReel";
 import "./App.css";
 
 type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
@@ -86,6 +87,11 @@ export default function App() {
   const [status, setStatus] = useState("");
   /** 재생 헤드: 4분 슬롯 0–15 (null = 정지) — 텍스트용 */
   const [playSlot, setPlaySlot] = useState<number | null>(null);
+  /** 키 릴: dir/gen은 nudge 시에만 갱신 */
+  const [keySpin, setKeySpin] = useState<{ dir: 1 | -1; gen: number }>({
+    dir: 1,
+    gen: 0,
+  });
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
   const staffRef = useRef<HTMLDivElement>(null);
@@ -232,8 +238,23 @@ export default function App() {
 
   const cycleSoundMode = useCallback(() => {
     const soundMode = nextSoundMode(sheetRef.current.soundMode);
+    if (soundMode === "piano") {
+      void warmPianoFont().catch(() => undefined);
+    }
     update((prev) => ({ ...prev, soundMode }));
   }, [update]);
+
+  const nudgeKey = useCallback(
+    (dir: 1 | -1) => {
+      update((prev) => {
+        const next = shiftKey(prev.key, dir);
+        if (next === prev.key) return prev;
+        setKeySpin((s) => ({ dir, gen: s.gen + 1 }));
+        return { ...prev, key: next };
+      });
+    },
+    [update],
+  );
 
   const onPlay = useCallback(() => {
     const gate = getPlaybackEpoch();
@@ -340,21 +361,17 @@ export default function App() {
             <button
               type="button"
               className="key-step"
-              onClick={() =>
-                update((prev) => ({ ...prev, key: shiftKey(prev.key, -1) }))
-              }
-              aria-label="key signature flat"
+              onClick={() => nudgeKey(-1)}
+              aria-label="key down flat"
             >
               ♭
             </button>
-            <span className="chip-v">{formatKeyGlyph(sheet.key)}</span>
+            <KeyReel value={sheet.key} dir={keySpin.dir} gen={keySpin.gen} />
             <button
               type="button"
               className="key-step"
-              onClick={() =>
-                update((prev) => ({ ...prev, key: shiftKey(prev.key, 1) }))
-              }
-              aria-label="key signature sharp"
+              onClick={() => nudgeKey(1)}
+              aria-label="key up sharp"
             >
               ♯
             </button>
@@ -365,8 +382,10 @@ export default function App() {
             onClick={cycleSoundMode}
             aria-label="sound mode"
           >
-            <span className="chip-k">MODE</span>
-            <span className="chip-v">{soundModeById(sheet.soundMode).label}</span>
+            <span className="chip-pair">
+              <span className="chip-k">MODE</span>
+              <span className="chip-v">{soundModeById(sheet.soundMode).label}</span>
+            </span>
           </button>
           <label className="chip tempo-chip">
             <span className="chip-k">BPM</span>
@@ -449,7 +468,18 @@ export default function App() {
           aria-busy={loading}
         >
           <span className="tr-icon" aria-hidden>
-            {loading ? <span className="spin" /> : playing ? "■" : "▶"}
+            {loading ? (
+              <span className="spin" />
+            ) : (
+              <span className="tr-transport-icon">
+                <span className={`tr-glyph ${playing ? "is-off" : "is-on"}`}>
+                  ▶
+                </span>
+                <span className={`tr-glyph ${playing ? "is-on" : "is-off"}`}>
+                  ■
+                </span>
+              </span>
+            )}
           </span>
           <span className="tr-label">
             {loading ? "LOAD" : playing ? "STOP" : "PLAY"}
@@ -457,7 +487,7 @@ export default function App() {
         </button>
         <button
           type="button"
-          className={`tr-btn ${sheet.metro ? "on" : ""}`}
+          className={`tr-btn metro ${sheet.metro ? "on" : ""}`}
           onClick={() => update((prev) => ({ ...prev, metro: !prev.metro }))}
           aria-pressed={sheet.metro}
           aria-label="metronome"
@@ -482,15 +512,16 @@ export default function App() {
                 className="tr-metro-ticks"
                 d="M10.2 7.2h3.6M10.2 9.4h3.6M10.2 11.6h3.6M10.2 13.8h3.6"
               />
-              {/* 추봉 + 사각 슬라이드 추 */}
-              <path d="M12 5.8 18.6 9.6" />
+              {/* 추봉 — 하단 피벗 고정, 위가 기울어짐 */}
+              <path d="M12 17.4 16.6 5.8" />
               <rect
-                x="16.9"
-                y="8.35"
+                className="tr-metro-bob"
+                x="14.55"
+                y="7.85"
                 width="3.4"
                 height="2.5"
                 rx="0.35"
-                transform="rotate(28 18.6 9.6)"
+                transform="rotate(-20 16.25 9.1)"
                 fill="currentColor"
                 stroke="none"
               />

@@ -12,6 +12,12 @@
   /* 기본: Geist Pixel / 한글·폴백: Pretendard */
   --font: "Geist Pixel", "Pretendard", system-ui, sans-serif;
   --font-ui: "Pretendard", system-ui, sans-serif;
+  /* 영역 넘김(활성↔비활성·armed) — Nothing식 모노 점등. 포인트는 한 신호만 */
+  --point: #ff3b30;
+  --ease-presence: cubic-bezier(0.33, 1, 0.32, 1);
+  --dur-presence: 0.22s;
+  --dur-armed: 0.28s;
+  --dur-glyph: 0.2s;
 }
 
 * {
@@ -320,6 +326,9 @@ button {
   padding: 4px 2px;
   border-radius: 6px;
   background: transparent;
+  transition:
+    background-color var(--dur-presence) var(--ease-presence),
+    box-shadow var(--dur-presence) var(--ease-presence);
 }
 
 .chord-cell.on {
@@ -348,6 +357,9 @@ button {
   line-height: 1;
   color: var(--muted);
   text-align: center;
+  transition:
+    opacity var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
 }
 
 .chord-deg {
@@ -357,9 +369,16 @@ button {
   color: var(--muted);
   letter-spacing: 0.02em;
   text-align: center;
+  transition:
+    opacity var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
 }
 
 .chip {
+  --chip-row-h: 1.35rem;
+  --chip-type: 0.72rem;
+  /* Bold 페이스 없음 → Pretendard로 폴백되지 않게 스택에서 제외 */
+  --font-chip: "Geist Pixel", system-ui, sans-serif;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -369,6 +388,13 @@ button {
   background: var(--bg);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   min-width: 0;
+  min-height: calc(var(--chip-row-h) + 12px);
+  box-sizing: border-box;
+  font-family: var(--font-chip);
+  font-size: var(--chip-type);
+  font-weight: 400;
+  line-height: 1;
+  font-synthesis: none;
 }
 
 .key-chip {
@@ -379,21 +405,74 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.35rem;
-  height: 1.35rem;
+  min-width: var(--chip-row-h);
+  height: var(--chip-row-h);
   padding: 0;
   border: 1px solid var(--line);
   border-radius: calc(var(--radius) - 2px);
   background: var(--fill);
   color: var(--fg);
-  font-family: var(--font-ui);
-  font-size: 0.78rem;
+  font-family: inherit;
+  font-size: var(--chip-type);
+  font-weight: 400;
   line-height: 1;
+  text-shadow:
+    0.45px 0 0 currentColor,
+    -0.45px 0 0 currentColor;
 }
 
 .key-step:active {
   transform: scale(0.94);
   background: var(--fill-2);
+}
+
+/* 키 릴 — 고정폭 + 뷰포트 정확히 1행 (두 키가 동시에 비치지 않게) */
+.key-reel {
+  --key-reel-h: var(--chip-type);
+  --key-reel-w: 2.75ch;
+  display: inline-block;
+  vertical-align: middle;
+  width: var(--key-reel-w);
+  min-width: var(--key-reel-w);
+  max-width: var(--key-reel-w);
+  height: var(--key-reel-h);
+  overflow: hidden;
+  contain: paint;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  line-height: var(--key-reel-h);
+}
+
+.key-reel-track {
+  display: block;
+  width: 100%;
+  transform: translate3d(0, calc(var(--key-y, 0) * var(--key-reel-h)), 0);
+  transition: none;
+  will-change: transform;
+}
+
+.key-reel-track.is-moving {
+  transition: transform 0.28s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.key-reel-item {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--key-reel-h);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: inherit;
+  font-weight: 400;
+  font-size: var(--key-reel-h);
+  line-height: var(--key-reel-h);
+  color: var(--fg);
+  white-space: nowrap;
+  text-align: center;
+  text-shadow:
+    0.45px 0 0 currentColor,
+    -0.45px 0 0 currentColor;
 }
 
 .tempo-chip {
@@ -403,16 +482,49 @@ button {
 .tempo-chip input[type="range"] {
   flex: 1;
   min-width: 0;
+  height: var(--chip-row-h);
+  margin: 0;
   accent-color: var(--fg);
 }
 
+.chip,
+.chip .chip-k,
+.chip .chip-v,
+.chip .key-step,
+.chip .key-reel,
+.chip .key-reel-item {
+  font-family: var(--font-chip);
+}
+
+/* 라벨+값: 같은 Geist Pixel·크기, 값은 emph(가짜 bold)만 */
+.chip-pair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.chip-k,
+.chip-v {
+  display: inline-block;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  box-sizing: border-box;
+}
+
 .chip-k {
-  font-size: 0.6rem;
   color: var(--muted);
 }
 
 .chip-v {
-  font-size: 0.72rem;
+  color: var(--fg);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0.45px 0 0 currentColor,
+    -0.45px 0 0 currentColor;
 }
 
 .transport,
@@ -438,6 +550,11 @@ button {
   background: var(--fill);
   box-shadow: var(--shadow);
   flex-shrink: 0;
+  transition:
+    background-color var(--dur-armed) var(--ease-presence),
+    border-color var(--dur-armed) var(--ease-presence),
+    color var(--dur-armed) var(--ease-presence),
+    box-shadow var(--dur-armed) var(--ease-presence);
 }
 
 .tr-btn:active,
@@ -456,9 +573,19 @@ button {
   box-shadow: var(--shadow-on);
 }
 
+/* 메트로 armed — 모노 점등 + 포인트 한 점(아이콘 추) */
+.tr-btn.metro.on {
+  background: var(--fg);
+}
+
+.tr-btn.metro.on .tr-metro-bob {
+  fill: var(--point);
+}
+
 .tr-btn.on .tr-label,
 .brush.on .brush-hint {
   color: var(--bg);
+  transition: color var(--dur-armed) var(--ease-presence);
 }
 
 .tr-icon,
@@ -473,6 +600,33 @@ button {
   width: 1.1rem;
   height: 1.1rem;
   overflow: visible;
+}
+
+.tr-metro-bob {
+  transition: fill var(--dur-armed) var(--ease-presence);
+}
+
+/* PLAY↔STOP 글리프 모프 (크로스페이드) */
+.tr-transport-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.tr-transport-icon .tr-glyph {
+  grid-area: 1 / 1;
+  transition: opacity var(--dur-glyph) var(--ease-presence);
+  line-height: 1;
+}
+
+.tr-transport-icon .tr-glyph.is-off {
+  opacity: 0;
+}
+
+.tr-transport-icon .tr-glyph.is-on {
+  opacity: 1;
 }
 
 .tr-btn.loading .tr-icon {
@@ -501,6 +655,7 @@ button {
 .brush-hint {
   font-size: 0.58rem;
   color: var(--muted);
+  transition: color var(--dur-armed) var(--ease-presence);
 }
 
 .pad-stage {
@@ -651,6 +806,12 @@ button {
   justify-content: center;
   gap: 2px;
   overflow: visible;
+  transition:
+    background-color var(--dur-presence) var(--ease-presence),
+    border-color var(--dur-presence) var(--ease-presence),
+    box-shadow var(--dur-presence) var(--ease-presence),
+    opacity var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
 }
 
 .pad.on {
@@ -667,8 +828,10 @@ button {
   opacity: 0.75;
 }
 
+/* 리듬 타격 점등 — 영역 넘김 (rest↔hit) */
 .pad.hit:not(.on) {
   border-color: var(--fg);
+  background: var(--fill-2);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
@@ -677,8 +840,20 @@ button {
 }
 
 .pad.empty .pad-label,
+.pad.empty .pad-roman,
 .pad.ghost {
   opacity: 0.35;
+}
+
+.pad .pad-label,
+.pad .pad-roman,
+.pad .pad-sub {
+  transition: opacity var(--dur-presence) var(--ease-presence);
+}
+
+/* 차트 슬롯 채움 — empty 해제 시 스탬프감 */
+.pad:not(.empty):not(.tool):not(.tone) .pad-label {
+  opacity: 1;
 }
 
 .pad.ghost {
@@ -793,4 +968,31 @@ button {
   color: var(--muted);
   text-align: center;
   flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tr-btn,
+  .brush,
+  .pad,
+  .chord-cell,
+  .chord-name,
+  .chord-deg,
+  .pad .pad-label,
+  .pad .pad-roman,
+  .pad .pad-sub,
+  .tr-label,
+  .brush-hint,
+  .tr-metro-bob,
+  .tr-transport-icon .tr-glyph {
+    transition: none !important;
+  }
+
+  .tr-btn .spin {
+    animation: none !important;
+  }
+
+  .key-reel-track,
+  .key-reel-track.is-moving {
+    transition: none !important;
+  }
 }

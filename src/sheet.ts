@@ -30,6 +30,69 @@ export const SOUND_MODES: readonly SoundMode[] = [
 
 export type SoundModeId = (typeof SOUND_MODES)[number]["id"];
 
+/**
+ * 모드별 보이스 설정 — sample·gain·ADSR·clip.
+ * 새 MODE 추가 시 SOUND_MODES + 여기 + layer* 만 맞추면 된다.
+ * (스트럼의 pitchGain/late 등은 레이어 전용 보정으로 남김)
+ */
+export type SoundModeVoice = {
+  sample: string;
+  /** sheet.gain 에 곱하는 배율 */
+  gainMul: number;
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+  /** art === "X" 일 때 clip */
+  muteClip: number;
+  /** 고정 clip (있으면). 스트럼처럼 길이·late로 계산하면 생략 */
+  clip?: number;
+  /**
+   * 스트럼: 이벤트 길이(late 보정 후) 중 소리로 채울 비율.
+   * 1에 가까울수록 다음 어택 직전까지 링. 겹침 방지용으로 1 미만.
+   */
+  clipFill?: number;
+  hpf?: number;
+};
+
+export const SOUND_MODE_VOICE: Record<SoundModeId, SoundModeVoice> = {
+  strum: {
+    sample: "gm_electric_guitar_clean:5",
+    gainMul: 1.25,
+    attack: 0.003,
+    decay: 0.14,
+    sustain: 0.42,
+    /** 짧게 — clip 끝(=다음 어택)에서 끊김 */
+    release: 0.035,
+    muteClip: 0.18,
+    clipFill: 0.985,
+    hpf: 180,
+  },
+  piano: {
+    sample: "gm_piano:1", // FluidR3
+    gainMul: 1.35,
+    attack: 0.006,
+    decay: 0.22,
+    sustain: 0.5,
+    release: 0.18,
+    muteClip: 0.16,
+    clip: 0.9,
+  },
+};
+
+export function soundModeVoice(id: SoundModeId): SoundModeVoice {
+  return SOUND_MODE_VOICE[id];
+}
+
+function voiceAdsr(v: SoundModeVoice): string {
+  return [
+    `.attack(${v.attack})`,
+    `.decay(${v.decay})`,
+    `.sustain(${v.sustain})`,
+    `.release(${v.release})`,
+  ].join("");
+}
+
 export type SheetState = {
   bpm: number;
   key: string;
@@ -109,11 +172,6 @@ const INTERVAL_ST: Record<ChordInterval, number> = {
 const TONES_MAJ: ToneSet = ["1", "3", "5"];
 const TONES_MIN: ToneSet = ["1", "b3", "5"];
 const TONES_DIM: ToneSet = ["1", "b3", "b5"];
-
-/** strum — GM clean 기타 */
-const TONE_STRUM = "gm_electric_guitar_clean:5";
-/** piano — 전음 동시, GM 피아노 */
-const TONE_PIANO = "gm_piano";
 
 /**
  * 오픈(·바레) 셰이프 — 저→고 절대음.
@@ -341,8 +399,7 @@ export const MAJOR_KEYS: Record<string, readonly string[]> = {
 };
 
 /**
- * 5도권 (시계방향 = 조표 ♯·완전5도 위).
- * C→G→…→F#→Db→…→F→C — 메이저 12조 전부.
+ * 5도권 (참고·레거시). UI 순회는 KEY_CHROMATIC을 쓴다.
  */
 export const CIRCLE_OF_FIFTHS = [
   "C",
@@ -359,19 +416,38 @@ export const CIRCLE_OF_FIFTHS = [
   "F",
 ] as const;
 
-export type MajorKey = (typeof CIRCLE_OF_FIFTHS)[number];
+/**
+ * 반음 키 단위 순 (낮→높).
+ * ♭ = −1, ♯ = +1 — 표기는 보유 12조 철자(Db·F# 등).
+ */
+export const KEY_CHROMATIC = [
+  "C",
+  "Db",
+  "D",
+  "Eb",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "Ab",
+  "A",
+  "Bb",
+  "B",
+] as const;
 
-export const KEY_LIST: readonly string[] = CIRCLE_OF_FIFTHS;
+export type MajorKey = (typeof KEY_CHROMATIC)[number];
 
-/** 조표처럼 5도권으로 steps칸 이동 (+ = ♯쪽, − = ♭쪽) */
+export const KEY_LIST: readonly string[] = KEY_CHROMATIC;
+
+/** 반음 키 단위로 steps칸 이동 (+ = ♯·위, − = ♭·아래) */
 export function shiftKey(current: string, steps: number): string {
-  const i = CIRCLE_OF_FIFTHS.indexOf(current as MajorKey);
+  const i = KEY_CHROMATIC.indexOf(current as MajorKey);
   const from = i < 0 ? 0 : i;
-  const n = CIRCLE_OF_FIFTHS.length;
-  return CIRCLE_OF_FIFTHS[((from + steps) % n + n) % n]!;
+  const n = KEY_CHROMATIC.length;
+  return KEY_CHROMATIC[((from + steps) % n + n) % n]!;
 }
 
-/** @deprecated shiftKey(current, 1) — 5도권 ♯쪽 */
+/** @deprecated shiftKey(current, 1) */
 export function nextKey(current: string): string {
   return shiftKey(current, 1);
 }
@@ -863,6 +939,8 @@ export function cyclesPerSecond(bpm: number): number {
 
 export type TimedEvent = {
   chord: string | null;
+  /** 슬롯 구성음 — piano 보이싱용. chord만 있으면 decode */
+  tones: ToneSet | null;
   steps: number;
   gain: number;
   art: AttackArt | null;
@@ -897,12 +975,13 @@ export function compileSheet(sheet: SheetState): StrudelParts {
           art === "X" ? base * 0.22 : art === "U" ? base * 0.72 : base;
         events.push({
           chord,
+          tones: toneSet ?? defaultTonesForDegree(degree!),
           steps,
           gain: Number(gain.toFixed(3)),
           art: art as AttackArt,
         });
         if (art === "X" && holds > 0) {
-          events.push({ chord: null, steps: holds, gain: 0, art: null });
+          events.push({ chord: null, tones: null, steps: holds, gain: 0, art: null });
         }
         step += 1 + holds;
         continue;
@@ -919,7 +998,7 @@ export function compileSheet(sheet: SheetState): StrudelParts {
         span += 1;
         step += 1;
       }
-      events.push({ chord: null, steps: span, gain: 0, art: null });
+      events.push({ chord: null, tones: null, steps: span, gain: 0, art: null });
     }
   }
 
@@ -959,60 +1038,96 @@ function strokeNotes(chord: string, art: AttackArt): string[] {
 }
 
 /**
- * piano — 오픈셰이프 전음을 한꺼번에 (쉼표 = 동시).
- * X는 중현만·짧게.
+ * piano 보이싱: 선택한 구성음만 (오픈 6현 아님).
+ * 근음 부근(C3–C4)에서 한 번씩만 쌓는다.
+ */
+export function pianoToneNotes(root: string, tones: ToneSet): string[] {
+  const pc = PC[root] ?? 0;
+  let rootMidi = 48 + ((pc - 0 + 12) % 12); // C3=48 근처
+  if (rootMidi > 59) rootMidi -= 12;
+  const sts = normTones(tones).map((id) => INTERVAL_ST[id]);
+  const midis: number[] = [];
+  let prev = rootMidi - 1;
+  for (const st of sts) {
+    let n = rootMidi + st;
+    while (n <= prev) n += 12;
+    if (n > 76) n -= 12;
+    midis.push(n);
+    prev = n;
+  }
+  return midis.map(midiToNote);
+}
+
+function pianoEventNotes(e: TimedEvent): string[] {
+  if (!e.chord || !e.art) return [];
+  const { root, tones: decoded } = decodeChordToTones(e.chord);
+  const tones =
+    e.tones && e.tones.length > 0 ? e.tones : decoded;
+  const notes = pianoToneNotes(root, tones);
+  if (e.art === "X") {
+    // 뮤트: 중음만 짧게
+    if (notes.length <= 2) return notes;
+    return notes.slice(1, Math.min(3, notes.length));
+  }
+  return notes;
+}
+
+/**
+ * piano — 선택 구성음만 동시. 기타 오픈셰이프/6현 금지.
  */
 function layerPiano(parts: StrudelParts): string {
-  const toks = parts.events
-    .map((e) => {
-      if (!e.chord || !e.art) {
-        return e.steps === 1 ? "~" : `~@${e.steps}`;
-      }
-      const notes =
-        e.art === "X" ? strokeNotes(e.chord, e.art) : guitarShape(e.chord);
-      const chord = notes.join(",");
-      return e.steps === 1 ? chord : `${chord}@${e.steps}`;
-    })
-    .join(" ");
+  const voice = soundModeVoice("piano");
+  const maxVoices = Math.max(
+    1,
+    ...parts.events.map((e) => pianoEventNotes(e).length),
+  );
+  const voices: string[] = [];
 
-  const gainPat = parts.events
-    .map((e) => {
-      if (!e.chord || !e.art) {
-        return e.steps === 1 ? "0" : `0@${e.steps}`;
-      }
-      const durScale = Math.min(1, 2 / Math.max(1, e.steps));
-      // 5~6음 동시 → 헤드룸
-      const g = Number((e.gain * durScale * 0.42).toFixed(3));
-      return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
-    })
-    .join(" ");
+  for (let slot = 0; slot < maxVoices; slot++) {
+    const toks = parts.events
+      .map((e) => {
+        const n = pianoEventNotes(e)[slot];
+        if (!n) return e.steps === 1 ? "~" : `~@${e.steps}`;
+        return e.steps === 1 ? n : `${n}@${e.steps}`;
+      })
+      .join(" ");
 
-  const clip = parts.events
-    .map((e) => {
-      if (!e.chord || !e.art) {
-        return e.steps === 1 ? "0" : `0@${e.steps}`;
-      }
-      const c = e.art === "X" ? 0.18 : 0.92;
-      return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
-    })
-    .join(" ");
+    const gainPat = parts.events
+      .map((e) => {
+        const notes = pianoEventNotes(e);
+        if (!notes[slot]) return e.steps === 1 ? "0" : `0@${e.steps}`;
+        const g = Number((e.gain * voice.gainMul).toFixed(3));
+        return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
+      })
+      .join(" ");
 
-  return [
-    `note("${toks}")`,
-    `.s("${TONE_PIANO}")`,
-    `.gain("${gainPat}")`,
-    `.clip("${clip}")`,
-    `.attack(0.004)`,
-    `.decay(0.12)`,
-    `.sustain(0.32)`,
-    `.release(0.05)`,
-  ].join("");
+    const clip = parts.events
+      .map((e) => {
+        const notes = pianoEventNotes(e);
+        if (!notes[slot]) return e.steps === 1 ? "0" : `0@${e.steps}`;
+        const c = e.art === "X" ? voice.muteClip : (voice.clip ?? 0.9);
+        return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
+      })
+      .join(" ");
+
+    voices.push(
+      [
+        `note("${toks}")`,
+        `.s("${voice.sample}")`,
+        `.gain("${gainPat}")`,
+        `.clip("${clip}")`,
+        voiceAdsr(voice),
+      ].join(""),
+    );
+  }
+
+  return stackBody(voices);
 }
 
 /**
  * 오픈셰이프 note + late 스트럼.
  * - 코드마다 5~6음 (C/Am 오픈은 6번줄 뮤트 → 5)
- * - late로 onset만 어긋남. clip을 late만큼 줄여 다음 코드와 안 겹침
+ * - late로 onset만 어긋남. clip은 late만큼만 줄여 다음 어택 직전까지 링
  * - 피치별 gain: 저현↓ / **1번줄(고현)↑** — GM이 고현을 작게 내는 보정
  * - hpf로 저역 머드 컷
  */
@@ -1047,6 +1162,7 @@ function pitchGain(midi: number): number {
 }
 
 function layerStrum(parts: StrudelParts): string {
+  const voice = soundModeVoice("strum");
   const maxVoices = Math.max(
     1,
     ...parts.events.map((e) =>
@@ -1079,38 +1195,42 @@ function layerStrum(parts: StrudelParts): string {
         if (!n) return e.steps === 1 ? "0" : `0@${e.steps}`;
         const durScale = Math.min(1, 2 / Math.max(1, e.steps));
         const g = Number(
-          (e.gain * durScale * pitchGain(noteMidi(n))).toFixed(3),
+          (
+            e.gain *
+            durScale *
+            pitchGain(noteMidi(n)) *
+            voice.gainMul
+          ).toFixed(3),
         );
         return e.steps === 1 ? String(g) : `${g}@${e.steps}`;
       })
       .join(" ");
 
-    // late만큼 clip↓ — 바닥을 더 높여 마지막 현(1번줄)이 너무 짧아지지 않게
+    // late만큼만 clip↓ — 나머지는 clipFill로 다음 어택 직전까지 채움 (공백↓)
+    const fill = voice.clipFill ?? 0.985;
     const clip = parts.events
       .map((e) => {
         if (!e.chord || !e.art) {
           return e.steps === 1 ? "0" : `0@${e.steps}`;
         }
         if (e.art === "X") {
-          return e.steps === 1 ? "0.18" : `0.18@${e.steps}`;
+          const m = voice.muteClip;
+          return e.steps === 1 ? String(m) : `${m}@${e.steps}`;
         }
         const dur = e.steps / total;
         const room = Math.max(0.55, (dur - lateAmt) / dur);
-        const c = Number((room * 0.92).toFixed(3));
+        const c = Number((room * fill).toFixed(3));
         return e.steps === 1 ? String(c) : `${c}@${e.steps}`;
       })
       .join(" ");
 
     let line = [
       `note("${toks}")`,
-      `.s("${TONE_STRUM}")`,
+      `.s("${voice.sample}")`,
       `.gain("${gainPat}")`,
       `.clip("${clip}")`,
-      `.hpf(180)`,
-      `.attack(0.003)`,
-      `.decay(0.1)`,
-      `.sustain(0.28)`,
-      `.release(0.045)`,
+      voice.hpf != null ? `.hpf(${voice.hpf})` : "",
+      voiceAdsr(voice),
     ].join("");
     if (slot > 0 && gap > 0) {
       line += `.late(${lateAmt.toFixed(5)})`;
