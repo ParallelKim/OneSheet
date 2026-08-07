@@ -387,6 +387,7 @@ button {
   min-width: 0;
   min-height: calc(var(--chip-row-h) + 12px);
   box-sizing: border-box;
+  font-family: var(--font-ui);
 }
 
 .key-chip {
@@ -451,6 +452,7 @@ button {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  font-family: var(--font-ui);
   font-weight: 700;
   font-size: var(--key-reel-h);
   line-height: var(--key-reel-h);
@@ -467,21 +469,29 @@ button {
   flex: 1;
   min-width: 0;
   height: var(--chip-row-h);
+  margin: 0;
   accent-color: var(--fg);
 }
 
-/* KEY / MODE / BPM 라벨·값이 같은 행 높이를 공유 → 가로 기준선 맞춤 */
+/* 라벨+값: 같은 베이스라인 (piano 디센더에 center가 깨지지 않게) */
+.chip-pair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
 .chip-k,
 .chip-v {
-  display: inline-flex;
-  align-items: center;
-  height: var(--chip-row-h);
+  display: inline-block;
   line-height: 1;
   box-sizing: border-box;
 }
 
 .chip-k {
   font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   color: var(--muted);
 }
 
@@ -489,6 +499,7 @@ button {
   font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .transport,

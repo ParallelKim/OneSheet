@@ -382,8 +382,10 @@ export default function App() {
             onClick={cycleSoundMode}
             aria-label="sound mode"
           >
-            <span className="chip-k">MODE</span>
-            <span className="chip-v">{soundModeById(sheet.soundMode).label}</span>
+            <span className="chip-pair">
+              <span className="chip-k">MODE</span>
+              <span className="chip-v">{soundModeById(sheet.soundMode).label}</span>
+            </span>
           </button>
           <label className="chip tempo-chip">
             <span className="chip-k">BPM</span>
