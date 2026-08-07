@@ -12,6 +12,12 @@
   /* 기본: Geist Pixel / 한글·폴백: Pretendard */
   --font: "Geist Pixel", "Pretendard", system-ui, sans-serif;
   --font-ui: "Pretendard", system-ui, sans-serif;
+  /* 영역 넘김(활성↔비활성·armed) — Nothing식 모노 점등. 포인트는 한 신호만 */
+  --point: #ff3b30;
+  --ease-presence: cubic-bezier(0.33, 1, 0.32, 1);
+  --dur-presence: 0.22s;
+  --dur-armed: 0.28s;
+  --dur-glyph: 0.2s;
 }
 
 * {
@@ -320,6 +326,9 @@ button {
   padding: 4px 2px;
   border-radius: 6px;
   background: transparent;
+  transition:
+    background-color var(--dur-presence) var(--ease-presence),
+    box-shadow var(--dur-presence) var(--ease-presence);
 }
 
 .chord-cell.on {
@@ -348,6 +357,9 @@ button {
   line-height: 1;
   color: var(--muted);
   text-align: center;
+  transition:
+    opacity var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
 }
 
 .chord-deg {
@@ -357,6 +369,9 @@ button {
   color: var(--muted);
   letter-spacing: 0.02em;
   text-align: center;
+  transition:
+    opacity var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
 }
 
 .chip {
@@ -438,6 +453,11 @@ button {
   background: var(--fill);
   box-shadow: var(--shadow);
   flex-shrink: 0;
+  transition:
+    background-color var(--dur-armed) var(--ease-presence),
+    border-color var(--dur-armed) var(--ease-presence),
+    color var(--dur-armed) var(--ease-presence),
+    box-shadow var(--dur-armed) var(--ease-presence);
 }
 
 .tr-btn:active,
@@ -456,9 +476,19 @@ button {
   box-shadow: var(--shadow-on);
 }
 
+/* 메트로 armed — 모노 점등 + 포인트 한 점(아이콘 추) */
+.tr-btn.metro.on {
+  background: var(--fg);
+}
+
+.tr-btn.metro.on .tr-metro-bob {
+  fill: var(--point);
+}
+
 .tr-btn.on .tr-label,
 .brush.on .brush-hint {
   color: var(--bg);
+  transition: color var(--dur-armed) var(--ease-presence);
 }
 
 .tr-icon,
@@ -473,6 +503,33 @@ button {
   width: 1.1rem;
   height: 1.1rem;
   overflow: visible;
+}
+
+.tr-metro-bob {
+  transition: fill var(--dur-armed) var(--ease-presence);
+}
+
+/* PLAY↔STOP 글리프 모프 (크로스페이드) */
+.tr-transport-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.tr-transport-icon .tr-glyph {
+  grid-area: 1 / 1;
+  transition: opacity var(--dur-glyph) var(--ease-presence);
+  line-height: 1;
+}
+
+.tr-transport-icon .tr-glyph.is-off {
+  opacity: 0;
+}
+
+.tr-transport-icon .tr-glyph.is-on {
+  opacity: 1;
 }
 
 .tr-btn.loading .tr-icon {
@@ -501,6 +558,7 @@ button {
 .brush-hint {
   font-size: 0.58rem;
   color: var(--muted);
+  transition: color var(--dur-armed) var(--ease-presence);
 }
 
 .pad-stage {
@@ -651,6 +709,12 @@ button {
   justify-content: center;
   gap: 2px;
   overflow: visible;
+  transition:
+    background-color var(--dur-presence) var(--ease-presence),
+    border-color var(--dur-presence) var(--ease-presence),
+    box-shadow var(--dur-presence) var(--ease-presence),
+    opacity var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
 }
 
 .pad.on {
@@ -667,8 +731,10 @@ button {
   opacity: 0.75;
 }
 
+/* 리듬 타격 점등 — 영역 넘김 (rest↔hit) */
 .pad.hit:not(.on) {
   border-color: var(--fg);
+  background: var(--fill-2);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
@@ -677,8 +743,20 @@ button {
 }
 
 .pad.empty .pad-label,
+.pad.empty .pad-roman,
 .pad.ghost {
   opacity: 0.35;
+}
+
+.pad .pad-label,
+.pad .pad-roman,
+.pad .pad-sub {
+  transition: opacity var(--dur-presence) var(--ease-presence);
+}
+
+/* 차트 슬롯 채움 — empty 해제 시 스탬프감 */
+.pad:not(.empty):not(.tool):not(.tone) .pad-label {
+  opacity: 1;
 }
 
 .pad.ghost {
@@ -793,4 +871,26 @@ button {
   color: var(--muted);
   text-align: center;
   flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tr-btn,
+  .brush,
+  .pad,
+  .chord-cell,
+  .chord-name,
+  .chord-deg,
+  .pad .pad-label,
+  .pad .pad-roman,
+  .pad .pad-sub,
+  .tr-label,
+  .brush-hint,
+  .tr-metro-bob,
+  .tr-transport-icon .tr-glyph {
+    transition: none !important;
+  }
+
+  .tr-btn .spin {
+    animation: none;
+  }
 }

@@ -449,7 +449,18 @@ export default function App() {
           aria-busy={loading}
         >
           <span className="tr-icon" aria-hidden>
-            {loading ? <span className="spin" /> : playing ? "■" : "▶"}
+            {loading ? (
+              <span className="spin" />
+            ) : (
+              <span className="tr-transport-icon">
+                <span className={`tr-glyph ${playing ? "is-off" : "is-on"}`}>
+                  ▶
+                </span>
+                <span className={`tr-glyph ${playing ? "is-on" : "is-off"}`}>
+                  ■
+                </span>
+              </span>
+            )}
           </span>
           <span className="tr-label">
             {loading ? "LOAD" : playing ? "STOP" : "PLAY"}
@@ -457,7 +468,7 @@ export default function App() {
         </button>
         <button
           type="button"
-          className={`tr-btn ${sheet.metro ? "on" : ""}`}
+          className={`tr-btn metro ${sheet.metro ? "on" : ""}`}
           onClick={() => update((prev) => ({ ...prev, metro: !prev.metro }))}
           aria-pressed={sheet.metro}
           aria-label="metronome"
@@ -485,6 +496,7 @@ export default function App() {
               {/* 추봉 + 사각 슬라이드 추 */}
               <path d="M12 5.8 18.6 9.6" />
               <rect
+                className="tr-metro-bob"
                 x="16.9"
                 y="8.35"
                 width="3.4"
