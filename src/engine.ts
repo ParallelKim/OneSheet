@@ -39,8 +39,10 @@ const DIRT_BASE =
 
 /** gm_electric_guitar_clean:5 → Stratocaster */
 const STRUM_FONT = "0270_Stratocaster_sf2_file";
-/** 오픈 기타 음역 — 첫 타격 skip hap(still loading) 방지 */
-const STRUM_WARM_MIDI = [40, 45, 48, 50, 52, 55, 59, 60, 64, 67];
+/** gm_piano (n 생략 = 0) → JCLive acoustic */
+const PIANO_FONT = "0000_JCLive_sf2_file";
+/** 오픈 셰이프 음역 — still loading 스킵 방지 */
+const WARM_MIDI = [40, 45, 48, 50, 52, 55, 59, 60, 64, 67];
 
 const MASTER_DUCK_SEC = 0.03;
 const MASTER_OPEN_SEC = 0.012;
@@ -142,24 +144,26 @@ async function loadDirtGtr(): Promise<void> {
   dirtGtrLoaded = true;
 }
 
-/** 사운드폰트 피치 캐시 — 첫 스트럼이 still loading으로 잘리는 것 완화 */
-async function warmStrumFont(): Promise<void> {
+/** 사운드폰트 피치 캐시 — strum/piano 첫 타격 still loading 스킵 완화 */
+async function warmPlaybackFonts(): Promise<void> {
   if (fontsWarmed) return;
   const ctx = getAudioContext() as AudioContext;
-  await Promise.all(
-    STRUM_WARM_MIDI.map(async (midi) => {
+  const warm = async (font: string, midi: number) => {
+    try {
+      const src = await getFontBufferSource(font, { note: midi }, ctx);
       try {
-        const src = await getFontBufferSource(STRUM_FONT, { note: midi }, ctx);
-        try {
-          src.disconnect();
-        } catch {
-          /* ignore */
-        }
+        src.disconnect();
       } catch {
-        /* warm 실패해도 재생은 진행 */
+        /* ignore */
       }
-    }),
-  );
+    } catch {
+      /* warm 실패해도 재생은 진행 */
+    }
+  };
+  await Promise.all([
+    ...WARM_MIDI.map((midi) => warm(STRUM_FONT, midi)),
+    ...WARM_MIDI.map((midi) => warm(PIANO_FONT, midi)),
+  ]);
   fontsWarmed = true;
 }
 
@@ -214,7 +218,7 @@ export async function evaluateStrudel(
     if (my !== epoch) return false;
     await ensureAudioRunning();
     if (my !== epoch) return false;
-    await warmStrumFont();
+    await warmPlaybackFonts();
     if (my !== epoch) return false;
 
     openMaster();

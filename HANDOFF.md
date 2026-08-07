@@ -15,7 +15,8 @@
 - 리듬 rest↔hit → 점등 (bg/border)
 - 차트·LCD 슬롯 empty↔채움 → opacity/스탬프감
 - PLAY↔STOP → 글리프 크로스페이드
-- KEY ♭/♯ → 반음 키 단위 순회 + 슬롯머신 롤
+- KEY ♭/♯ → 반음 키 단위 순회 + 슬롯머신 롤 (표시 슬롯 **고정폭**)
+- piano 사운드폰트도 워밍 (동시 다성 still-loading 스킵 완화)
 
 ---
 

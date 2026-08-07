@@ -411,22 +411,26 @@ button {
   background: var(--fill-2);
 }
 
-/* 키 슬롯/오도미터 릴 — 뷰포트 1칸, 스트립이 한 칸 미끄러짐 */
+/* 키 릴 — 최장 글리프(F♯/D♭ 등) 기준 고정폭. 레이아웃 시프트 금지 */
 .key-reel {
   --key-reel-h: 1.15em;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.75rem;
+  --key-reel-w: 2.75ch;
+  display: inline-block;
+  vertical-align: middle;
+  width: var(--key-reel-w);
+  min-width: var(--key-reel-w);
+  max-width: var(--key-reel-w);
   height: var(--key-reel-h);
   overflow: hidden;
   font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .key-reel-track {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
+  width: 100%;
   transform: translateY(calc(var(--key-y, 0) * var(--key-reel-h)));
   transition: none;
 }
@@ -439,12 +443,15 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
   flex: 0 0 var(--key-reel-h);
   height: var(--key-reel-h);
   font-weight: 700;
   font-size: 0.78rem;
   line-height: 1;
   color: var(--fg);
+  white-space: nowrap;
 }
 
 .tempo-chip {
