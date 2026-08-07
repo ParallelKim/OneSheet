@@ -101,36 +101,40 @@ describe("root × tones", () => {
     expect(a1).toEqual({ min: "1", maj: "1", polar: false });
   });
 
-  it("같은 근음 재클릭은 자주 쓰는 구성음 순회 (비우기는 ∅)", () => {
+  it("같은 근음 재클릭은 공통 자주-쓰는 코드 순회 (비우기는 ∅)", () => {
     let sheet = createInitialSheet();
     sheet = paintDegreeSlot(sheet, 0, 0); // I → C
     expect(sheet.degrees[0]).toBe(0);
-    expect(sheet.tones[0]).toEqual(["1", "3", "5"]);
     expect(slotLabel("C", 0, sheet.tones[0])).toBe("C");
 
+    sheet = paintDegreeSlot(sheet, 0, 0); // → Cm
+    expect(slotLabel("C", 0, sheet.tones[0])).toBe("Cm");
+
     sheet = paintDegreeSlot(sheet, 0, 0); // → C7
-    expect(sheet.tones[0]).toEqual(["1", "3", "5", "b7"]);
     expect(slotLabel("C", 0, sheet.tones[0])).toBe("C7");
 
-    sheet = paintDegreeSlot(sheet, 0, 0); // → Cmaj7
-    expect(slotLabel("C", 0, sheet.tones[0])).toBe("Cmaj7");
+    sheet = paintDegreeSlot(sheet, 0, 0); // → Cm7
+    expect(slotLabel("C", 0, sheet.tones[0])).toBe("Cm7");
 
-    sheet = paintDegreeSlot(sheet, 0, 0); // → Cadd2
-    expect(slotLabel("C", 0, sheet.tones[0])).toBe("Cadd2");
+    sheet = paintDegreeSlot(sheet, 0, 0); // → Csus4
+    expect(slotLabel("C", 0, sheet.tones[0])).toBe("Csus4");
+
+    sheet = paintDegreeSlot(sheet, 0, 0); // → C
+    expect(slotLabel("C", 0, sheet.tones[0])).toBe("C");
 
     sheet = paintDegreeSlot(sheet, 0, null); // ∅
     expect(sheet.degrees[0]).toBeNull();
     expect(sheet.tones[0]).toBeNull();
   });
 
-  it("min 도수는 m → m7 → madd2 순", () => {
+  it("min 도수 첫 칠은 다이아토닉, 이후 공통 순회", () => {
     let sheet = createInitialSheet();
     sheet = paintDegreeSlot(sheet, 0, 5); // vi → Am
     expect(slotLabel("C", 5, sheet.tones[0])).toBe("Am");
-    sheet = paintDegreeSlot(sheet, 0, 5);
+    sheet = paintDegreeSlot(sheet, 0, 5); // → A7
+    expect(slotLabel("C", 5, sheet.tones[0])).toBe("A7");
+    sheet = paintDegreeSlot(sheet, 0, 5); // → Am7
     expect(slotLabel("C", 5, sheet.tones[0])).toBe("Am7");
-    sheet = paintDegreeSlot(sheet, 0, 5);
-    expect(slotLabel("C", 5, sheet.tones[0])).toBe("Amadd2");
   });
 
   it("상대도수 순회는 선택 슬롯에만 적용", () => {
