@@ -340,6 +340,7 @@ describe("compileSheet / toStrudel", () => {
     expect(code).toContain('.s("gm_electric_guitar_clean:5")');
     expect(code).toContain(".late(");
     expect(code).toContain(".hpf(180)");
+    expect(code).toContain(".release(");
     expect(code).toContain("note(");
     expect(code).not.toContain('dict("gtr6")');
     expect(code).not.toMatch(/\bn\("/);

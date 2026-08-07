@@ -261,15 +261,17 @@ export default function App() {
           return;
         }
         const code = toStrudel(sheetRef.current);
-        const ok = await evaluateStrudel(code);
+        // UI 위상을 0에 붙인 뒤 스케줄러 start — 첫 코드 잘림 완화
+        playingRef.current = true;
+        setEngine("playing");
+        setStatus("");
+        const ok = await evaluateStrudel(code, { syncStart: true });
         if (!ok || getPlaybackEpoch() !== gate) {
           playingRef.current = false;
           setEngine((e) => (e === "error" ? e : "ready"));
           setStatus("");
           return;
         }
-        playingRef.current = true;
-        setEngine("playing");
         setStatus(
           getAudioState() === "running" ? "" : "audio locked — tap PLAY",
         );

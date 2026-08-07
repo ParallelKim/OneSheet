@@ -1013,8 +1013,10 @@ function layerPiano(parts: StrudelParts): string {
     `.s("${TONE_PIANO}")`,
     `.gain("${gainPat}")`,
     `.clip("${clip}")`,
-    `.decay(0.15)`,
-    `.sustain(0.45)`,
+    `.attack(0.004)`,
+    `.decay(0.12)`,
+    `.sustain(0.32)`,
+    `.release(0.05)`,
   ].join("");
 }
 
@@ -1116,8 +1118,10 @@ function layerStrum(parts: StrudelParts): string {
       `.gain("${gainPat}")`,
       `.clip("${clip}")`,
       `.hpf(180)`,
-      `.decay(0.08)`,
-      `.sustain(0.4)`,
+      `.attack(0.003)`,
+      `.decay(0.1)`,
+      `.sustain(0.28)`,
+      `.release(0.045)`,
     ].join("");
     if (slot > 0 && gap > 0) {
       line += `.late(${lateAmt.toFixed(5)})`;

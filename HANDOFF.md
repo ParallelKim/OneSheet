@@ -36,6 +36,12 @@
 | `strum` | ✅ | 오픈셰이프 + late |
 | `piano` | | 전음 동시 |
 
+## Transport / 오디오
+
+- PLAY: UI 위상 선부착 → 패턴 로드 → 스케줄러 start (사이클 0). 스트럼 폰트 워밍·latency 0.14
+- STOP: epoch↑ + 마스터 gain duck(~30ms) + hush — 스케줄만 끊지 않고 잔향도 짧게 죽임
+- 편집 중 재생: syncStart 없이 핫스왑
+
 ## Share (SheetDoc)
 
 휴대용 채보 포맷 `SheetDoc` v1 — URL / 파일 / 서버 공통.
