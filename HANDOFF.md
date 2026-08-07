@@ -2,13 +2,13 @@
 
 작성 시점: 2026-08-06 · 브랜치 `cursor/rhythm-inherit-4663`
 
-철학: **write simple play loop** — 빈 차트에서 쓰고, 바로 듣고, 루프한다.
+철학: **write simple play loop** — 심플 & 루프. 모노톤 기본.
 
 ## UX — 상태 전환
 
 상태는 점프하지 않고 **전환으로** 바뀐다. 아르카나는 **한** 사례(양극 회전)일 뿐.
 2상태(on/off)도 전환 — 메타포는 기능·UI가 고른다: 뒤집힘 / 밀림 / 점등 / 상승·하강 …
-조사·어휘 목록: **`docs/transition-vocabulary.md`**
+조사·어휘: **`docs/transition-vocabulary.md`** · 디자인 레퍼런스(TE·Nothing): **`docs/design-references.md`**
 why 없는 motion은 스타일링. 소리(PLAY/STOP)도 같은 축.
 
 ---

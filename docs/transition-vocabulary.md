@@ -78,6 +78,13 @@
 - **OP-Z app**: camera **flip** 토글 — 이름 그대로 축 flip 메타포.  
   https://teenage.engineering/guides/op-z/app
 
+### Nothing
+- **모노톤 + 포인트**: 흑·백이 구조, 포인트 색/Glyph 빛이 **활성·알림·한 신호**만 담당.  
+  OneSheet 점등·재료 presence와 같은 축. 팔레트 복제가 아니라 **운용**을 훔친다.
+- https://nothing.tech  
+  https://design-milk.com/the-nothing-phone-3s-glyph-matrix-turns-notifications-into-pixel-art/
+- 상세: `docs/design-references.md`
+
 ### 일반 UI (사무 스위치)
 - Apple HIG / Material 토글: thumb **슬라이드**, 즉시 적용.  
   악기·장난감 UX에 그대로 쓰면 너무 설정 앱이 되기 쉽다. **어휘 후보일 뿐 기본값은 아님.**
@@ -105,8 +112,8 @@
 
 ## 고를 때 질문
 
-1. 이 컨트롤은 **양극(A/B)** 인가, **활성(on/armed)** 인가, **레벨** 인가?
-2. 같은 물체가 바뀌는가, 아니면 불이 붙는가?
+1. 이 컨트롤은 **양극(A/B)** 인가, **재료 활성/비활성** 인가, **기기 armed** 인가, **레벨** 인가?
+2. 같은 물체가 바뀌는가, 아니면 불이 붙는가? (모노 위 포인트/점등은 Nothing 축)
 3. 소리의 어택/릴리즈와 **한 문장으로** 설명할 수 있는가?
 4. why를 한 줄로 못 쓰면 → 스타일링. 빼거나 다시 고른다.
 
