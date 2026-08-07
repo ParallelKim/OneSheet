@@ -139,12 +139,15 @@ const OPEN_SHAPES: Record<string, readonly string[]> = {
 
 const PC: Record<string, number> = {
   C: 0,
+  "B#": 0,
   "C#": 1,
   Db: 1,
   D: 2,
   "D#": 3,
   Eb: 3,
   E: 4,
+  Fb: 4,
+  "E#": 5,
   F: 5,
   "F#": 6,
   Gb: 6,
@@ -155,6 +158,7 @@ const PC: Record<string, number> = {
   "A#": 10,
   Bb: 10,
   B: 11,
+  Cb: 11,
 };
 
 const PC_NAME = [
@@ -327,11 +331,55 @@ export const MAJOR_KEYS: Record<string, readonly string[]> = {
   D: ["D", "E", "F#", "G", "A", "B", "C#"],
   A: ["A", "B", "C#", "D", "E", "F#", "G#"],
   E: ["E", "F#", "G#", "A", "B", "C#", "D#"],
-  F: ["F", "G", "A", "Bb", "C", "D", "E"],
+  B: ["B", "C#", "D#", "E", "F#", "G#", "A#"],
+  "F#": ["F#", "G#", "A#", "B", "C#", "D#", "E#"],
+  Db: ["Db", "Eb", "F", "Gb", "Ab", "Bb", "C"],
+  Ab: ["Ab", "Bb", "C", "Db", "Eb", "F", "G"],
+  Eb: ["Eb", "F", "G", "Ab", "Bb", "C", "D"],
   Bb: ["Bb", "C", "D", "Eb", "F", "G", "A"],
+  F: ["F", "G", "A", "Bb", "C", "D", "E"],
 };
 
-export const KEY_LIST = Object.keys(MAJOR_KEYS);
+/**
+ * 5도권 (시계방향 = 조표 ♯·완전5도 위).
+ * C→G→…→F#→Db→…→F→C — 메이저 12조 전부.
+ */
+export const CIRCLE_OF_FIFTHS = [
+  "C",
+  "G",
+  "D",
+  "A",
+  "E",
+  "B",
+  "F#",
+  "Db",
+  "Ab",
+  "Eb",
+  "Bb",
+  "F",
+] as const;
+
+export type MajorKey = (typeof CIRCLE_OF_FIFTHS)[number];
+
+export const KEY_LIST: readonly string[] = CIRCLE_OF_FIFTHS;
+
+/** 조표처럼 5도권으로 steps칸 이동 (+ = ♯쪽, − = ♭쪽) */
+export function shiftKey(current: string, steps: number): string {
+  const i = CIRCLE_OF_FIFTHS.indexOf(current as MajorKey);
+  const from = i < 0 ? 0 : i;
+  const n = CIRCLE_OF_FIFTHS.length;
+  return CIRCLE_OF_FIFTHS[((from + steps) % n + n) % n]!;
+}
+
+/** @deprecated shiftKey(current, 1) — 5도권 ♯쪽 */
+export function nextKey(current: string): string {
+  return shiftKey(current, 1);
+}
+
+/** 화면용 키 이름 (F# → F♯) */
+export function formatKeyGlyph(key: string): string {
+  return key.replace("#", "♯").replace("b", "♭");
+}
 
 export const DEGREE_META = [
   { roman: "I", quality: "maj" as const },
@@ -547,12 +595,10 @@ export function intervalNoteLabel(
 
 /** 키의 임시표 취향에 맞춘 피치클래스 라벨 */
 function pitchClassLabel(pc: number, key: string): string {
-  const flatKeys = new Set(["F", "Bb", "Eb", "Ab", "Db", "Gb"]);
+  const flatKeys = new Set(["C", "F", "Bb", "Eb", "Ab", "Db", "Gb"]);
   const flats = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
   const sharps = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-  const table = flatKeys.has(key) || key === "C" ? flats : sharps;
-  if (key === "C") return flats[pc]!;
-  return table[pc]!;
+  return (flatKeys.has(key) ? flats : sharps)[pc]!;
 }
 
 export function tonesInclude(tones: ToneSet | null, interval: ChordInterval): boolean {
@@ -716,11 +762,6 @@ export function paintToneSlot(
   const tones = [...sheet.tones];
   tones[slot] = cycleToneAxis(cur, axis);
   return { ...sheet, tones };
-}
-
-export function nextKey(current: string): string {
-  const i = KEY_LIST.indexOf(current);
-  return KEY_LIST[((i < 0 ? 0 : i) + 1) % KEY_LIST.length]!;
 }
 
 export function barIndex(slot: number): number {

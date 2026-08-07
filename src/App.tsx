@@ -11,12 +11,13 @@ import {
   clearRhythmOverride,
   defaultTonesForDegree,
   DEGREE_META,
-  nextKey,
+  formatKeyGlyph,
   nextSoundMode,
   paintDegreeSlot,
   paintRhythmStep,
   paintToneSlot,
   rhythmBarKind,
+  shiftKey,
   SLOTS,
   slotLabel,
   slotRoman,
@@ -312,14 +313,30 @@ export default function App() {
     <div className="app">
       <section className="lcd" aria-label="lcd">
         <div className="lcd-meta">
-          <button
-            type="button"
-            className="chip"
-            onClick={() => update((prev) => ({ ...prev, key: nextKey(prev.key) }))}
-          >
+          <div className="chip key-chip" role="group" aria-label="key">
             <span className="chip-k">KEY</span>
-            <span className="chip-v">{sheet.key}</span>
-          </button>
+            <button
+              type="button"
+              className="key-step"
+              onClick={() =>
+                update((prev) => ({ ...prev, key: shiftKey(prev.key, -1) }))
+              }
+              aria-label="key signature flat"
+            >
+              ♭
+            </button>
+            <span className="chip-v">{formatKeyGlyph(sheet.key)}</span>
+            <button
+              type="button"
+              className="key-step"
+              onClick={() =>
+                update((prev) => ({ ...prev, key: shiftKey(prev.key, 1) }))
+              }
+              aria-label="key signature sharp"
+            >
+              ♯
+            </button>
+          </div>
           <button
             type="button"
             className="chip"

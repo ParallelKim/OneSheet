@@ -20,6 +20,7 @@ import {
   paintToneSlot,
   rhythmBarKind,
   rhythmFromLegacyBars,
+  shiftKey,
   slotLabel,
   SOUND_MODES,
   TONE_AXES,
@@ -51,6 +52,36 @@ describe("chordFromDegree", () => {
     expect(chordFromDegree("G", 0)).toBe("G");
     expect(chordFromDegree("G", 4)).toBe("D");
     expect(chordFromDegree("F", 6)).toBe("Eo");
+  });
+});
+
+describe("circle of fifths key", () => {
+  it("♯/♭ 한 칸은 5도권 조표 이동", () => {
+    expect(shiftKey("C", 1)).toBe("G");
+    expect(shiftKey("C", -1)).toBe("F");
+    expect(shiftKey("G", -1)).toBe("C");
+    expect(shiftKey("F", 1)).toBe("C");
+  });
+
+  it("12조를 한 바퀴 돈다", () => {
+    let k = "C";
+    const seen = new Set<string>();
+    for (let i = 0; i < 12; i += 1) {
+      seen.add(k);
+      k = shiftKey(k, 1);
+    }
+    expect(k).toBe("C");
+    expect(seen.size).toBe(12);
+    expect(seen.has("F#")).toBe(true);
+    expect(seen.has("Db")).toBe(true);
+    expect(seen.has("Eb")).toBe(true);
+  });
+
+  it("F#·Db 다이아토닉 근음", () => {
+    expect(chordFromDegree("F#", 0)).toBe("F#");
+    expect(chordFromDegree("F#", 4)).toBe("C#");
+    expect(chordFromDegree("Db", 0)).toBe("Db");
+    expect(chordFromDegree("Db", 5)).toBe("Bbm");
   });
 });
 
