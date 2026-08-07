@@ -378,7 +378,7 @@ export default function App() {
           </div>
           <button
             type="button"
-            className="chip mode-chip"
+            className="chip"
             onClick={cycleSoundMode}
             aria-label="sound mode"
           >
