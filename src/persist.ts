@@ -18,15 +18,6 @@ import {
   type ToneSet,
 } from "./sheet";
 
-/** v3: tones[]. v1/v2도 읽어 마이그레이션. */
-export const SHEET_STORAGE_KEY = "onesheet.sheet.v3";
-const LEGACY_KEYS = ["onesheet.sheet.v2", "onesheet.sheet.v1"] as const;
-
-type StoredBlob = {
-  v: 1 | 2 | 3;
-  sheet: unknown;
-};
-
 const ART_SET = new Set(ARTICULATIONS.map((a) => a.id));
 const KEY_SET = new Set(KEY_LIST);
 const MODE_SET = new Set(SOUND_MODES.map((m) => m.id));
@@ -148,42 +139,4 @@ export function normalizeSheet(raw: unknown): SheetState {
     metro,
     soundMode,
   };
-}
-
-function readBlob(key: string): StoredBlob | null {
-  try {
-    if (typeof localStorage === "undefined") return null;
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredBlob;
-    if (!parsed || (parsed.v !== 1 && parsed.v !== 2 && parsed.v !== 3)) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-export function loadStoredSheet(): SheetState | null {
-  const blob =
-    readBlob(SHEET_STORAGE_KEY) ??
-    LEGACY_KEYS.map(readBlob).find((b) => b != null) ??
-    null;
-  if (!blob) return null;
-  return normalizeSheet(blob.sheet);
-}
-
-export function saveStoredSheet(sheet: SheetState): void {
-  try {
-    if (typeof localStorage === "undefined") return;
-    const blob: StoredBlob = { v: 3, sheet };
-    localStorage.setItem(SHEET_STORAGE_KEY, JSON.stringify(blob));
-  } catch (err) {
-    console.warn("sheet cache save failed", err);
-  }
-}
-
-export function loadSheetState(): SheetState {
-  return loadStoredSheet() ?? createInitialSheet();
 }

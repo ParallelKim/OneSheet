@@ -11,6 +11,7 @@ import {
   BPM_MIN,
   TONE_AXES,
   clearRhythmOverride,
+  createInitialSheet,
   defaultTonesForDegree,
   DEGREE_META,
   nextSoundMode,
@@ -34,7 +35,6 @@ import {
   type SheetState,
   type ToneAxisId,
 } from "./sheet";
-import { loadSheetState, saveStoredSheet } from "./persist";
 import { readSheetFromSearch, syncSheetQuery } from "./shareQuery";
 import {
   ensureAudioRunning,
@@ -71,14 +71,11 @@ function playColHold(posInRow: number, hold = 0.7): number {
 function loadInitialSheet(): SheetState {
   try {
     const fromUrl = readSheetFromSearch(window.location.search);
-    if (fromUrl) {
-      saveStoredSheet(fromUrl);
-      return fromUrl;
-    }
+    if (fromUrl) return fromUrl;
   } catch (err) {
     console.warn("share query load failed", err);
   }
-  return loadSheetState();
+  return createInitialSheet();
 }
 
 export default function App() {
@@ -105,12 +102,7 @@ export default function App() {
     sheetRef.current = sheet;
   }, [sheet]);
 
-  // 편집본 localStorage 캐시 (배포/새로고침 유지)
-  useEffect(() => {
-    saveStoredSheet(sheet);
-  }, [sheet]);
-
-  // 공유용 ?s= 동기화 (같은 포맷으로 파일/서버도 열 예정)
+  // 단일 세션 저장은 ?s= 만 (localStorage 중복 제거)
   useEffect(() => {
     const id = window.setTimeout(() => syncSheetQuery(sheet), 160);
     return () => window.clearTimeout(id);
