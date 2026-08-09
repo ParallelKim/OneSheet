@@ -7,8 +7,11 @@ import {
   BEATS,
   BARS,
   BAR_STEPS,
+  BPM_MAX,
+  BPM_MIN,
   TONE_AXES,
   clearRhythmOverride,
+  createInitialSheet,
   defaultTonesForDegree,
   DEGREE_META,
   nextSoundMode,
@@ -32,7 +35,6 @@ import {
   type SheetState,
   type ToneAxisId,
 } from "./sheet";
-import { loadSheetState, saveStoredSheet } from "./persist";
 import { readSheetFromSearch, syncSheetQuery } from "./shareQuery";
 import {
   ensureAudioRunning,
@@ -48,6 +50,7 @@ import {
   warmPianoFont,
 } from "./engine";
 import { KeyReel } from "./KeyReel";
+import { ParamKnob } from "./ParamKnob";
 import "./App.css";
 
 type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
@@ -68,14 +71,11 @@ function playColHold(posInRow: number, hold = 0.7): number {
 function loadInitialSheet(): SheetState {
   try {
     const fromUrl = readSheetFromSearch(window.location.search);
-    if (fromUrl) {
-      saveStoredSheet(fromUrl);
-      return fromUrl;
-    }
+    if (fromUrl) return fromUrl;
   } catch (err) {
     console.warn("share query load failed", err);
   }
-  return loadSheetState();
+  return createInitialSheet();
 }
 
 export default function App() {
@@ -102,12 +102,7 @@ export default function App() {
     sheetRef.current = sheet;
   }, [sheet]);
 
-  // 편집본 localStorage 캐시 (배포/새로고침 유지)
-  useEffect(() => {
-    saveStoredSheet(sheet);
-  }, [sheet]);
-
-  // 공유용 ?s= 동기화 (같은 포맷으로 파일/서버도 열 예정)
+  // 단일 세션 저장은 ?s= 만 (localStorage 중복 제거)
   useEffect(() => {
     const id = window.setTimeout(() => syncSheetQuery(sheet), 160);
     return () => window.clearTimeout(id);
@@ -340,15 +335,11 @@ export default function App() {
   const loading = engine === "loading";
   const currentDegree = sheet.degrees[selected] ?? null;
   const bar = barIndex(selected);
-  const beat = (selected % BEATS) + 1;
   const barRhythmRow = barRhythm(sheet, bar);
   const rhyKind = rhythmBarKind(sheet, bar);
   const playBar = playSlot !== null ? barIndex(playSlot) : null;
-  const playBeat = playSlot !== null ? (playSlot % BEATS) + 1 : null;
   /** 하이라이트할 마디: 재생 중이면 재생 마디, 아니면 선택 마디 */
   const markBar = playBar ?? bar;
-  const posBar = playBar ?? bar;
-  const posBeat = playBeat ?? beat;
 
   return (
     <div className="app">
@@ -374,6 +365,24 @@ export default function App() {
               ♯
             </button>
           </div>
+          <ParamKnob
+            label="BPM"
+            value={sheet.bpm}
+            min={BPM_MIN}
+            max={BPM_MAX}
+            step={1}
+            turns={4}
+            onChange={(bpm) => update((prev) => ({ ...prev, bpm }))}
+          />
+          <ParamKnob
+            label="VOL"
+            value={sheet.gain}
+            min={0.05}
+            max={1}
+            step={0.01}
+            format={(v) => String(Math.round(v * 100))}
+            onChange={(gain) => update((prev) => ({ ...prev, gain }))}
+          />
           <button
             type="button"
             className="chip"
@@ -385,22 +394,6 @@ export default function App() {
               <span className="chip-v">{soundModeById(sheet.soundMode).label}</span>
             </span>
           </button>
-          <label className="chip tempo-chip">
-            <span className="chip-k">BPM</span>
-            <input
-              type="range"
-              min={70}
-              max={140}
-              step={1}
-              value={sheet.bpm}
-              onChange={(e) => update((prev) => ({ ...prev, bpm: Number(e.target.value) }))}
-            />
-            <span className="chip-v">{sheet.bpm}</span>
-          </label>
-          <p className={`pos ${playing ? "playing" : ""}`} aria-label="position">
-            <span className="pos-bar">|{posBar + 1}|</span>
-            <span className="pos-beat">{posBeat}</span>
-          </p>
         </div>
 
         <div

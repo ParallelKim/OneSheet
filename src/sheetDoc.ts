@@ -2,7 +2,8 @@
  * Portable sheet document — URL / 파일 / 서버 공통 포맷.
  *
  * 쿼리 키는 `?s=` 고정. 버전은 페이로드로 구분한다.
- * - v2 (쓰기 기본): 바이너리 비트팩 → base64url (첫 바이트 = 2)
+ * - v3 (쓰기 기본): 바이너리 비트팩 → base64url (첫 바이트 = 3)
+ * - v2 (읽기 호환): 바이너리 — bpm이 70..140 오프셋
  * - v1 (읽기 호환): base64url(JSON) — 옛 공유 링크
  *
  * Wire v1 (JSON):
@@ -24,11 +25,15 @@
  *   [12..]  ton 16×12bit 마스크 (CHORD_INTERVALS 비트)
  *           rhy 16×3bit (D/U/X/h/r)
  *           ovMask:3 + 각 override마다 rhy 16×3bit
+ *
+ * Wire v3 (binary): v2와 동일, [0]=3, [1]=bpm 절대값 (BPM_MIN..BPM_MAX)
  */
 
 import {
   BARS,
   BAR_STEPS,
+  BPM_MAX,
+  BPM_MIN,
   CHORD_INTERVALS,
   createInitialSheet,
   KEY_CHROMATIC,
@@ -44,6 +49,8 @@ import { normalizeSheet } from "./persist";
 
 export const SHEET_DOC_VERSION = 1 as const;
 export const SHEET_DOC_VERSION_V2 = 2 as const;
+/** v3: v2와 동일 레이아웃, bpm은 절대값 (BPM_MIN..BPM_MAX) */
+export const SHEET_DOC_VERSION_V3 = 3 as const;
 
 export type SheetDocV1 = {
   v: typeof SHEET_DOC_VERSION;
@@ -248,9 +255,15 @@ export function docToSheet(doc: unknown): SheetState {
   });
 }
 
-/** SheetState → v2 바이너리 */
-export function encodeSheetV2(sheet: SheetState): Uint8Array {
-  const bpmOff = Math.min(70, Math.max(0, Math.round(sheet.bpm) - 70));
+/** SheetState → 바이너리 (v2/v3). bpmCodec만 버전별 다름. */
+function encodeSheetBinary(
+  sheet: SheetState,
+  version: typeof SHEET_DOC_VERSION_V2 | typeof SHEET_DOC_VERSION_V3,
+): Uint8Array {
+  const bpmByte =
+    version === SHEET_DOC_VERSION_V3
+      ? Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(sheet.bpm)))
+      : Math.min(70, Math.max(0, Math.round(sheet.bpm) - 70));
   let keyIdx = KEY_CHROMATIC.indexOf(sheet.key as (typeof KEY_CHROMATIC)[number]);
   if (keyIdx < 0) keyIdx = 0;
   let modeIdx = SOUND_MODES.findIndex((m) => m.id === sheet.soundMode);
@@ -259,8 +272,8 @@ export function encodeSheetV2(sheet: SheetState): Uint8Array {
   const gainCent = Math.min(100, Math.max(5, Math.round(sheet.gain * 100)));
 
   const head = new Uint8Array(4);
-  head[0] = SHEET_DOC_VERSION_V2;
-  head[1] = bpmOff;
+  head[0] = version;
+  head[1] = bpmByte;
   head[2] = (keyIdx & 0xf) | (metro << 4) | ((modeIdx & 0x7) << 5);
   head[3] = gainCent;
 
@@ -318,12 +331,28 @@ export function encodeSheetV2(sheet: SheetState): Uint8Array {
   return out;
 }
 
-/** v2 바이너리 → SheetState */
-export function decodeSheetV2(bytes: Uint8Array): SheetState | null {
-  if (bytes.length < 4 + 8 + 24 + 6 + 1) return null;
-  if (bytes[0] !== SHEET_DOC_VERSION_V2) return null;
+/** @deprecated 테스트·레거시용 — 쓰기는 encodeSheetV3 */
+export function encodeSheetV2(sheet: SheetState): Uint8Array {
+  return encodeSheetBinary(sheet, SHEET_DOC_VERSION_V2);
+}
 
-  const bpm = 70 + (bytes[1] ?? 0);
+export function encodeSheetV3(sheet: SheetState): Uint8Array {
+  return encodeSheetBinary(sheet, SHEET_DOC_VERSION_V3);
+}
+
+/** v2/v3 바이너리 → SheetState */
+function decodeSheetBinary(
+  bytes: Uint8Array,
+  version: typeof SHEET_DOC_VERSION_V2 | typeof SHEET_DOC_VERSION_V3,
+): SheetState | null {
+  if (bytes.length < 4 + 8 + 24 + 6 + 1) return null;
+  if (bytes[0] !== version) return null;
+
+  const rawBpm = bytes[1] ?? 0;
+  const bpm =
+    version === SHEET_DOC_VERSION_V3
+      ? Math.min(BPM_MAX, Math.max(BPM_MIN, rawBpm))
+      : 70 + rawBpm;
   const flags = bytes[2] ?? 0;
   const keyIdx = flags & 0xf;
   const metro = ((flags >> 4) & 1) === 1;
@@ -387,6 +416,16 @@ export function decodeSheetV2(bytes: Uint8Array): SheetState | null {
   });
 }
 
+/** v2 바이너리 → SheetState */
+export function decodeSheetV2(bytes: Uint8Array): SheetState | null {
+  return decodeSheetBinary(bytes, SHEET_DOC_VERSION_V2);
+}
+
+/** v3 바이너리 → SheetState */
+export function decodeSheetV3(bytes: Uint8Array): SheetState | null {
+  return decodeSheetBinary(bytes, SHEET_DOC_VERSION_V3);
+}
+
 function bytesToBase64Url(bytes: Uint8Array): string {
   let bin = "";
   for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]!);
@@ -427,16 +466,19 @@ export function decodeSheetDoc(raw: string): SheetDoc | null {
   }
 }
 
-/** 쓰기: 항상 v2 */
+/** 쓰기: 항상 v3 */
 export function encodeSheetParam(sheet: SheetState): string {
-  return bytesToBase64Url(encodeSheetV2(sheet));
+  return bytesToBase64Url(encodeSheetV3(sheet));
 }
 
-/** 읽기: v2 바이너리 또는 v1 JSON */
+/** 읽기: v3 / v2 바이너리 또는 v1 JSON */
 export function decodeSheetParam(raw: string): SheetState | null {
   const bytes = base64UrlToBytes(raw);
   if (!bytes || bytes.length === 0) return null;
 
+  if (bytes[0] === SHEET_DOC_VERSION_V3) {
+    return decodeSheetV3(bytes);
+  }
   if (bytes[0] === SHEET_DOC_VERSION_V2) {
     return decodeSheetV2(bytes);
   }
