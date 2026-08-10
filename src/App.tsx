@@ -1,74 +1,35 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import {
-  ARTICULATIONS,
-  artLabel,
-  barIndex,
-  barRhythm,
-  BEATS,
-  BARS,
-  BAR_STEPS,
-  BPM_MAX,
-  BPM_MIN,
-  TONE_AXES,
-  clearRhythmOverride,
-  createInitialSheet,
-  defaultTonesForDegree,
-  DEGREE_META,
-  nextSoundMode,
-  paintDegreeSlot,
-  paintRhythmStep,
-  paintToneSlot,
-  rhythmBarKind,
-  shiftKey,
-  SLOTS,
-  slotLabel,
-  slotRoman,
-  soundModeById,
-  SUBDIV,
-  toneAxisFaces,
-  toneAxisLabel,
-  toneAxisOn,
-  toneAxisPolarity,
-  TOTAL_STEPS,
-  toStrudel,
-  type Articulation,
-  type SheetState,
-  type ToneAxisId,
-} from "./sheet";
-import { readSheetFromSearch, syncSheetQuery } from "./shareQuery";
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+  type TransitionEvent,
+} from "react";
+import { createInitialSheet, toStrudel, toStrudelChain, type SheetState } from "./sheet";
+import { readSheetFromSearch } from "./shareQuery";
+import { SimpleSheet } from "./SimpleSheet";
 import {
-  ensureAudioRunning,
-  evaluateStrudel,
-  getAudioState,
-  getCyclePhase,
-  getLastStrudelCode,
-  getPlaybackEpoch,
-  hushStrudel,
-  initStrudelEngine,
-  isEngineReady,
-  unlockAudioOutput,
-  warmPianoFont,
-} from "./engine";
-import { KeyReel } from "./KeyReel";
-import { ParamKnob } from "./ParamKnob";
-import "./App.css";
+  activeSheet,
+  clearSlot,
+  createDefaultStudio,
+  filledOrder,
+  readStudioFromSearch,
+  setActiveSlot,
+  sheetsForChain,
+  STUDIO_SLOT_COUNT,
+  syncStudioQuery,
+  updateActiveSheet,
+  type StudioState,
+} from "./studioDoc";
+import { getCycleTime } from "./engine";
 
-type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
-/** 렌즈: 같은 4×4 패드의 의미를 바꾼다 */
-type Mode = "chart" | "degree" | "rhythm";
+type Face = "simple" | "studio";
+/** fold → (swap) edge → open → idle — 하단 도크 Y축 회전문 */
+type FlipPhase = "idle" | "fold" | "edge" | "open";
 
-/**
- * 재생 링 열 좌표: 셀 공격~대부분 구간은 칸 중심(정수)에 머물고,
- * 끝부분에서만 다음 칸으로 슬라이드 — 소리와 칸이 같이 느껴지도록.
- */
-function playColHold(posInRow: number, hold = 0.7): number {
-  const i = Math.floor(posInRow);
-  const frac = posInRow - i;
-  if (frac <= hold) return i;
-  return i + (frac - hold) / (1 - hold);
-}
-
-function loadInitialSheet(): SheetState {
+function loadSimpleSheet(): SheetState {
   try {
     const fromUrl = readSheetFromSearch(window.location.search);
     if (fromUrl) return fromUrl;
@@ -78,678 +39,403 @@ function loadInitialSheet(): SheetState {
   return createInitialSheet();
 }
 
+function loadStudio(): StudioState {
+  try {
+    const fromUrl = readStudioFromSearch(window.location.search);
+    if (fromUrl) return fromUrl;
+  } catch (err) {
+    console.warn("studio query load failed", err);
+  }
+  return createDefaultStudio();
+}
+
+function pathToFace(path: string): Face {
+  return path.startsWith("/studio") ? "studio" : "simple";
+}
+
+function faceToPath(face: Face): string {
+  return face === "studio" ? "/studio" : "/";
+}
+
+function preferReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+function usePathname(): string {
+  const [path, setPath] = useState(() =>
+    typeof window !== "undefined" ? window.location.pathname : "/",
+  );
+  useEffect(() => {
+    const sync = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+  return path;
+}
+
+function pushPath(to: string) {
+  const next = new URL(to, window.location.origin).pathname;
+  if (next === window.location.pathname && window.location.search === "") {
+    return;
+  }
+  history.pushState(history.state, "", next);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+function ModeChip({
+  href,
+  label,
+  current,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  current: string;
+  onNavigate: (href: string) => void;
+}) {
+  return (
+    <a
+      className="chip mode-chip"
+      href={href}
+      aria-label={`${current}, switch to ${label}`}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+          return;
+        }
+        e.preventDefault();
+        onNavigate(href);
+      }}
+    >
+      <span className="chip-v">{label}</span>
+    </a>
+  );
+}
+
+const LONG_PRESS_MS = 480;
+
+function StudioSlotPad({
+  index,
+  filled,
+  active,
+  live,
+  mark,
+  onSelect,
+  onClear,
+}: {
+  index: number;
+  filled: boolean;
+  active: boolean;
+  live: boolean;
+  mark: string;
+  onSelect: () => void;
+  onClear: () => void;
+}) {
+  const timerRef = useRef<number | null>(null);
+  const clearedRef = useRef(false);
+
+  const clearTimer = () => {
+    if (timerRef.current != null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const onPointerDown = (e: PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    clearedRef.current = false;
+    clearTimer();
+    if (!filled) return;
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      clearedRef.current = true;
+      onClear();
+    }, LONG_PRESS_MS);
+  };
+
+  const onPointerUp = () => {
+    clearTimer();
+  };
+
+  const onClick = () => {
+    if (clearedRef.current) {
+      clearedRef.current = false;
+      return;
+    }
+    onSelect();
+  };
+
+  return (
+    <button
+      type="button"
+      role="listitem"
+      className={[
+        "studio-slot",
+        filled ? "filled" : "empty",
+        active ? "active" : "",
+        live ? "sounding" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      aria-label={
+        filled
+          ? `sheet ${index + 1}${active ? ", active" : ""}. Hold to clear`
+          : `empty slot ${index + 1}`
+      }
+      aria-pressed={active}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onPointerLeave={onPointerUp}
+      onClick={onClick}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <span className="studio-slot-n">{index + 1}</span>
+      <span className="studio-slot-mark">{mark}</span>
+    </button>
+  );
+}
+
+function StudioDock({
+  studio,
+  sounding,
+  onNavigate,
+  onToggleChain,
+  onSelectSlot,
+  onClearSlot,
+}: {
+  studio: StudioState;
+  sounding: number | null;
+  onNavigate: (href: string) => void;
+  onToggleChain: () => void;
+  onSelectSlot: (index: number) => void;
+  onClearSlot: (index: number) => void;
+}) {
+  return (
+    <div className="studio-rail" aria-label="studio slots">
+      <div className="studio-rail-top">
+        <ModeChip
+          href="/"
+          label="SIMPLE"
+          current="STUDIO"
+          onNavigate={onNavigate}
+        />
+        <button
+          type="button"
+          className={`chip studio-chain${studio.chain ? " on" : ""}`}
+          aria-pressed={studio.chain}
+          aria-label="chain"
+          onClick={onToggleChain}
+        >
+          <span className="chip-v">CHAIN</span>
+        </button>
+      </div>
+      <div className="studio-slots" role="list">
+        {Array.from({ length: STUDIO_SLOT_COUNT }, (_, i) => (
+          <StudioSlotPad
+            key={i}
+            index={i}
+            filled={studio.slots[i] != null}
+            active={studio.active === i}
+            live={sounding === i}
+            mark={studio.slots[i]?.key ?? "·"}
+            onSelect={() => onSelectSlot(i)}
+            onClear={() => onClearSlot(i)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SimpleDock({ onNavigate }: { onNavigate: (href: string) => void }) {
+  return (
+    <div className="studio-rail page-rail" aria-label="page">
+      <div className="studio-rail-top">
+        <ModeChip
+          href="/studio"
+          label="STUDIO"
+          current="SIMPLE"
+          onNavigate={onNavigate}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 차트는 고정. 하단 도크만 세로축(rotateY) 회전문 —
+ * SIMPLE 면 ↔ STUDIO 슬롯 면.
+ */
 export default function App() {
-  const [sheet, setSheet] = useState<SheetState>(loadInitialSheet);
-  const [selected, setSelected] = useState(0);
-  const [mode, setMode] = useState<Mode>("chart");
-  const [brush, setBrush] = useState<Articulation>("D");
-  const [engine, setEngine] = useState<EngineState>("idle");
-  const [status, setStatus] = useState("");
-  /** 재생 헤드: 4분 슬롯 0–15 (null = 정지) — 텍스트용 */
-  const [playSlot, setPlaySlot] = useState<number | null>(null);
-  /** 키 릴: dir/gen은 nudge 시에만 갱신 */
-  const [keySpin, setKeySpin] = useState<{ dir: 1 | -1; gen: number }>({
-    dir: 1,
-    gen: 0,
-  });
-  const sheetRef = useRef(sheet);
-  const playingRef = useRef(false);
-  const staffRef = useRef<HTMLDivElement>(null);
-  const padStageRef = useRef<HTMLDivElement>(null);
-  const padBoardRef = useRef<HTMLDivElement>(null);
+  const path = usePathname();
+  const [simpleSheet, setSimpleSheet] = useState<SheetState>(loadSimpleSheet);
+  const [studio, setStudio] = useState<StudioState>(loadStudio);
+  const [face, setFace] = useState<Face>(() => pathToFace(path));
+  const [flipPhase, setFlipPhase] = useState<FlipPhase>("idle");
+  const [flipDir, setFlipDir] = useState<1 | -1>(1);
+  const [sounding, setSounding] = useState<number | null>(null);
+
+  const pendingFaceRef = useRef<Face | null>(null);
+  const studioRef = useRef(studio);
+  studioRef.current = studio;
+  const flipping = flipPhase !== "idle";
 
   useEffect(() => {
-    sheetRef.current = sheet;
-  }, [sheet]);
+    if (flipping) return;
+    const next = pathToFace(path);
+    setFace((prev) => (prev === next ? prev : next));
+  }, [path, flipping]);
 
-  // 단일 세션 저장은 ?s= 만 (localStorage 중복 제거)
   useEffect(() => {
-    const id = window.setTimeout(() => syncSheetQuery(sheet), 160);
+    if (face !== "studio") return;
+    const id = window.setTimeout(() => syncStudioQuery(studio), 180);
     return () => window.clearTimeout(id);
-  }, [sheet]);
+  }, [studio, face]);
 
-  // 엔진은 마운트 직후 백그라운드 기동 (Play를 기다리지 않음)
-  useEffect(() => {
-    void initStrudelEngine().catch((err) => console.warn("engine boot", err));
+  const order = useMemo(() => filledOrder(studio.slots), [studio.slots]);
+
+  const patternOf = useCallback((live: SheetState) => {
+    const merged = updateActiveSheet(studioRef.current, live);
+    if (merged.chain) {
+      const chain = sheetsForChain(merged);
+      if (chain.length > 1) return toStrudelChain(chain);
+    }
+    return toStrudel(live);
   }, []);
 
-  // 첫 포인터에서 오디오 unlock (iOS: 제스처 안에서 동기)
   useEffect(() => {
-    const onFirstPointer = () => {
-      unlockAudioOutput();
-      void ensureAudioRunning().catch((err) =>
-        console.warn("audio unlock", err),
-      );
-    };
-    window.addEventListener("pointerdown", onFirstPointer, {
-      once: true,
-      passive: true,
-    });
-    return () => window.removeEventListener("pointerdown", onFirstPointer);
-  }, []);
-
-  /** 패드 실측 → --pad-cell-px / --pad-stride-px (항상 width===height 정원) */
-  useEffect(() => {
-    const board = padBoardRef.current;
-    if (!board) return;
-
-    const syncPadMetrics = () => {
-      const pads = board.querySelectorAll<HTMLElement>(".pad-grid > .pad");
-      const first = pads[0];
-      if (!first) return;
-      const a = first.getBoundingClientRect();
-      if (a.width < 2) return;
-      const cell = a.width;
-      const next = pads[1]?.getBoundingClientRect();
-      const below = pads[BEATS]?.getBoundingClientRect();
-      const strideX = next ? next.left - a.left : cell + 8;
-      const strideY = below ? below.top - a.top : strideX;
-      // 한 프레임에 가로·세로가 어긋나면 스킵 (레이아웃 미완료)
-      if (Math.abs(strideX - strideY) > 1) return;
-      board.style.setProperty("--pad-cell-px", `${cell}px`);
-      board.style.setProperty("--pad-stride-px", `${strideX}px`);
-    };
-
-    const ro = new ResizeObserver(() => {
-      requestAnimationFrame(syncPadMetrics);
-    });
-    ro.observe(board);
-    requestAnimationFrame(syncPadMetrics);
-    return () => ro.disconnect();
-  }, [mode]);
-
-  // Strudel 사이클 → LCD/그리드 재생 커서 CSS 변수
-  useEffect(() => {
-    if (engine !== "playing") {
-      setPlaySlot(null);
-      staffRef.current?.style.setProperty("--play-phase", "-1");
-      padStageRef.current?.style.setProperty("--play-on", "0");
+    if (face !== "studio" || !studio.chain || order.length < 2) {
+      setSounding(null);
       return;
     }
     let raf = 0;
     const tick = () => {
-      const phase = getCyclePhase();
-      if (phase !== null) {
-        const slot = Math.min(SLOTS - 1, Math.floor(phase * SLOTS));
-        const slotF = phase * SLOTS;
-        const row = Math.floor(slotF / BEATS) % BARS;
-        const col = playColHold(slotF % BEATS);
-        const stepF = (phase * TOTAL_STEPS) % BAR_STEPS;
-        const rhyRow = Math.floor(stepF / SUBDIV) % BEATS;
-        const rhyCol = playColHold(stepF % SUBDIV);
-
-        setPlaySlot((prev) => (prev === slot ? prev : slot));
-        const staff = staffRef.current;
-        if (staff) {
-          staff.style.setProperty("--play-phase", phase.toFixed(5));
-          staff.style.setProperty("--mark-bar", String(row));
-        }
-        const pad = padStageRef.current;
-        if (pad) {
-          pad.style.setProperty("--play-on", "1");
-          pad.style.setProperty("--mark-bar", String(row));
-          pad.style.setProperty("--play-col-f", col.toFixed(5));
-          pad.style.setProperty("--play-row-f", String(row));
-          pad.style.setProperty("--play-row-next", String((row + 1) % BARS));
-          pad.style.setProperty("--play-row-prev", String((row - 1 + BARS) % BARS));
-          pad.style.setProperty("--rhy-col-f", rhyCol.toFixed(5));
-          pad.style.setProperty("--rhy-row-f", String(rhyRow));
-          pad.style.setProperty("--rhy-row-next", String((rhyRow + 1) % BEATS));
-          pad.style.setProperty("--rhy-row-prev", String((rhyRow - 1 + BEATS) % BEATS));
-        }
+      const t = getCycleTime();
+      if (t != null && order.length > 0) {
+        const idx =
+          order[((Math.floor(t) % order.length) + order.length) % order.length]!;
+        setSounding((prev) => (prev === idx ? prev : idx));
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [engine]);
+  }, [face, studio.chain, order]);
 
-  const pushPattern = useCallback(async (next: SheetState) => {
-    if (!playingRef.current) return;
-    try {
-      const ok = await evaluateStrudel(toStrudel(next));
-      if (!ok && playingRef.current) {
-        // 정지 레이스로 무효화된 평가
-        playingRef.current = false;
-        setEngine((e) => (e === "error" ? e : "ready"));
-        setStatus("");
-      }
-    } catch (err) {
-      console.error(err, getLastStrudelCode());
-      setEngine("error");
-      setStatus("pattern error");
-    }
+  const commitFace = useCallback((next: Face) => {
+    setFace(next);
+    pushPath(faceToPath(next));
   }, []);
 
-  const update = useCallback(
-    (recipe: (prev: SheetState) => SheetState) => {
-      setSheet((prev) => {
-        const next = recipe(prev);
-        void pushPattern(next);
-        return next;
-      });
+  const navigateWithFlip = useCallback(
+    (href: string) => {
+      const next = pathToFace(href);
+      if (next === face && !flipping) {
+        pushPath(faceToPath(next));
+        return;
+      }
+      if (flipping) return;
+
+      if (preferReducedMotion()) {
+        commitFace(next);
+        return;
+      }
+
+      pendingFaceRef.current = next;
+      setFlipDir(next === "studio" ? 1 : -1);
+      setFlipPhase("fold");
     },
-    [pushPattern],
+    [face, flipping, commitFace],
   );
 
-  const cycleSoundMode = useCallback(() => {
-    const soundMode = nextSoundMode(sheetRef.current.soundMode);
-    if (soundMode === "piano") {
-      void warmPianoFont().catch(() => undefined);
-    }
-    update((prev) => ({ ...prev, soundMode }));
-  }, [update]);
+  const onFlipTransitionEnd = (e: TransitionEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.propertyName !== "transform") return;
 
-  const nudgeKey = useCallback(
-    (dir: 1 | -1) => {
-      update((prev) => {
-        const next = shiftKey(prev.key, dir);
-        if (next === prev.key) return prev;
-        setKeySpin((s) => ({ dir, gen: s.gen + 1 }));
-        return { ...prev, key: next };
+    if (flipPhase === "fold") {
+      const next = pendingFaceRef.current;
+      if (next) commitFace(next);
+      pendingFaceRef.current = null;
+      setFlipPhase("edge");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setFlipPhase("open"));
       });
-    },
-    [update],
-  );
-
-  const onPlay = useCallback(() => {
-    const gate = getPlaybackEpoch();
-    // 제스처 콜스택에서 동기 unlock (async 전에)
-    unlockAudioOutput();
-
-    if (!isEngineReady()) {
-      setEngine("loading");
-      setStatus("");
+      return;
     }
 
-    void (async () => {
-      try {
-        await ensureAudioRunning();
-        if (getPlaybackEpoch() !== gate) {
-          setEngine((e) => (e === "error" ? e : "ready"));
-          return;
-        }
-        await initStrudelEngine();
-        if (getPlaybackEpoch() !== gate) {
-          setEngine((e) => (e === "error" ? e : "ready"));
-          return;
-        }
-        const code = toStrudel(sheetRef.current);
-        // UI 위상을 0에 붙인 뒤 스케줄러 start — 첫 코드 잘림 완화
-        playingRef.current = true;
-        setEngine("playing");
-        setStatus("");
-        const ok = await evaluateStrudel(code, { syncStart: true });
-        if (!ok || getPlaybackEpoch() !== gate) {
-          playingRef.current = false;
-          setEngine((e) => (e === "error" ? e : "ready"));
-          setStatus("");
-          return;
-        }
-        setStatus(
-          getAudioState() === "running" ? "" : "audio locked — tap PLAY",
-        );
-      } catch (err) {
-        console.error(err, getLastStrudelCode());
-        playingRef.current = false;
-        setEngine("error");
-        setStatus("play error");
-      }
-    })();
+    if (flipPhase === "open") {
+      setFlipPhase("idle");
+    }
+  };
+
+  const onChangeSimple = useCallback((next: SheetState) => {
+    setSimpleSheet(next);
   }, []);
 
-  const onStop = useCallback(() => {
-    hushStrudel();
-    playingRef.current = false;
-    setEngine((e) => (e === "error" ? e : "ready"));
-    setStatus("");
+  const onChangeStudioSheet = useCallback((next: SheetState) => {
+    setStudio((prev) => updateActiveSheet(prev, next));
   }, []);
 
-  const paintDegree = (degree: number | null) => {
-    update((prev) => paintDegreeSlot(prev, selected, degree));
-  };
-
-  const paintTone = (axisId: ToneAxisId) => {
-    update((prev) => paintToneSlot(prev, selected, axisId));
-  };
-
-  const paintRhythm = (step: number) => {
-    const bar = barIndex(selected);
-    update((prev) => {
-      const current = barRhythm(prev, bar)[step] ?? "rest";
-      const nextArt = current === brush ? "rest" : brush;
-      return paintRhythmStep(prev, bar, step, nextArt);
-    });
-  };
-
-  const resetRhythmLink = () => {
-    const bar = barIndex(selected);
-    update((prev) => clearRhythmOverride(prev, bar));
-  };
-
-  const selectBar = (bar: number) => {
-    setSelected(bar * BEATS + (selected % BEATS));
-  };
-
-  const playing = engine === "playing";
-  const loading = engine === "loading";
-  const currentDegree = sheet.degrees[selected] ?? null;
-  const bar = barIndex(selected);
-  const barRhythmRow = barRhythm(sheet, bar);
-  const rhyKind = rhythmBarKind(sheet, bar);
-  const playBar = playSlot !== null ? barIndex(playSlot) : null;
-  /** 하이라이트할 마디: 재생 중이면 재생 마디, 아니면 선택 마디 */
-  const markBar = playBar ?? bar;
+  const turnClass = [
+    "dock-turntable",
+    flipDir < 0 ? "dir-back" : "dir-fwd",
+    flipPhase === "idle" ? "is-idle" : "",
+    flipPhase === "fold" ? "is-fold" : "",
+    flipPhase === "edge" ? "is-edge" : "",
+    flipPhase === "open" ? "is-open" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div className="app">
-      <section className="lcd" aria-label="lcd">
-        <div className="lcd-meta">
-          <div className="chip key-chip" role="group" aria-label="key">
-            <span className="chip-k">KEY</span>
-            <button
-              type="button"
-              className="key-step"
-              onClick={() => nudgeKey(-1)}
-              aria-label="key down flat"
-            >
-              ♭
-            </button>
-            <KeyReel value={sheet.key} dir={keySpin.dir} gen={keySpin.gen} />
-            <button
-              type="button"
-              className="key-step"
-              onClick={() => nudgeKey(1)}
-              aria-label="key up sharp"
-            >
-              ♯
-            </button>
-          </div>
-          <ParamKnob
-            label="BPM"
-            value={sheet.bpm}
-            min={BPM_MIN}
-            max={BPM_MAX}
-            step={1}
-            turns={4}
-            onChange={(bpm) => update((prev) => ({ ...prev, bpm }))}
+    <div className="app-shell">
+      <div className="app-chart">
+        {face === "studio" ? (
+          <SimpleSheet
+            sheet={activeSheet(studio)}
+            onChange={onChangeStudioSheet}
+            patternOf={patternOf}
+            playbackKey={`${studio.active}:${studio.chain}:${order.join(",")}`}
+            className="app-panel"
           />
-          <ParamKnob
-            label="VOL"
-            value={sheet.gain}
-            min={0.05}
-            max={1}
-            step={0.01}
-            format={(v) => String(Math.round(v * 100))}
-            onChange={(gain) => update((prev) => ({ ...prev, gain }))}
+        ) : (
+          <SimpleSheet
+            sheet={simpleSheet}
+            onChange={onChangeSimple}
+            syncUrl
+            className="app-panel"
           />
-          <button
-            type="button"
-            className="chip"
-            onClick={cycleSoundMode}
-            aria-label="sound mode"
-          >
-            <span className="chip-pair">
-              <span className="chip-k">MODE</span>
-              <span className="chip-v">{soundModeById(sheet.soundMode).label}</span>
-            </span>
-          </button>
-        </div>
-
-        <div
-          ref={staffRef}
-          className={`staff ${playing ? "is-playing" : ""}`}
-          aria-label="chart"
-          style={{ "--mark-bar": markBar } as CSSProperties}
-        >
-          <div className="staff-back" aria-hidden>
-            <div className="ind-measure" />
-            <div className="ind-cursor" />
-          </div>
-          <div className="staff-front">
-            {Array.from({ length: BARS }, (_, bi) => (
-              <div
-                key={bi}
-                className={`measure rhy-${rhythmBarKind(sheet, bi)} ${mode === "rhythm" ? "rhy-show" : ""}`}
-                role="group"
-                aria-label={`bar ${bi + 1} ${rhythmBarKind(sheet, bi)}`}
-                onClick={() => selectBar(bi)}
-              >
-                {Array.from({ length: BEATS }, (_, qi) => {
-                  const i = bi * BEATS + qi;
-                  const d = sheet.degrees[i] ?? null;
-                  const on = selected === i;
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      className={`chord-cell ${on ? "on" : ""} ${d === null ? "empty" : ""}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelected(i);
-                      }}
-                      aria-label={`bar ${bi + 1} beat ${qi + 1}`}
-                    >
-                      <span className="chord-name">{slotLabel(sheet.key, d, sheet.tones[i])}</span>
-                      <span className="chord-deg">{d !== null ? slotRoman(d) : "·"}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <nav className="transport" aria-label="transport">
-        <button
-          type="button"
-          className={`tr-btn play ${playing ? "on" : ""} ${loading ? "loading" : ""}`}
-          onPointerDown={() => {
-            // click보다 이른 제스처에서 unlock (iOS 필수)
-            if (playing || loading) return;
-            unlockAudioOutput();
-          }}
-          onClick={() => void (playing || loading ? onStop() : onPlay())}
-          aria-label={loading ? "loading" : playing ? "stop" : "play"}
-          aria-busy={loading}
-        >
-          <span className="tr-icon" aria-hidden>
-            {loading ? (
-              <span className="spin" />
-            ) : (
-              <span className="tr-transport-icon">
-                <span className={`tr-glyph ${playing ? "is-off" : "is-on"}`}>
-                  ▶
-                </span>
-                <span className={`tr-glyph ${playing ? "is-on" : "is-off"}`}>
-                  ■
-                </span>
-              </span>
-            )}
-          </span>
-          <span className="tr-label">
-            {loading ? "LOAD" : playing ? "STOP" : "PLAY"}
-          </span>
-        </button>
-        <button
-          type="button"
-          className={`tr-btn metro ${sheet.metro ? "on" : ""}`}
-          onClick={() => update((prev) => ({ ...prev, metro: !prev.metro }))}
-          aria-pressed={sheet.metro}
-          aria-label="metronome"
-        >
-          <span className="tr-icon" aria-hidden>
-            <svg
-              className="tr-metro"
-              viewBox="0 0 24 24"
-              width="16"
-              height="16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              {/* 사다리꼴 본체 (플랫탑) */}
-              <path d="M8 3.5h8l3.2 16.5H4.8L8 3.5Z" />
-              {/* 중앙 눈금대 */}
-              <path d="M12 5.2v12.2" />
-              <path
-                className="tr-metro-ticks"
-                d="M10.2 7.2h3.6M10.2 9.4h3.6M10.2 11.6h3.6M10.2 13.8h3.6"
-              />
-              {/* 추봉 — 하단 피벗 고정, 위가 기울어짐 */}
-              <path d="M12 17.4 16.6 5.8" />
-              <rect
-                className="tr-metro-bob"
-                x="14.55"
-                y="7.85"
-                width="3.4"
-                height="2.5"
-                rx="0.35"
-                transform="rotate(-20 16.25 9.1)"
-                fill="currentColor"
-                stroke="none"
-              />
-            </svg>
-          </span>
-          <span className="tr-label">CLICK</span>
-        </button>
-        <button
-          type="button"
-          className={`tr-btn ${mode === "chart" ? "on" : ""}`}
-          onClick={() => setMode("chart")}
-          aria-label="chart"
-        >
-          <span className="tr-icon">▦</span>
-          <span className="tr-label">GRID</span>
-        </button>
-        <button
-          type="button"
-          className={`tr-btn ${mode === "degree" ? "on" : ""}`}
-          onClick={() => setMode("degree")}
-          aria-label="degree"
-        >
-          <span className="tr-icon">I</span>
-          <span className="tr-label">DEG</span>
-        </button>
-        <button
-          type="button"
-          className={`tr-btn ${mode === "rhythm" ? "on" : ""}`}
-          onClick={() => setMode("rhythm")}
-          aria-label="rhythm"
-        >
-          <span className="tr-icon">♩♪</span>
-          <span className="tr-label">RHY</span>
-        </button>
-      </nav>
-
-      {mode === "rhythm" && (
-        <>
-          <div className="rhy-meta" aria-label="rhythm source">
-            <span className={`rhy-tag rhy-tag-${rhyKind}`}>
-              {rhyKind === "base" && "BASE · BAR 1"}
-              {rhyKind === "link" && `LINK · ← BAR 1`}
-              {rhyKind === "own" && `OWN · BAR ${bar + 1}`}
-            </span>
-            {rhyKind === "own" && (
-              <button
-                type="button"
-                className="rhy-reset"
-                onClick={resetRhythmLink}
-              >
-                USE BASE
-              </button>
-            )}
-            {rhyKind === "link" && (
-              <span className="rhy-hint">edit to fork</span>
-            )}
-          </div>
-          <div className="brush-row" aria-label="articulation">
-            {ARTICULATIONS.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                className={`brush ${brush === a.id ? "on" : ""}`}
-                onClick={() => setBrush(a.id)}
-              >
-                <span className="brush-mark">{a.label}</span>
-                <span className="brush-hint">{a.hint}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      <div
-        ref={padStageRef}
-        className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode} rhy-${rhyKind}`}
-        style={{ "--mark-bar": markBar } as CSSProperties}
-      >
-        <div className="pad-board" ref={padBoardRef}>
-          <div className="pad-back" aria-hidden>
-            {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
-          </div>
-          {/* 재생 링: main + 행 wrap(prev/next)로 오른쪽↔왼쪽 이어짐 */}
-          {mode === "chart" && (
-            <div className="pad-play" aria-hidden>
-              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-prev" />
-              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-main" />
-              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-next" />
-            </div>
-          )}
-          {mode === "rhythm" && playBar === bar && (
-            <div className="pad-play pad-play-rhythm" aria-hidden>
-              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-prev" />
-              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-main" />
-              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-next" />
-            </div>
-          )}
-          <section className="pad-grid" aria-label={modeLabel(mode)}>
-            {mode === "chart" &&
-              Array.from({ length: SLOTS }, (_, i) => {
-                const degree = sheet.degrees[i] ?? null;
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
-                    onClick={() => setSelected(i)}
-                  >
-                    <span className="pad-sub">{(i % BEATS) + 1}</span>
-                    <span className="pad-label">{slotLabel(sheet.key, degree, sheet.tones[i])}</span>
-                    <span className="pad-roman">{slotRoman(degree)}</span>
-                  </button>
-                );
-              })}
-
-            {mode === "degree" &&
-              Array.from({ length: SLOTS }, (_, i) => {
-                if (i < 7) {
-                  const meta = DEGREE_META[i]!;
-                  const labelTones =
-                    currentDegree === i
-                      ? (sheet.tones[selected] ?? defaultTonesForDegree(i))
-                      : defaultTonesForDegree(i);
-                  return (
-                    <button
-                      key={meta.roman}
-                      type="button"
-                      className={`pad tool ${currentDegree === i ? "on" : ""} ${sheet.degrees.includes(i) ? "used" : ""}`}
-                      onClick={() => paintDegree(i)}
-                    >
-                      <span className="pad-label">{meta.roman}</span>
-                      <span className="pad-roman">
-                        {slotLabel(sheet.key, i, labelTones)}
-                      </span>
-                    </button>
-                  );
-                }
-                if (i === 7) {
-                  return (
-                    <button
-                      key="rest"
-                      type="button"
-                      className={`pad tool ${currentDegree === null ? "on" : ""}`}
-                      onClick={() => paintDegree(null)}
-                    >
-                      <span className="pad-label">∅</span>
-                      <span className="pad-roman"> </span>
-                    </button>
-                  );
-                }
-                const axis = TONE_AXES[i - 8];
-                if (!axis) {
-                  return (
-                    <div
-                      key={`tone-idle-${i}`}
-                      className="pad tone tone-idle"
-                      aria-hidden
-                    />
-                  );
-                }
-                const rootDeg = currentDegree;
-                if (rootDeg === null) {
-                  return (
-                    <div
-                      key={`tone-${axis.id}`}
-                      className="pad tone tone-idle"
-                      aria-hidden
-                    />
-                  );
-                }
-                const tones = sheet.tones[selected];
-                const on = toneAxisOn(tones, axis);
-                const label = toneAxisLabel(tones, axis);
-                const faces = toneAxisFaces(axis);
-                const polarity = toneAxisPolarity(tones, axis);
-                return (
-                  <button
-                    key={`tone-${axis.id}`}
-                    type="button"
-                    className={[
-                      "pad",
-                      "tone",
-                      "arcana",
-                      on ? "on" : "",
-                      axis.id === "1" ? "tone-root" : "",
-                      faces.polar ? "polar" : "mirror",
-                      faces.polar && polarity === "min" ? "reversed" : "",
-                      faces.polar && polarity === "maj" ? "upright" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={() => paintTone(axis.id)}
-                    aria-pressed={on}
-                    aria-label={label}
-                  >
-                    <span className="arcana-face">
-                      <span className="arcana-end maj">{faces.maj}</span>
-                      <span className="arcana-rule" aria-hidden />
-                      <span className="arcana-end min">{faces.min}</span>
-                    </span>
-                  </button>
-                );
-              })}
-
-            {mode === "rhythm" &&
-              Array.from({ length: BAR_STEPS }, (_, step) => {
-                const art = barRhythmRow[step] ?? "rest";
-                const beatNo = Math.floor(step / SUBDIV) + 1;
-                const sub = step % SUBDIV;
-                const subMark = ["1", "e", "&", "a"][sub]!;
-                return (
-                  <button
-                    key={step}
-                    type="button"
-                    className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""} ${rhyKind === "link" ? "rhy-link" : ""} ${rhyKind === "own" ? "rhy-own" : ""} ${rhyKind === "base" ? "rhy-base" : ""}`}
-                    onClick={() => paintRhythm(step)}
-                  >
-                    <span className="pad-sub">
-                      {beatNo}
-                      {subMark}
-                    </span>
-                    <span className="pad-label">{artLabel(art)}</span>
-                    <span className="pad-roman">{artHint(art)}</span>
-                  </button>
-                );
-              })}
-          </section>
-        </div>
+        )}
       </div>
 
-      {status ? <p className="status">{status}</p> : null}
+      <div className="app-dock">
+        <div className="dock-turn-stage">
+          <div
+            className={turnClass}
+            onTransitionEnd={onFlipTransitionEnd}
+          >
+            {face === "studio" ? (
+              <StudioDock
+                studio={studio}
+                sounding={sounding}
+                onNavigate={navigateWithFlip}
+                onToggleChain={() =>
+                  setStudio((prev) => ({ ...prev, chain: !prev.chain }))
+                }
+                onSelectSlot={(i) =>
+                  setStudio((prev) => setActiveSlot(prev, i))
+                }
+                onClearSlot={(i) => setStudio((prev) => clearSlot(prev, i))}
+              />
+            ) : (
+              <SimpleDock onNavigate={navigateWithFlip} />
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
-}
-
-function modeLabel(mode: Mode): string {
-  if (mode === "chart") return "grid";
-  if (mode === "degree") return "degree";
-  return "rhythm";
-}
-
-function artHint(art: Articulation): string {
-  return ARTICULATIONS.find((a) => a.id === art)?.hint ?? art;
 }

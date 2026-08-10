@@ -18,6 +18,8 @@
   --dur-presence: 0.22s;
   --dur-armed: 0.28s;
   --dur-glyph: 0.2s;
+  --dur-flip: 0.32s;
+  --ease-flip: cubic-bezier(0.45, 0.05, 0.25, 1);
 }
 
 * {
@@ -83,6 +85,107 @@ button {
   overflow-x: hidden;
   overflow-y: hidden;
   position: relative;
+}
+
+/* 심플↔스튜디오 셸 — 차트 고정, 하단 도크만 Y축 회전문 */
+.app-shell {
+  width: 100%;
+  max-width: 390px;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0 auto;
+  padding:
+    calc(24px + env(safe-area-inset-top, 0px))
+    0
+    calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.app-chart {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app.app-panel {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* 하단 도크 회전문 (세로축 = CSS rotateY) */
+.app-dock {
+  --dock-pad: 10px;
+  --dock-gap: 8px;
+  --dock-chip-h: 3rem;
+  --dock-slot: 3rem;
+  flex-shrink: 0;
+  margin: 0 12px;
+  height: calc(
+    var(--dock-pad) * 2 + var(--dock-chip-h) + var(--dock-gap) + var(--dock-slot)
+  );
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-box);
+  background: #000;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -3px 10px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.dock-turn-stage {
+  height: 100%;
+  perspective: 900px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+  background: #000;
+}
+
+.dock-turntable {
+  height: 100%;
+  transform-origin: 50% 50%;
+  transform: rotateY(0deg);
+  transition: transform var(--dur-flip) var(--ease-flip);
+  will-change: transform;
+  backface-visibility: hidden;
+  background: var(--fill);
+  border-radius: calc(var(--radius-box) - 1px);
+}
+
+.dock-turntable.is-fold {
+  transform: rotateY(90deg);
+}
+
+.dock-turntable.is-edge {
+  transition: none;
+  transform: rotateY(-90deg);
+}
+
+.dock-turntable.is-open,
+.dock-turntable.is-idle {
+  transform: rotateY(0deg);
+}
+
+.dock-turntable.dir-back.is-fold {
+  transform: rotateY(-90deg);
+}
+
+.dock-turntable.dir-back.is-edge {
+  transition: none;
+  transform: rotateY(90deg);
 }
 
 .lcd {
@@ -1046,7 +1149,8 @@ button {
   .tr-label,
   .brush-hint,
   .tr-metro-bob,
-  .tr-transport-icon .tr-glyph {
+  .tr-transport-icon .tr-glyph,
+  .dock-turntable {
     transition: none !important;
   }
 
@@ -1058,4 +1162,150 @@ button {
   .key-reel-track.is-moving {
     transition: none !important;
   }
+
+  .dock-turntable.is-fold,
+  .dock-turntable.is-edge,
+  .dock-turntable.is-open,
+  .dock-turntable.is-idle {
+    transform: none !important;
+  }
+}
+
+/* —— Studio —— */
+.app-nav {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 12px;
+  flex-shrink: 0;
+  min-height: 1.1rem;
+}
+
+.mode-chip {
+  flex: 0 0 auto;
+  text-decoration: none;
+  color: inherit;
+  height: var(--dock-chip-h);
+  min-height: var(--dock-chip-h);
+  min-width: 7rem;
+  padding: 0 1.15rem;
+  box-sizing: border-box;
+  justify-content: center;
+  --chip-type: 0.84rem;
+  font-size: var(--chip-type);
+}
+
+.mode-chip:active {
+  transform: scale(0.97);
+}
+
+.studio-rail {
+  height: 100%;
+  margin: 0;
+  padding: var(--dock-pad);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dock-gap);
+}
+
+.page-rail {
+  justify-content: center;
+  align-items: center;
+}
+
+.page-rail .studio-rail-top {
+  width: 100%;
+  justify-content: center;
+}
+
+.studio-rail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: var(--dock-chip-h);
+  flex-shrink: 0;
+}
+
+.studio-chain {
+  flex: 0 0 auto;
+  height: var(--dock-chip-h);
+  min-height: var(--dock-chip-h);
+  min-width: 5.5rem;
+  padding: 0 1rem;
+  box-sizing: border-box;
+  justify-content: center;
+  --chip-type: 0.84rem;
+  font-size: var(--chip-type);
+}
+
+.studio-chain.on {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.studio-chain.on .chip-k,
+.studio-chain.on .chip-v {
+  color: inherit;
+  text-shadow: none;
+}
+
+.studio-slots {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  height: var(--dock-slot);
+  flex-shrink: 0;
+}
+
+.studio-slot {
+  aspect-ratio: auto;
+  height: 100%;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px;
+  min-width: 0;
+  color: var(--muted);
+  transition:
+    background var(--dur-presence) var(--ease-presence),
+    border-color var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
+}
+
+.studio-slot.filled {
+  color: var(--fg);
+}
+
+.studio-slot.active {
+  border-color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--fg);
+}
+
+.studio-slot.sounding {
+  background: var(--fill-2);
+}
+
+.studio-slot.empty {
+  opacity: 0.55;
+}
+
+.studio-slot-n {
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.studio-slot-mark {
+  font-size: 0.68rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
