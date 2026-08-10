@@ -1173,13 +1173,3 @@ button {
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-
-.studio-hint {
-  margin: 0;
-  font-size: 0.58rem;
-  color: var(--muted);
-  letter-spacing: 0.02em;
-  min-width: 0;
-  flex: 1 1 auto;
-  text-align: right;
-}

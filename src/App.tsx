@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { createInitialSheet, toStrudel, toStrudelChain, type SheetState } from "./sheet";
 import { readSheetFromSearch } from "./shareQuery";
 import { SimpleSheet } from "./SimpleSheet";
@@ -44,20 +44,100 @@ function ModeChip({
 }: {
   href: string;
   label: string;
-  /** 지금 있는 쪽 라벨 (표시용) */
   current: string;
 }) {
   return (
     <a
       className="chip mode-chip"
       href={href}
-      aria-label={`${current} — go to ${label}`}
+      aria-label={`${current}, switch to ${label}`}
     >
-      <span className="chip-pair">
-        <span className="chip-k">PAGE</span>
-        <span className="chip-v">{label}</span>
-      </span>
+      <span className="chip-v">{label}</span>
     </a>
+  );
+}
+
+const LONG_PRESS_MS = 480;
+
+function StudioSlotPad({
+  index,
+  filled,
+  active,
+  live,
+  mark,
+  onSelect,
+  onClear,
+}: {
+  index: number;
+  filled: boolean;
+  active: boolean;
+  live: boolean;
+  mark: string;
+  onSelect: () => void;
+  onClear: () => void;
+}) {
+  const timerRef = useRef<number | null>(null);
+  const clearedRef = useRef(false);
+
+  const clearTimer = () => {
+    if (timerRef.current != null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const onPointerDown = (e: PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    clearedRef.current = false;
+    clearTimer();
+    if (!filled) return;
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      clearedRef.current = true;
+      onClear();
+    }, LONG_PRESS_MS);
+  };
+
+  const onPointerUp = () => {
+    clearTimer();
+  };
+
+  const onClick = () => {
+    if (clearedRef.current) {
+      clearedRef.current = false;
+      return;
+    }
+    onSelect();
+  };
+
+  return (
+    <button
+      type="button"
+      role="listitem"
+      className={[
+        "studio-slot",
+        filled ? "filled" : "empty",
+        active ? "active" : "",
+        live ? "sounding" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      aria-label={
+        filled
+          ? `sheet ${index + 1}${active ? ", active" : ""}. Hold to clear`
+          : `empty slot ${index + 1}`
+      }
+      aria-pressed={active}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onPointerLeave={onPointerUp}
+      onClick={onClick}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <span className="studio-slot-n">{index + 1}</span>
+      <span className="studio-slot-mark">{mark}</span>
+    </button>
   );
 }
 
@@ -152,57 +232,27 @@ export function StudioPage() {
               type="button"
               className={`chip studio-chain${studio.chain ? " on" : ""}`}
               aria-pressed={studio.chain}
+              aria-label="chain"
               onClick={() =>
                 setStudio((prev) => ({ ...prev, chain: !prev.chain }))
               }
             >
-              <span className="chip-pair">
-                <span className="chip-k">CHAIN</span>
-                <span className="chip-v">{studio.chain ? "ON" : "OFF"}</span>
-              </span>
+              <span className="chip-v">CHAIN</span>
             </button>
-            <p className="studio-hint font-ui">
-              탭=선택 · 우클릭=비우기
-              {studio.chain ? " · 채운 순 이어재생" : ""}
-            </p>
           </div>
           <div className="studio-slots" role="list">
-            {Array.from({ length: STUDIO_SLOT_COUNT }, (_, i) => {
-              const filled = studio.slots[i] != null;
-              const active = studio.active === i;
-              const live = sounding === i;
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  role="listitem"
-                  className={[
-                    "studio-slot",
-                    filled ? "filled" : "empty",
-                    active ? "active" : "",
-                    live ? "sounding" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  aria-label={
-                    filled
-                      ? `sheet ${i + 1}${active ? " active" : ""}`
-                      : `empty slot ${i + 1}`
-                  }
-                  aria-pressed={active}
-                  onClick={() => selectSlot(i)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    if (filled) onClearSlot(i);
-                  }}
-                >
-                  <span className="studio-slot-n">{i + 1}</span>
-                  <span className="studio-slot-mark">
-                    {filled ? (studio.slots[i]!.key ?? "·") : "·"}
-                  </span>
-                </button>
-              );
-            })}
+            {Array.from({ length: STUDIO_SLOT_COUNT }, (_, i) => (
+              <StudioSlotPad
+                key={i}
+                index={i}
+                filled={studio.slots[i] != null}
+                active={studio.active === i}
+                live={sounding === i}
+                mark={studio.slots[i]?.key ?? "·"}
+                onSelect={() => selectSlot(i)}
+                onClear={() => onClearSlot(i)}
+              />
+            ))}
           </div>
         </div>
       }
