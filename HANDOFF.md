@@ -1,6 +1,6 @@
 # OneSheet 핸드오프
 
-작성 시점: 2026-08-09 · 브랜치 `cursor/session-share-4663`
+작성 시점: 2026-08-10 · 브랜치 `cursor/mode-chassis-transition-7153`
 
 철학: **write simple play loop** — 심플 & 루프. 모노톤 기본.
 
@@ -28,6 +28,12 @@
 **성격 경계(realm):** 영역 안 순회 ≠ 영역 넘김. 활성↔비활성(∅/`rest`)은 활성 안 프리셋 순회와 분리 (예: 옛 Maj/Min/dim 순회 분리와 같은 논리).
 2상태도 전환 — 메타포는 기능·UI가 고른다. 어휘: **`docs/transition-vocabulary.md`** · 레퍼런스: **`docs/design-references.md`**
 
+### 기계 섀시 (서비스 기본 정책)
+
+**PO식:** 4×4·LCD·transport는 **고정**. 모드(GRID/DEG/RHY)는 같은 키의 **뱅크** — 레이아웃이 바뀌는 화면 전환이 아님.  
+모드 피드백 초안: transport **래치 점등** + 패드 **LED/잉크 재매핑** (딤→페이드). ❌ Y-flip / 와이프 / 그리드 재배치.  
+상세: `docs/transition-vocabulary.md` § 모드 전환 트랜지션 초안.
+
 적용됨 (우선 후보):
 - 메트로 armed → 점등 (`--dur-armed` + 추 `--point`)
 - 리듬 rest↔hit → 점등 (bg/border)
@@ -36,6 +42,10 @@
 - KEY ♭/♯ → 반음 키 단위 순회 + 슬롯머신 롤 (표시 슬롯 **고정폭**)
 - piano 사운드폰트도 워밍 (동시 다성 still-loading 스킵 완화)
   - piano는 보이스 스택(쉼표@ 버그 회피) + `gm_piano:1` + 모드 진입 시 워밍
+
+아직 (모드):
+- [ ] 래치 + 패드 재매핑 시제품 (A+B+C)
+- [ ] (선택) 스캔 펄스 D
 
 ---
 
