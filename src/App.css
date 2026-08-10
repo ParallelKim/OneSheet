@@ -124,13 +124,36 @@ button {
 }
 
 /* 하단 도크 회전문 (세로축 = CSS rotateY) */
+.app-dock {
+  --dock-pad: 8px;
+  --dock-gap: 6px;
+  --dock-chip-h: 2.55rem;
+  --dock-slot: 2.55rem;
+  flex-shrink: 0;
+  margin: 0 12px;
+  height: calc(
+    var(--dock-pad) * 2 + var(--dock-chip-h) + var(--dock-gap) + var(--dock-slot)
+  );
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-box);
+  background: var(--fill);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -3px 10px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
 .dock-turn-stage {
+  height: 100%;
   perspective: 900px;
   perspective-origin: 50% 50%;
   transform-style: preserve-3d;
 }
 
 .dock-turntable {
+  height: 100%;
   transform-origin: 50% 50%;
   transform: rotateY(0deg);
   transition: transform var(--dur-flip) var(--ease-flip);
@@ -1154,15 +1177,13 @@ button {
   min-height: 1.1rem;
 }
 
-.app-dock {
-  flex-shrink: 0;
-  min-height: 0;
-}
-
 .mode-chip {
   flex: 0 0 auto;
   text-decoration: none;
   color: inherit;
+  height: var(--dock-chip-h);
+  min-height: var(--dock-chip-h);
+  box-sizing: border-box;
 }
 
 .mode-chip:active {
@@ -1170,11 +1191,17 @@ button {
 }
 
 .studio-rail {
-  flex-shrink: 0;
-  margin: 0 12px;
+  height: 100%;
+  margin: 0;
+  padding: var(--dock-pad);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--dock-gap);
+}
+
+.page-rail {
+  justify-content: center;
 }
 
 .page-rail .studio-rail-top {
@@ -1186,10 +1213,15 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  height: var(--dock-chip-h);
+  flex-shrink: 0;
 }
 
 .studio-chain {
   flex: 0 0 auto;
+  height: var(--dock-chip-h);
+  min-height: var(--dock-chip-h);
+  box-sizing: border-box;
 }
 
 .studio-chain.on {
@@ -1208,13 +1240,17 @@ button {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   gap: 4px;
+  height: var(--dock-slot);
+  flex-shrink: 0;
 }
 
 .studio-slot {
-  aspect-ratio: 1;
+  aspect-ratio: auto;
+  height: 100%;
+  width: 100%;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: var(--fill);
+  background: var(--bg);
   display: flex;
   flex-direction: column;
   align-items: center;
