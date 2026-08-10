@@ -117,73 +117,74 @@ export function StudioPage() {
   };
 
   return (
-    <div className="studio-shell">
-      <div className="studio-rail" aria-label="studio slots">
-        <div className="studio-rail-top">
-          <ModeLink href="/" label="SIMPLE" />
-          <button
-            type="button"
-            className={`chip studio-chain${studio.chain ? " on" : ""}`}
-            aria-pressed={studio.chain}
-            onClick={() =>
-              setStudio((prev) => ({ ...prev, chain: !prev.chain }))
-            }
-          >
-            <span className="chip-k">CHAIN</span>
-            <span className="chip-v">{studio.chain ? "ON" : "OFF"}</span>
-          </button>
+    <SimpleSheet
+      sheet={sheet}
+      onChange={onChangeSheet}
+      patternOf={patternOf}
+      playbackKey={`${studio.active}:${studio.chain}:${order.join(",")}`}
+      nav={<ModeLink href="/" label="SIMPLE" />}
+      dock={
+        <div className="studio-rail" aria-label="studio slots">
+          <div className="studio-rail-top">
+            <button
+              type="button"
+              className={`chip studio-chain${studio.chain ? " on" : ""}`}
+              aria-pressed={studio.chain}
+              onClick={() =>
+                setStudio((prev) => ({ ...prev, chain: !prev.chain }))
+              }
+            >
+              <span className="chip-pair">
+                <span className="chip-k">CHAIN</span>
+                <span className="chip-v">{studio.chain ? "ON" : "OFF"}</span>
+              </span>
+            </button>
+            <p className="studio-hint font-ui">
+              탭=선택 · 우클릭=비우기
+              {studio.chain ? " · 채운 순 이어재생" : ""}
+            </p>
+          </div>
+          <div className="studio-slots" role="list">
+            {Array.from({ length: STUDIO_SLOT_COUNT }, (_, i) => {
+              const filled = studio.slots[i] != null;
+              const active = studio.active === i;
+              const live = sounding === i;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  role="listitem"
+                  className={[
+                    "studio-slot",
+                    filled ? "filled" : "empty",
+                    active ? "active" : "",
+                    live ? "sounding" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-label={
+                    filled
+                      ? `sheet ${i + 1}${active ? " active" : ""}`
+                      : `empty slot ${i + 1}`
+                  }
+                  aria-pressed={active}
+                  onClick={() => selectSlot(i)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (filled) onClearSlot(i);
+                  }}
+                >
+                  <span className="studio-slot-n">{i + 1}</span>
+                  <span className="studio-slot-mark">
+                    {filled ? (studio.slots[i]!.key ?? "·") : "·"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="studio-slots" role="list">
-          {Array.from({ length: STUDIO_SLOT_COUNT }, (_, i) => {
-            const filled = studio.slots[i] != null;
-            const active = studio.active === i;
-            const live = sounding === i;
-            return (
-              <button
-                key={i}
-                type="button"
-                role="listitem"
-                className={[
-                  "studio-slot",
-                  filled ? "filled" : "empty",
-                  active ? "active" : "",
-                  live ? "sounding" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                aria-label={
-                  filled
-                    ? `sheet ${i + 1}${active ? " active" : ""}`
-                    : `empty slot ${i + 1}`
-                }
-                aria-pressed={active}
-                onClick={() => selectSlot(i)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  if (filled) onClearSlot(i);
-                }}
-              >
-                <span className="studio-slot-n">{i + 1}</span>
-                <span className="studio-slot-mark">
-                  {filled ? (studio.slots[i]!.key ?? "·") : "·"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <p className="studio-hint font-ui">
-          탭=선택/생성 · 우클릭=비우기
-          {studio.chain ? " · CHAIN=채운 순서로 이어 재생" : ""}
-        </p>
-      </div>
-      <SimpleSheet
-        sheet={sheet}
-        onChange={onChangeSheet}
-        patternOf={patternOf}
-        playbackKey={`${studio.active}:${studio.chain}:${order.join(",")}`}
-        className="app-embed"
-      />
-    </div>
+      }
+    />
   );
 }
 

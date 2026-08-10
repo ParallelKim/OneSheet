@@ -69,6 +69,8 @@ export type SimpleSheetProps = {
    */
   playbackKey?: string | number;
   nav?: ReactNode;
+  /** 패드 그리드 아래 도크 (스튜디오 슬롯·CHAIN) */
+  dock?: ReactNode;
   className?: string;
 };
 
@@ -91,6 +93,7 @@ export function SimpleSheet({
   patternOf,
   playbackKey,
   nav,
+  dock,
   className,
 }: SimpleSheetProps) {
   const [selected, setSelected] = useState(0);
@@ -770,6 +773,8 @@ export function SimpleSheet({
           </section>
         </div>
       </div>
+
+      {dock ? <div className="app-dock">{dock}</div> : null}
 
       {status ? <p className="status">{status}</p> : null}
     </div>

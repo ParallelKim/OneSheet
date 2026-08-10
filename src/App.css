@@ -1083,20 +1083,9 @@ button {
   color: var(--fg);
 }
 
-.studio-shell {
-  width: 100%;
-  max-width: 390px;
-  height: 100dvh;
-  max-height: 100dvh;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow: hidden;
-  padding:
-    calc(12px + env(safe-area-inset-top, 0px))
-    0
-    calc(16px + env(safe-area-inset-bottom, 0px));
+.app-dock {
+  flex-shrink: 0;
+  min-height: 0;
 }
 
 .studio-rail {
@@ -1189,13 +1178,7 @@ button {
   font-size: 0.58rem;
   color: var(--muted);
   letter-spacing: 0.02em;
-}
-
-.app.app-embed {
-  flex: 1 1 0;
-  min-height: 0;
-  height: auto;
-  max-height: none;
-  padding-top: 0;
-  padding-bottom: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: right;
 }
