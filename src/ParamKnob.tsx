@@ -1,4 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { haptic } from './haptic'
 
 type ParamKnobProps = {
   label: string
@@ -21,6 +22,8 @@ type ParamKnobProps = {
    * multi-turn ≈ 2.5px/unit for finer control.
    */
   dragPxPerUnit?: number
+  /** Detent pulse when snapped value changes (default true). */
+  hapticDetent?: boolean
 }
 
 const SWEEP_DEG = 270
@@ -50,11 +53,13 @@ export function ParamKnob({
   disabled = false,
   turns = 1,
   dragPxPerUnit,
+  hapticDetent = true,
 }: ParamKnobProps) {
   const dragRef = useRef<{
     pointerId: number
     startY: number
     startValue: number
+    lastHaptic: number
   } | null>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -73,9 +78,19 @@ export function ParamKnob({
         ? DRAG_PX
         : DRAG_PX / range)
 
-  function commitFromDeltaY(startValue: number, deltaY: number) {
-    const next = snap(startValue - deltaY / pxPerUnit, step)
-    onChange(clamp(next, min, max))
+  function emitValue(next: number, from: number) {
+    const clamped = clamp(next, min, max)
+    if (clamped !== from && hapticDetent) haptic('detent')
+    onChange(clamped)
+  }
+
+  function commitFromDeltaY(startValue: number, deltaY: number, lastHaptic: number) {
+    const next = clamp(snap(startValue - deltaY / pxPerUnit, step), min, max)
+    if (next !== lastHaptic && hapticDetent) {
+      haptic('detent')
+      if (dragRef.current) dragRef.current.lastHaptic = next
+    }
+    onChange(next)
   }
 
   function onPointerDown(e: PointerEvent<HTMLButtonElement>) {
@@ -86,6 +101,7 @@ export function ParamKnob({
       pointerId: e.pointerId,
       startY: e.clientY,
       startValue: value,
+      lastHaptic: value,
     }
     setDragging(true)
   }
@@ -93,7 +109,7 @@ export function ParamKnob({
   function onPointerMove(e: PointerEvent<HTMLButtonElement>) {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
-    commitFromDeltaY(drag.startValue, e.clientY - drag.startY)
+    commitFromDeltaY(drag.startValue, e.clientY - drag.startY, drag.lastHaptic)
   }
 
   function endDrag(e: PointerEvent<HTMLButtonElement>) {
@@ -117,7 +133,7 @@ export function ParamKnob({
     else if (e.key === 'End') next = max
     else return
     e.preventDefault()
-    onChange(clamp(snap(next, step), min, max))
+    emitValue(snap(next, step), value)
   }
 
   return (

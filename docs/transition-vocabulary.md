@@ -290,3 +290,4 @@ export function haptic(kind: "tick" | "detent" | "latch" | "mark"): void {
 - [ ] (선택) D 스캔 펄스 강약
 - [ ] 프리셋 순회(영역 안) 약한 펄 — 영역 넘김과 차별
 - [ ] (선택) `haptic()` 헬퍼 + Android 디텐트/래치 와이어
+- [x] 햅틱 적용: 모드 래치 · 버튼 · 노브 디텐트 (`src/haptic.ts`)

@@ -51,6 +51,7 @@ import {
 } from "./engine";
 import { KeyReel } from "./KeyReel";
 import { ParamKnob } from "./ParamKnob";
+import { haptic } from "./haptic";
 import "./App.css";
 
 type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
@@ -237,6 +238,7 @@ export default function App() {
     if (soundMode === "piano") {
       void warmPianoFont().catch(() => undefined);
     }
+    haptic("latch");
     update((prev) => ({ ...prev, soundMode }));
   }, [update]);
 
@@ -245,6 +247,7 @@ export default function App() {
       update((prev) => {
         const next = shiftKey(prev.key, dir);
         if (next === prev.key) return prev;
+        haptic("detent");
         setKeySpin((s) => ({ dir, gen: s.gen + 1 }));
         return { ...prev, key: next };
       });
@@ -256,6 +259,7 @@ export default function App() {
     const gate = getPlaybackEpoch();
     // 제스처 콜스택에서 동기 unlock (async 전에)
     unlockAudioOutput();
+    haptic("mark");
 
     if (!isEngineReady()) {
       setEngine("loading");
@@ -299,6 +303,7 @@ export default function App() {
   }, []);
 
   const onStop = useCallback(() => {
+    haptic("mark");
     hushStrudel();
     playingRef.current = false;
     setEngine((e) => (e === "error" ? e : "ready"));
@@ -306,29 +311,47 @@ export default function App() {
   }, []);
 
   const paintDegree = (degree: number | null) => {
+    const cur = sheetRef.current.degrees[selected] ?? null;
+    if (degree === null) haptic("mark");
+    else if (cur === degree) haptic("detent");
+    else haptic("tick");
     update((prev) => paintDegreeSlot(prev, selected, degree));
   };
 
   const paintTone = (axisId: ToneAxisId) => {
+    const axis = TONE_AXES.find((a) => a.id === axisId);
+    const before = axis
+      ? toneAxisPolarity(sheetRef.current.tones[selected], axis)
+      : "off";
+    const next = paintToneSlot(sheetRef.current, selected, axisId);
+    const after = axis ? toneAxisPolarity(next.tones[selected], axis) : "off";
+    haptic(before !== "off" && after === "off" ? "mark" : "detent");
     update((prev) => paintToneSlot(prev, selected, axisId));
   };
 
   const paintRhythm = (step: number) => {
     const bar = barIndex(selected);
-    update((prev) => {
-      const current = barRhythm(prev, bar)[step] ?? "rest";
-      const nextArt = current === brush ? "rest" : brush;
-      return paintRhythmStep(prev, bar, step, nextArt);
-    });
+    const current = barRhythm(sheetRef.current, bar)[step] ?? "rest";
+    const nextArt = current === brush ? "rest" : brush;
+    haptic(nextArt === "rest" || current === "rest" ? "mark" : "tick");
+    update((prev) => paintRhythmStep(prev, bar, step, nextArt));
   };
 
   const resetRhythmLink = () => {
     const bar = barIndex(selected);
+    haptic("mark");
     update((prev) => clearRhythmOverride(prev, bar));
   };
 
   const selectBar = (bar: number) => {
+    haptic("tick");
     setSelected(bar * BEATS + (selected % BEATS));
+  };
+
+  const switchMode = (next: Mode) => {
+    if (next === mode) return;
+    haptic("latch");
+    setMode(next);
   };
 
   const playing = engine === "playing";
@@ -426,6 +449,7 @@ export default function App() {
                       className={`chord-cell ${on ? "on" : ""} ${d === null ? "empty" : ""}`}
                       onClick={(e) => {
                         e.stopPropagation();
+                        haptic("tick");
                         setSelected(i);
                       }}
                       aria-label={`bar ${bi + 1} beat ${qi + 1}`}
@@ -475,7 +499,10 @@ export default function App() {
         <button
           type="button"
           className={`tr-btn metro ${sheet.metro ? "on" : ""}`}
-          onClick={() => update((prev) => ({ ...prev, metro: !prev.metro }))}
+          onClick={() => {
+            haptic("mark");
+            update((prev) => ({ ...prev, metro: !prev.metro }));
+          }}
           aria-pressed={sheet.metro}
           aria-label="metronome"
         >
@@ -519,7 +546,7 @@ export default function App() {
         <button
           type="button"
           className={`tr-btn ${mode === "chart" ? "on" : ""}`}
-          onClick={() => setMode("chart")}
+          onClick={() => switchMode("chart")}
           aria-label="chart"
         >
           <span className="tr-icon">▦</span>
@@ -528,7 +555,7 @@ export default function App() {
         <button
           type="button"
           className={`tr-btn ${mode === "degree" ? "on" : ""}`}
-          onClick={() => setMode("degree")}
+          onClick={() => switchMode("degree")}
           aria-label="degree"
         >
           <span className="tr-icon">I</span>
@@ -537,7 +564,7 @@ export default function App() {
         <button
           type="button"
           className={`tr-btn ${mode === "rhythm" ? "on" : ""}`}
-          onClick={() => setMode("rhythm")}
+          onClick={() => switchMode("rhythm")}
           aria-label="rhythm"
         >
           <span className="tr-icon">♩♪</span>
@@ -572,7 +599,11 @@ export default function App() {
                 key={a.id}
                 type="button"
                 className={`brush ${brush === a.id ? "on" : ""}`}
-                onClick={() => setBrush(a.id)}
+                onClick={() => {
+                  if (brush === a.id) return;
+                  haptic("tick");
+                  setBrush(a.id);
+                }}
               >
                 <span className="brush-mark">{a.label}</span>
                 <span className="brush-hint">{a.hint}</span>
@@ -615,7 +646,10 @@ export default function App() {
                     key={i}
                     type="button"
                     className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
-                    onClick={() => setSelected(i)}
+                    onClick={() => {
+                      haptic("tick");
+                      setSelected(i);
+                    }}
                   >
                     <span className="pad-sub">{(i % BEATS) + 1}</span>
                     <span className="pad-label">{slotLabel(sheet.key, degree, sheet.tones[i])}</span>

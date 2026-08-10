@@ -52,6 +52,7 @@
 - **Android:** `navigator.vibrate`로 디텐트/래치 가능 (제스처 안, 짧은 펄스).
 - **iOS:** Vibration API **없음** (WebKit Oppose). 스위치 트릭은 비표준·깨지기 쉬움 → 기본 의존 X.
 - 본체는 시각 전환. 햅틱 = progressive. 상세: `docs/transition-vocabulary.md` § 햅틱.
+- **적용됨:** `src/haptic.ts` — 모드 래치 · transport/패드/KEY · BPM/VOL 노브 디텐트. `prefers-reduced-motion` 시 끔.
 
 ---
 
