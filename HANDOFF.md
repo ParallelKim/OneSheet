@@ -53,7 +53,8 @@
 - **Android:** `navigator.vibrate` (펄스 ≥~30ms — 짧은 값은 모터에 안 느껴짐).
 - **iOS:** 공식 API 없음 → no-op.
 - **적용:** `src/haptic.ts` — tick/detent/latch/mark ≥100ms. `vibrate(0)` 취소 제거(일부 안드에서 후속 펄스 죽임).
-- **디버그:** URL `?haptic=1` → 하단 diag · tick · latch · raw200. `hapticDiag()`로 API/secure/reducedMotion/lastError 확인.
+- **디버그:** URL `?haptic=1` → `1·100ms` / `2·latch` / `3·500ms` / `4·diag` (pointerdown).
+- **주의:** `api-ok`인데 손이 안 울리면 Chrome이 true를 줘도 **OS/OEM이 웹 진동을 막는 경우**가 많음 (절전·진동 off·일부 삼성 등).
 
 ---
 
