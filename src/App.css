@@ -87,7 +87,7 @@ button {
   position: relative;
 }
 
-/* 심플↔스튜디오 셸 — 차트 고정, 하단 도크만 Y축 회전문 */
+/* 심플↔스튜디오 셸 — 차트 고정, 하단 도크만 X축 플립(가로 패널) */
 .app-shell {
   width: 100%;
   max-width: 390px;
@@ -123,8 +123,9 @@ button {
   min-height: 0;
 }
 
-/* 하단 도크 회전문 (세로축 = CSS rotateY)
- * 레이어: 캐비티(z0, 2D 검정) → 스테이지(z1, perspective만) → 턴테이블(z2, flat 면).
+/* 하단 도크 플립 (가로축 = CSS rotateX, 세로 중앙 피벗)
+ * 가로형 패널이라 Y(좌우 문짝)보다 X(상하 접힘)가 자연스럽다.
+ * 레이어: 캐비티(z0, 2D 검정) → 스테이지(z1, perspective만) → 플립 면(z2, flat).
  * 검정·preserve-3d를 같은 노드에 두면 회전면이 배경 평면 뒤로 뚫린다. */
 .app-dock {
   --dock-pad: 10px;
@@ -166,7 +167,7 @@ button {
   height: 100%;
   perspective: 900px;
   perspective-origin: 50% 50%;
-  /* preserve-3d / 배경 금지 — 자식 rotateY만으로 충분 */
+  /* preserve-3d / 배경 금지 — 자식 rotateX만으로 충분 */
   transform-style: flat;
   background: transparent;
 }
@@ -176,7 +177,7 @@ button {
   z-index: 2;
   height: 100%;
   transform-origin: 50% 50%;
-  transform: rotateY(0deg);
+  transform: rotateX(0deg);
   transform-style: flat;
   transition: transform var(--dur-flip) var(--ease-flip);
   will-change: transform;
@@ -193,26 +194,26 @@ button {
 }
 
 .dock-turntable.is-fold {
-  transform: rotateY(90deg);
+  transform: rotateX(90deg);
 }
 
 .dock-turntable.is-edge {
   transition: none;
-  transform: rotateY(-90deg);
+  transform: rotateX(-90deg);
 }
 
 .dock-turntable.is-open,
 .dock-turntable.is-idle {
-  transform: rotateY(0deg);
+  transform: rotateX(0deg);
 }
 
 .dock-turntable.dir-back.is-fold {
-  transform: rotateY(-90deg);
+  transform: rotateX(-90deg);
 }
 
 .dock-turntable.dir-back.is-edge {
   transition: none;
-  transform: rotateY(90deg);
+  transform: rotateX(90deg);
 }
 
 .lcd {

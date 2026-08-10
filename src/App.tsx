@@ -26,7 +26,7 @@ import {
 import { getCycleTime } from "./engine";
 
 type Face = "simple" | "studio";
-/** fold → (swap) edge → open → idle — 하단 도크 Y축 회전문 */
+/** fold → (swap) edge → open → idle — 하단 도크 X축 플립(세로 중앙) */
 type FlipPhase = "idle" | "fold" | "edge" | "open";
 
 function loadSimpleSheet(): SheetState {
@@ -266,7 +266,7 @@ function SimpleDock({ onNavigate }: { onNavigate: (href: string) => void }) {
 }
 
 /**
- * 차트는 고정. 하단 도크만 세로축(rotateY) 회전문 —
+ * 차트는 고정. 하단 도크만 가로축(rotateX) 플립 —
  * SIMPLE 면 ↔ STUDIO 슬롯 면.
  */
 export default function App() {
