@@ -1258,9 +1258,29 @@ function chartToStrudel(sheet: SheetState, modeId: SoundModeId): string {
   return `setcps(${parts.cps})\n${body}`;
 }
 
+function chartBody(sheet: SheetState): string {
+  const full = chartToStrudel(sheet, soundModeById(sheet.soundMode).id);
+  if (full === "silence") return "silence";
+  const nl = full.indexOf("\n");
+  return nl >= 0 ? full.slice(nl + 1) : full;
+}
+
 /**
  * Play/재평가용 코드 — 차트 리듬·코드·BPM 반영.
  */
 export function toStrudel(sheet: SheetState): string {
   return chartToStrudel(sheet, soundModeById(sheet.soundMode).id);
+}
+
+/**
+ * 여러 시트를 사이클 단위로 이어 재생 (Strudel `cat`).
+ * cps·템포는 첫 시트를 따른다.
+ */
+export function toStrudelChain(sheets: SheetState[]): string {
+  const list = sheets.filter(Boolean);
+  if (list.length === 0) return "silence";
+  if (list.length === 1) return toStrudel(list[0]!);
+  const cps = cyclesPerSecond(list[0]!.bpm);
+  const bodies = list.map((s) => chartBody(s));
+  return `setcps(${cps})\ncat(${bodies.join(", ")})`;
 }

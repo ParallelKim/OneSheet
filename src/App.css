@@ -1059,3 +1059,143 @@ button {
     transition: none !important;
   }
 }
+
+/* —— Studio —— */
+.app-nav {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 12px;
+  flex-shrink: 0;
+  min-height: 1.1rem;
+}
+
+.mode-link {
+  font-family: var(--font);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 2px 0;
+}
+
+.mode-link:active {
+  color: var(--fg);
+}
+
+.studio-shell {
+  width: 100%;
+  max-width: 390px;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  padding:
+    calc(12px + env(safe-area-inset-top, 0px))
+    0
+    calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+.studio-rail {
+  flex-shrink: 0;
+  margin: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.studio-rail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.studio-chain {
+  flex: 0 0 auto;
+}
+
+.studio-chain.on {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.studio-chain.on .chip-k,
+.studio-chain.on .chip-v {
+  color: inherit;
+  text-shadow: none;
+}
+
+.studio-slots {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.studio-slot {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px;
+  min-width: 0;
+  color: var(--muted);
+  transition:
+    background var(--dur-presence) var(--ease-presence),
+    border-color var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
+}
+
+.studio-slot.filled {
+  color: var(--fg);
+}
+
+.studio-slot.active {
+  border-color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--fg);
+}
+
+.studio-slot.sounding {
+  background: var(--fill-2);
+}
+
+.studio-slot.empty {
+  opacity: 0.55;
+}
+
+.studio-slot-n {
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.studio-slot-mark {
+  font-size: 0.68rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-hint {
+  margin: 0;
+  font-size: 0.58rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.app.app-embed {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  padding-top: 0;
+  padding-bottom: 0;
+}

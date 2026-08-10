@@ -102,12 +102,21 @@ export function isEngineReady(): boolean {
  * 엔진 미준비·정지 직후면 null.
  */
 export function getCyclePhase(): number | null {
+  const t = getCycleTime();
+  if (t == null) return null;
+  return ((t % 1) + 1) % 1;
+}
+
+/**
+ * 스케줄러 절대 사이클 시각 (cat 체인에서 sheetIndex = floor(t) % N).
+ */
+export function getCycleTime(): number | null {
   const now = replRef?.scheduler?.now;
   if (typeof now !== "function") return null;
   try {
     const t = now.call(replRef.scheduler) as number;
     if (!Number.isFinite(t)) return null;
-    return ((t % 1) + 1) % 1;
+    return t;
   } catch {
     return null;
   }
