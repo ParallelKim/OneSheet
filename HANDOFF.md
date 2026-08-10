@@ -52,7 +52,8 @@
 
 - **Android:** `navigator.vibrate` (펄스 ≥~30ms — 짧은 값은 모터에 안 느껴짐).
 - **iOS:** 공식 API 없음 → no-op.
-- **적용:** `src/haptic.ts` — 모드 latch 더블노크 · 버튼 · 노브 디텐트. `prefers-reduced-motion` 시 끔.
+- **적용:** `src/haptic.ts` — tick/detent/latch/mark ≥100ms. `vibrate(0)` 취소 제거(일부 안드에서 후속 펄스 죽임).
+- **디버그:** URL `?haptic=1` → 하단 diag · tick · latch · raw200. `hapticDiag()`로 API/secure/reducedMotion/lastError 확인.
 
 ---
 

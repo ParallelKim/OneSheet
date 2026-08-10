@@ -901,8 +901,10 @@ button {
   gap: var(--pad-gap);
 }
 
-/* 같은 키 위 잉크만 — 뱅크 전환 시 짧게 밝아짐 (격자 不动) */
+/* 같은 키 위 잉크 + LED — 뱅크 전환 시 점등 패턴이 먼저 */
 .pad-ink {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -912,13 +914,73 @@ button {
   min-height: 0;
 }
 
+.pad-led {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  transition:
+    background-color var(--dur-presence) var(--ease-presence),
+    box-shadow var(--dur-presence) var(--ease-presence),
+    opacity var(--dur-presence) var(--ease-presence);
+}
+
+.pad-led.led-off {
+  opacity: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pad-led.led-dim {
+  opacity: 1;
+  background: rgba(236, 236, 236, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(236, 236, 236, 0.16);
+}
+
+.pad-led.led-lit {
+  opacity: 1;
+  background: rgba(236, 236, 236, 0.2);
+  box-shadow: inset 0 0 0 1.5px rgba(236, 236, 236, 0.4);
+}
+
+.pad-led.led-pulse {
+  opacity: 1;
+  background: rgba(236, 236, 236, 0.24);
+  box-shadow: inset 0 0 0 2px rgba(236, 236, 236, 0.5);
+  animation: led-breathe 1.05s var(--ease-presence) infinite;
+}
+
+@keyframes led-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.pad-stage.bank-flash .pad-led:not(.led-off) {
+  animation: led-remap-flash 0.2s var(--ease-presence) both;
+}
+
 .pad-stage.bank-flash .pad-ink {
   animation: pad-ink-flash 0.18s var(--ease-presence) both;
 }
 
+@keyframes led-remap-flash {
+  from {
+    filter: brightness(1.55);
+  }
+  to {
+    filter: none;
+  }
+}
+
 @keyframes pad-ink-flash {
   from {
-    opacity: 0.4;
+    opacity: 0.55;
   }
   to {
     opacity: 1;
@@ -926,6 +988,7 @@ button {
 }
 
 .pad {
+  position: relative;
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -1109,6 +1172,39 @@ button {
   flex-shrink: 0;
 }
 
+.haptic-debug {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 12px 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--fill);
+  flex-shrink: 0;
+}
+
+.haptic-debug-log {
+  flex: 1 1 100%;
+  font-family: var(--font-ui);
+  font-size: 0.58rem;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.haptic-debug-btn {
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--fill-2);
+  color: var(--fg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tr-btn,
   .brush,
@@ -1130,7 +1226,9 @@ button {
   }
 
   .tr-btn .spin,
-  .pad-stage.bank-flash .pad-ink {
+  .pad-stage.bank-flash .pad-ink,
+  .pad-stage.bank-flash .pad-led,
+  .pad-led.led-pulse {
     animation: none !important;
   }
 

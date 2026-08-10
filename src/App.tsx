@@ -51,12 +51,14 @@ import {
 } from "./engine";
 import { KeyReel } from "./KeyReel";
 import { ParamKnob } from "./ParamKnob";
-import { haptic } from "./haptic";
+import { haptic, hapticDiag, hapticRaw } from "./haptic";
 import "./App.css";
 
 type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
 /** 렌즈: 같은 4×4 패드의 의미를 바꾼다 */
 type Mode = "chart" | "degree" | "rhythm";
+/** 칸별 LED — 라벨과 별도. 뱅크 재매핑은 이 패턴이 먼저 말한다 */
+type LedLevel = "off" | "dim" | "lit" | "pulse";
 
 /**
  * 재생 링 열 좌표: 셀 공격~대부분 구간은 칸 중심(정수)에 머물고,
@@ -96,6 +98,10 @@ export default function App() {
   /** 모드 전환 시 같은 키 위 잉크만 짧게 펄스 */
   const [bankFlash, setBankFlash] = useState(false);
   const bankFlashTimerRef = useRef<number | null>(null);
+  const hapticDebug =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("haptic");
+  const [hapticLog, setHapticLog] = useState("");
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
   const staffRef = useRef<HTMLDivElement>(null);
@@ -359,10 +365,22 @@ export default function App() {
     setSelected(bar * BEATS + (selected % BEATS));
   };
 
+  const refreshHapticLog = () => {
+    const d = hapticDiag();
+    setHapticLog(
+      [
+        `can=${d.canHaptic}`,
+        `api=${d.hasVibrate} (${d.vibrateType})`,
+        `secure=${d.secureContext}`,
+        `reducedMotion=${d.reducedMotion}`,
+        `last=${d.lastKind} ok=${d.lastOk} err=${d.lastError ?? "-"}`,
+      ].join(" · "),
+    );
+  };
+
   const switchMode = (next: Mode) => {
     if (next === mode) return;
-    haptic("latch");
-    // 같은 16키 유지 — 모드·잉크만 즉시. 딜레이 딤은 버벅임·다른 화면 감각.
+    // 햅틱은 pointerdown에서 (안드 제스처 결합). 여기는 시각만.
     setMode(next);
     const reduce =
       typeof window !== "undefined" &&
@@ -571,6 +589,9 @@ export default function App() {
         <button
           type="button"
           className={`tr-btn ${mode === "chart" ? "on" : ""}`}
+          onPointerDown={() => {
+            if (mode !== "chart") haptic("latch");
+          }}
           onClick={() => switchMode("chart")}
           aria-label="chart"
           aria-pressed={mode === "chart"}
@@ -581,6 +602,9 @@ export default function App() {
         <button
           type="button"
           className={`tr-btn ${mode === "degree" ? "on" : ""}`}
+          onPointerDown={() => {
+            if (mode !== "degree") haptic("latch");
+          }}
           onClick={() => switchMode("degree")}
           aria-label="degree"
           aria-pressed={mode === "degree"}
@@ -591,6 +615,9 @@ export default function App() {
         <button
           type="button"
           className={`tr-btn ${mode === "rhythm" ? "on" : ""}`}
+          onPointerDown={() => {
+            if (mode !== "rhythm") haptic("latch");
+          }}
           onClick={() => switchMode("rhythm")}
           aria-label="rhythm"
           aria-pressed={mode === "rhythm"}
@@ -698,6 +725,48 @@ export default function App() {
       </div>
 
       {status ? <p className="status">{status}</p> : null}
+      {hapticDebug ? (
+        <div className="haptic-debug" role="status">
+          <span className="haptic-debug-log">{hapticLog || "tap a test"}</span>
+          <button
+            type="button"
+            className="haptic-debug-btn"
+            onClick={() => {
+              haptic("tick");
+              refreshHapticLog();
+            }}
+          >
+            tick
+          </button>
+          <button
+            type="button"
+            className="haptic-debug-btn"
+            onClick={() => {
+              haptic("latch");
+              refreshHapticLog();
+            }}
+          >
+            latch
+          </button>
+          <button
+            type="button"
+            className="haptic-debug-btn"
+            onClick={() => {
+              hapticRaw(200);
+              refreshHapticLog();
+            }}
+          >
+            raw200
+          </button>
+          <button
+            type="button"
+            className="haptic-debug-btn"
+            onClick={refreshHapticLog}
+          >
+            diag
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -728,7 +797,7 @@ type LaunchPadProps = {
 
 /**
  * 고정 슬롯 하나 — key는 부모가 index로 고정.
- * 모드가 바뀌어도 같은 <button> 위에서 잉크·핸들러만 갱신.
+ * LED 레이어(점등 패턴) + 라벨 잉크. 모드 전환 시 둘 다 같은 키 위에서 갱신.
  */
 function LaunchPad({
   index: i,
@@ -745,12 +814,15 @@ function LaunchPad({
 }: LaunchPadProps) {
   if (mode === "chart") {
     const degree = sheet.degrees[i] ?? null;
+    const led: LedLevel =
+      selected === i ? "pulse" : degree === null ? "off" : "dim";
     return (
       <button
         type="button"
         className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
         onClick={onSelect}
       >
+        <span className={`pad-led led-${led}`} aria-hidden />
         <span className="pad-ink">
           <span className="pad-sub">{(i % BEATS) + 1}</span>
           <span className="pad-label">
@@ -767,12 +839,16 @@ function LaunchPad({
     const beatNo = Math.floor(i / SUBDIV) + 1;
     const sub = i % SUBDIV;
     const subMark = ["1", "e", "&", "a"][sub]!;
+    const hit = art === "D" || art === "U" || art === "X";
+    const led: LedLevel =
+      art === "rest" ? "off" : hit ? "lit" : "dim"; /* hold */
     return (
       <button
         type="button"
-        className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""} ${rhyKind === "link" ? "rhy-link" : ""} ${rhyKind === "own" ? "rhy-own" : ""} ${rhyKind === "base" ? "rhy-base" : ""}`}
+        className={`pad ${art === "rest" ? "empty" : ""} ${hit ? "hit" : ""} ${rhyKind === "link" ? "rhy-link" : ""} ${rhyKind === "own" ? "rhy-own" : ""} ${rhyKind === "base" ? "rhy-base" : ""}`}
         onClick={() => onPaintRhythm(i)}
       >
+        <span className={`pad-led led-${led}`} aria-hidden />
         <span className="pad-ink">
           <span className="pad-sub">
             {beatNo}
@@ -792,12 +868,16 @@ function LaunchPad({
       currentDegree === i
         ? (sheet.tones[selected] ?? defaultTonesForDegree(i))
         : defaultTonesForDegree(i);
+    const used = sheet.degrees.includes(i);
+    const led: LedLevel =
+      currentDegree === i ? "pulse" : used ? "dim" : "off";
     return (
       <button
         type="button"
-        className={`pad tool ${currentDegree === i ? "on" : ""} ${sheet.degrees.includes(i) ? "used" : ""}`}
+        className={`pad tool ${currentDegree === i ? "on" : ""} ${used ? "used" : ""}`}
         onClick={() => onPaintDegree(i)}
       >
+        <span className={`pad-led led-${led}`} aria-hidden />
         <span className="pad-ink">
           <span className="pad-label">{meta.roman}</span>
           <span className="pad-roman">
@@ -809,12 +889,14 @@ function LaunchPad({
   }
 
   if (i === 7) {
+    const led: LedLevel = currentDegree === null ? "pulse" : "dim";
     return (
       <button
         type="button"
         className={`pad tool ${currentDegree === null ? "on" : ""}`}
         onClick={() => onPaintDegree(null)}
       >
+        <span className={`pad-led led-${led}`} aria-hidden />
         <span className="pad-ink">
           <span className="pad-label">∅</span>
           <span className="pad-roman"> </span>
@@ -833,6 +915,7 @@ function LaunchPad({
         aria-hidden
         tabIndex={-1}
       >
+        <span className="pad-led led-off" aria-hidden />
         <span className="pad-ink" />
       </button>
     );
@@ -843,6 +926,8 @@ function LaunchPad({
   const label = toneAxisLabel(tones, axis);
   const faces = toneAxisFaces(axis);
   const polarity = toneAxisPolarity(tones, axis);
+  const led: LedLevel =
+    axis.id === "1" ? "dim" : on ? "lit" : "off";
   return (
     <button
       type="button"
@@ -862,6 +947,7 @@ function LaunchPad({
       aria-pressed={on}
       aria-label={label}
     >
+      <span className={`pad-led led-${led}`} aria-hidden />
       <span className="pad-ink">
         <span className="arcana-face">
           <span className="arcana-end maj">{faces.maj}</span>
