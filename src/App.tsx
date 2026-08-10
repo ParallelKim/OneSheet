@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+  type TransitionEvent,
+} from "react";
 import { createInitialSheet, toStrudel, toStrudelChain, type SheetState } from "./sheet";
 import { readSheetFromSearch } from "./shareQuery";
 import { SimpleSheet } from "./SimpleSheet";
@@ -16,6 +24,10 @@ import {
   type StudioState,
 } from "./studioDoc";
 import { getCycleTime } from "./engine";
+
+type Face = "simple" | "studio";
+/** fold → (swap) edge → open → idle */
+type FlipPhase = "idle" | "fold" | "edge" | "open";
 
 function loadSimpleSheet(): SheetState {
   try {
@@ -37,6 +49,21 @@ function loadStudio(): StudioState {
   return createDefaultStudio();
 }
 
+function pathToFace(path: string): Face {
+  return path.startsWith("/studio") ? "studio" : "simple";
+}
+
+function faceToPath(face: Face): string {
+  return face === "studio" ? "/studio" : "/";
+}
+
+function preferReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
 function usePathname(): string {
   const [path, setPath] = useState(() =>
     typeof window !== "undefined" ? window.location.pathname : "/",
@@ -49,8 +76,7 @@ function usePathname(): string {
   return path;
 }
 
-/** 심플↔스튜디오 — 풀 리로드 없이 전환 (문서 캐시로 옛 UI가 뜨는 것 방지) */
-function navigateApp(to: string) {
+function pushPath(to: string) {
   const next = new URL(to, window.location.origin).pathname;
   if (next === window.location.pathname && window.location.search === "") {
     return;
@@ -63,10 +89,12 @@ function ModeChip({
   href,
   label,
   current,
+  onNavigate,
 }: {
   href: string;
   label: string;
   current: string;
+  onNavigate: (href: string) => void;
 }) {
   return (
     <a
@@ -78,7 +106,7 @@ function ModeChip({
           return;
         }
         e.preventDefault();
-        navigateApp(href);
+        onNavigate(href);
       }}
     >
       <span className="chip-v">{label}</span>
@@ -170,43 +198,39 @@ function StudioSlotPad({
   );
 }
 
-/** 심플 `/` — 한 장, ?s= */
-export function SimplePage() {
-  const [sheet, setSheet] = useState<SheetState>(loadSimpleSheet);
-  const onChange = useCallback((next: SheetState) => setSheet(next), []);
-
-  return (
-    <SimpleSheet
-      sheet={sheet}
-      onChange={onChange}
-      syncUrl
-      dock={
-        <div className="studio-rail page-rail" aria-label="page">
-          <div className="studio-rail-top">
-            <ModeChip href="/studio" label="STUDIO" current="SIMPLE" />
-          </div>
-        </div>
-      }
-    />
-  );
-}
-
-/** 스튜디오 `/studio` — 8슬롯 + 체인, ?u= */
-export function StudioPage() {
+/**
+ * 심플↔스튜디오: 도크(슬롯)는 고정, 차트 패널만 X축 플립.
+ * 스튜디오 슬롯 상태는 언마운트하지 않고 유지.
+ */
+export default function App() {
+  const path = usePathname();
+  const [simpleSheet, setSimpleSheet] = useState<SheetState>(loadSimpleSheet);
   const [studio, setStudio] = useState<StudioState>(loadStudio);
+  const [face, setFace] = useState<Face>(() => pathToFace(path));
+  const [flipPhase, setFlipPhase] = useState<FlipPhase>("idle");
+  const [flipDir, setFlipDir] = useState<1 | -1>(1);
   const [sounding, setSounding] = useState<number | null>(null);
+
+  const pendingFaceRef = useRef<Face | null>(null);
   const studioRef = useRef(studio);
   studioRef.current = studio;
+  const flipping = flipPhase !== "idle";
+
+  // 브라우저 뒤로가기 등 — 플립 중이 아니면 페이스 동기화
+  useEffect(() => {
+    if (flipping) return;
+    const next = pathToFace(path);
+    setFace((prev) => (prev === next ? prev : next));
+  }, [path, flipping]);
 
   useEffect(() => {
+    if (face !== "studio") return;
     const id = window.setTimeout(() => syncStudioQuery(studio), 180);
     return () => window.clearTimeout(id);
-  }, [studio]);
+  }, [studio, face]);
 
-  const sheet = activeSheet(studio);
   const order = useMemo(() => filledOrder(studio.slots), [studio.slots]);
 
-  /** 핫스왑 시 인자 sheet를 활성 슬롯에 반영한 뒤 패턴 생성 */
   const patternOf = useCallback((live: SheetState) => {
     const merged = updateActiveSheet(studioRef.current, live);
     if (merged.chain) {
@@ -216,9 +240,8 @@ export function StudioPage() {
     return toStrudel(live);
   }, []);
 
-  // 체인 재생 중 울리는 슬롯 표시
   useEffect(() => {
-    if (!studio.chain || order.length < 2) {
+    if (face !== "studio" || !studio.chain || order.length < 2) {
       setSounding(null);
       return;
     }
@@ -226,72 +249,159 @@ export function StudioPage() {
     const tick = () => {
       const t = getCycleTime();
       if (t != null && order.length > 0) {
-        const idx = order[((Math.floor(t) % order.length) + order.length) % order.length]!;
+        const idx =
+          order[((Math.floor(t) % order.length) + order.length) % order.length]!;
         setSounding((prev) => (prev === idx ? prev : idx));
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [studio.chain, order]);
+  }, [face, studio.chain, order]);
 
-  const onChangeSheet = useCallback((next: SheetState) => {
+  const commitFace = useCallback((next: Face) => {
+    setFace(next);
+    pushPath(faceToPath(next));
+  }, []);
+
+  const navigateWithFlip = useCallback(
+    (href: string) => {
+      const next = pathToFace(href);
+      if (next === face && !flipping) {
+        pushPath(faceToPath(next));
+        return;
+      }
+      if (flipping) return;
+
+      if (preferReducedMotion()) {
+        commitFace(next);
+        return;
+      }
+
+      pendingFaceRef.current = next;
+      setFlipDir(next === "studio" ? 1 : -1);
+      setFlipPhase("fold");
+    },
+    [face, flipping, commitFace],
+  );
+
+  const onFlipTransitionEnd = (e: TransitionEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.propertyName !== "transform") return;
+
+    if (flipPhase === "fold") {
+      const next = pendingFaceRef.current;
+      if (next) commitFace(next);
+      pendingFaceRef.current = null;
+      setFlipPhase("edge");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setFlipPhase("open"));
+      });
+      return;
+    }
+
+    if (flipPhase === "open") {
+      setFlipPhase("idle");
+    }
+  };
+
+  const onChangeSimple = useCallback((next: SheetState) => {
+    setSimpleSheet(next);
+  }, []);
+
+  const onChangeStudioSheet = useCallback((next: SheetState) => {
     setStudio((prev) => updateActiveSheet(prev, next));
   }, []);
 
-  const selectSlot = (index: number) => {
-    setStudio((prev) => setActiveSlot(prev, index));
-  };
+  const panelClass = [
+    "app-flip-panel",
+    flipDir < 0 ? "dir-back" : "dir-fwd",
+    flipPhase === "idle" ? "is-idle" : "",
+    flipPhase === "fold" ? "is-fold" : "",
+    flipPhase === "edge" ? "is-edge" : "",
+    flipPhase === "open" ? "is-open" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  const onClearSlot = (index: number) => {
-    setStudio((prev) => clearSlot(prev, index));
-  };
+  const showStudioDock = face === "studio";
 
   return (
-    <SimpleSheet
-      sheet={sheet}
-      onChange={onChangeSheet}
-      patternOf={patternOf}
-      playbackKey={`${studio.active}:${studio.chain}:${order.join(",")}`}
-      dock={
-        <div className="studio-rail" aria-label="studio slots">
-          <div className="studio-rail-top">
-            <ModeChip href="/" label="SIMPLE" current="STUDIO" />
-            <button
-              type="button"
-              className={`chip studio-chain${studio.chain ? " on" : ""}`}
-              aria-pressed={studio.chain}
-              aria-label="chain"
-              onClick={() =>
-                setStudio((prev) => ({ ...prev, chain: !prev.chain }))
-              }
-            >
-              <span className="chip-v">CHAIN</span>
-            </button>
-          </div>
-          <div className="studio-slots" role="list">
-            {Array.from({ length: STUDIO_SLOT_COUNT }, (_, i) => (
-              <StudioSlotPad
-                key={i}
-                index={i}
-                filled={studio.slots[i] != null}
-                active={studio.active === i}
-                live={sounding === i}
-                mark={studio.slots[i]?.key ?? "·"}
-                onSelect={() => selectSlot(i)}
-                onClear={() => onClearSlot(i)}
-              />
-            ))}
-          </div>
+    <div className="app-shell">
+      <div className="app-flip-stage">
+        <div
+          className={panelClass}
+          onTransitionEnd={onFlipTransitionEnd}
+        >
+          {face === "studio" ? (
+            <SimpleSheet
+              sheet={activeSheet(studio)}
+              onChange={onChangeStudioSheet}
+              patternOf={patternOf}
+              playbackKey={`${studio.active}:${studio.chain}:${order.join(",")}`}
+              className="app-panel"
+            />
+          ) : (
+            <SimpleSheet
+              sheet={simpleSheet}
+              onChange={onChangeSimple}
+              syncUrl
+              className="app-panel"
+            />
+          )}
         </div>
-      }
-    />
-  );
-}
+      </div>
 
-/** pathname 기준 라우트 (풀 리로드 없이 popstate로 갱신) */
-export default function App() {
-  const path = usePathname();
-  if (path.startsWith("/studio")) return <StudioPage key="studio" />;
-  return <SimplePage key="simple" />;
+      <div className="app-dock" aria-hidden={flipping ? true : undefined}>
+        {showStudioDock ? (
+          <div className="studio-rail" aria-label="studio slots">
+            <div className="studio-rail-top">
+              <ModeChip
+                href="/"
+                label="SIMPLE"
+                current="STUDIO"
+                onNavigate={navigateWithFlip}
+              />
+              <button
+                type="button"
+                className={`chip studio-chain${studio.chain ? " on" : ""}`}
+                aria-pressed={studio.chain}
+                aria-label="chain"
+                onClick={() =>
+                  setStudio((prev) => ({ ...prev, chain: !prev.chain }))
+                }
+              >
+                <span className="chip-v">CHAIN</span>
+              </button>
+            </div>
+            <div className="studio-slots" role="list">
+              {Array.from({ length: STUDIO_SLOT_COUNT }, (_, i) => (
+                <StudioSlotPad
+                  key={i}
+                  index={i}
+                  filled={studio.slots[i] != null}
+                  active={studio.active === i}
+                  live={sounding === i}
+                  mark={studio.slots[i]?.key ?? "·"}
+                  onSelect={() => setStudio((prev) => setActiveSlot(prev, i))}
+                  onClear={() => setStudio((prev) => clearSlot(prev, i))}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="studio-rail page-rail" aria-label="page">
+            <div className="studio-rail-top">
+              <ModeChip
+                href="/studio"
+                label="STUDIO"
+                current="SIMPLE"
+                onNavigate={navigateWithFlip}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
