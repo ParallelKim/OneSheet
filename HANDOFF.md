@@ -47,6 +47,12 @@
 - [ ] 래치 + 패드 재매핑 시제품 (A+B+C)
 - [ ] (선택) 스캔 펄스 D
 
+### 햅틱 (조사)
+
+- **Android:** `navigator.vibrate`로 디텐트/래치 가능 (제스처 안, 짧은 펄스).
+- **iOS:** Vibration API **없음** (WebKit Oppose). 스위치 트릭은 비표준·깨지기 쉬움 → 기본 의존 X.
+- 본체는 시각 전환. 햅틱 = progressive. 상세: `docs/transition-vocabulary.md` § 햅틱.
+
 ---
 
 ## 기본값
