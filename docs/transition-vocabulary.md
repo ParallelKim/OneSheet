@@ -146,7 +146,7 @@ OneSheet는 **한 대의 물리 기계**다. Pocket Operator처럼 **격자와 �
 
 ## 모드 전환 트랜지션 초안 (채택 방향)
 
-목표: **같은 기계가 뱅크를 바꾼다.** 레이아웃은 不动, 인지 변화는 불과 잉크로.
+목표: **같은 기계가 뱅크를 바꾼다.** 레이아웃은 고정, 인지 변화는 불과 잉크로.
 
 ### A. Transport 래치 (주 신호)
 
@@ -192,78 +192,68 @@ OneSheet는 **한 대의 물리 기계**다. Pocket Operator처럼 **격자와 �
 | 단계 | 시간 | 토큰 |
 |------|------|------|
 | transport 래치 | ~0.28s | `--dur-armed` |
-| 패드 딤 | ~0.08–0.12s | `--ease-presence` |
-| 잉크·점등 인 | ~0.22s | `--dur-presence` |
-| 브러시 상승 (해당 시) | ~0.28s | `--dur-armed` |
+| 뱅크 즉시 재매핑 | 0 | — |
+| bank-flash 잉크 펄스 | ~0.18s | 1회 |
 | 스캔 펄스 (선택) | ~0.15s | 1회 |
 
 소리: 모드 전환은 **뮤트하지 않는다**. 재생 중에도 뱅크만 바뀌고 루프는 이어짐 (시간과 소리를 나누지 않음).
 
 ---
 
-## 햅틱 (모바일 우선 · 조사 2026-08-10)
+## 햅틱 (모바일 우선 · 채택 2026-08-10)
 
 목표: PO/런치패드처럼 **누름·디텐트·래치**를 손끝으로도 말하게.  
-현재 코드베이스: 햅틱 호출 **없음**.
+구현: `src/haptic.ts` · App/ParamKnob 와이어. **Android에서 검증됨** (기기 무음이 아닌 **진동/벨** 프로필일 때).
 
 ### 플랫폼 현실
 
 | 환경 | 가능? | 수단 |
 |------|-------|------|
-| **Android** Chrome / Edge / Samsung | ✅ | `navigator.vibrate(ms \| pattern)` — Vibration API |
-| **iOS / iPadOS** (Safari·Chrome 등 전부 WebKit) | ❌ 공식 API 없음 | WebKit **Oppose** Vibration API. 네이티브 Taptic은 웹에 미노출 |
-| Firefox Desktop | ❌ | v129+ 제거 |
-| Firefox Android | △ | API 흔적 있으나 실진동 비활성/부분 |
-| Desktop 대부분 | no-op | 모터 없음 |
+| **Android** Chrome / Edge / Samsung | ✅ | `navigator.vibrate` — 단, **OS가 허용할 때만** 모터가 움직임 |
+| **iOS / iPadOS** | ❌ | Vibration API 없음 (WebKit Oppose). 스위치 트릭 비의존 |
+| Firefox Android | △ | API 있어도 실진동 비활성인 경우 있음 (`true`만 반환) |
+| Desktop | no-op | 모터 없음 (`true`여도 무감) |
 
-제약 (Android에서도):
-- **유저 제스처** 이후 (Chrome). `pointerdown`/`click` 콜스택에서 호출하는 편이 안전.
-- 백그라운드/비가시 탭에서는 억제.
-- 남용 방지 rate limit 가능 → 짧은 펄스만.
+**`vibrate() === true` ≠ 손이 울림.** MDN·SO 공통: Silent / DND / 절전 / 터치·햅틱 피드백 off 이면 Chrome은 성공을 줘도 모터를 안 돌린다.  
+검증 시: 기기 무음 → **진동**으로 두고 `?haptic=1` → `3·500ms`.
 
-### iOS 우회 (비표준 · Fragile)
+기타 제약:
+- **유저 제스처** 안 (`pointerdown` 권장 — 모드 latch).
+- `vibrate(0)` 선취소 **금지** (일부 안드에서 다음 펄스 사망).
+- `prefers-reduced-motion` → 햅틱 off.
+- 펄스 **≥100ms** — 짧은 값은 모터에 안 느껴지는 경우가 많음.
 
-- iOS 18+에서 `<input type="checkbox" switch>` 토글 시 시스템 햅틱이 나는 것을 이용한 **히든 스위치 클릭** 트릭 (일부 npm: `web-haptics` / `haptics` 등).
-- **공식 API 아님.** Apple 패치로 다중 틱이 막히거나(보고: 최근 iOS에서 단일 틱만) 언제든 깨질 수 있음.
-- React concurrent / `await` 뒤 호출은 제스처 체인이 끊겨 실패하기 쉬움 → **동기 pointer 핸들러**에서만.
-- OneSheet 기본 경로로 **의존하지 말 것.** 실험·progressive만.
+### OneSheet 운용 (채택)
 
-### OneSheet에 맞는 운용 (초안)
+햅틱은 **시각 전환의 보조**. 없어도 UX 성립 (progressive). iOS·무음 기기는 시각만.
 
-햅틱은 **시각 전환의 보조**. 없어도 UX가 성립해야 함 (progressive enhancement).
-
-| 인터랙션 | Realm | 햅틱 후보 | 비고 |
-|----------|-------|-----------|------|
-| 패드 프레스 / 칠하기 | — | 아주 짧음 ~8–15ms | 매 타건. 과하면 피로 |
-| KEY ♯/♭ · 프리셋 순회 | 영역 안 | 단일 틱 ~10–20ms | 디텐트 |
-| rest↔hit · ∅ · 메트로 armed | 영역 넘김 | 조금 더 길거나 2연타 `[12, 30, 12]` | 점등과 짝 |
-| 모드 GRID/DEG/RHY 래치 | 뱅크 | 단일 중간 틱 ~20–30ms | transport 래치와 동기 |
-| PLAY/STOP | 영역 넘김 | STOP만 짧게, 또는 생략 | 소리 ADSR이 주 신호 |
+| 인터랙션 | Realm | kind | 패턴 (대략) |
+|----------|-------|------|-------------|
+| 패드 선택·칠하기·브러시 | — | `tick` | 100ms |
+| KEY ♯/♭ · 톤/도수 순회 · 노브 스텝 | 영역 안 | `detent` | 120ms |
+| ∅ · rest↔hit · metro armed · PLAY/STOP | 영역 넘김 | `mark` | `[110,50,140]` |
+| GRID/DEG/RHY · sound MODE | 뱅크 | `latch` | `[120,60,160]` · 모드는 pointerdown |
 | 플레이헤드 매 스텝 | — | ❌ | 루프 중 진동 지옥 |
+| **메트로놈 클릭마다** | — | — | **TODO 보류** (아래) |
 
-구현 스케치 (Android 우선):
+디버그: `?haptic=1` → `1·100ms` / `2·latch` / `3·500ms` / `4·diag`.
 
-```ts
-export function haptic(kind: "tick" | "detent" | "latch" | "mark"): void {
-  if (typeof navigator === "undefined" || !navigator.vibrate) return;
-  const pattern =
-    kind === "tick" ? 10 :
-    kind === "detent" ? 14 :
-    kind === "latch" ? 24 :
-    [12, 28, 12]; // mark = 영역 넘김
-  try { navigator.vibrate(pattern); } catch { /* no-op */ }
-}
-```
+### 메트로놈 클릭 햅틱 — TODO (보류)
 
-- `pointerdown`/`click` **안**에서만. `setTimeout`/`await` 뒤 X.
-- `prefers-reduced-motion`이면 햅틱도 끄기 (접근성 한 축).
-- iOS 스위치 트릭은 **별 플래그/실험** — 기본 off.
+아이디어: CLICK on + 재생 중일 때 **박마다** 짧은 틱 → 귀·손 메트로.
+
+왜 지금 안 넣나:
+- 클릭 소리는 Strudel 스케줄, UI는 RAF `getCyclePhase` 근사 — **샘플 정확 싱크 어려움**.
+- 고 BPM에서 레이트리밋·피로·무음 기기와 겹침.
+- 후보(나중에): 플레이헤드 슬롯 경계에서 `tick` (시각 커서와 같은 위상). 오디오 콜백 훅은 없음.
+
+→ **보류.** 필요해지면 별 이슈로 시제품.
 
 ### 결론
 
-- **줄 수 있다 — Android에서.** 모바일 우선이어도 iOS는 공식 경로가 없어 **시각(점등·래치)이 본체**, 햅틱은 Android 보너스.
-- 네이티브 랩(Capacitor 등) 없이는 iOS Taptic **신뢰 불가**. SPA 유지 전제면 Vibration 의존 금지.
-- 영역 안 = 약한 틱, 영역 넘김/모드 래치 = 조금 분명 — 시각 realm 규칙과 동일 문법.
+- Android + 진동 허용 OS = **기획대로 성공**.
+- iOS·무음 = 의도된 no-op. 시각(점등·래치·고정 슬롯)이 본체.
+- 영역 안 = detent, 영역 넘김/뱅크 = mark/latch — realm 문법과 동일.
 
 ---
 
@@ -284,11 +274,8 @@ export function haptic(kind: "tick" | "detent" | "latch" | "mark"): void {
 - [x] 우선 후보 적용: 메트로 점등 · 리듬 hit 점등 · 슬롯 채움/비움 · PLAY/STOP 모프
 - [x] KEY: 반음 키 단위 + 슬롯머신 롤
 - [x] **섀시 정책** 문서화 — 모드 = 같은 16키 뱅크 (PO)
-- [x] 모드 전환 초안: 래치 + LED 재매핑 (❌ Y-flip/와이프)
-- [x] 햅틱 조사 — Android `vibrate` / iOS 공식 불가 · progressive
-- [x] 모드 전환 A+B+C 시제품 — **고정 16키 DOM** · 즉시 뱅크 · 잉크 펄스 · rhy 높이 예약
-  - ❌ 딜레이 딤/전체 그리드 페이드 · 모드별 패드 언마운트 (버벅임·다른 화면 감각)
+- [x] 모드 전환 — **고정 16키 DOM** · 즉시 뱅크 · 잉크 펄스 · rhy 높이 예약
+- [x] 햅틱 채택·검증 — Android 진동 프로필 (`src/haptic.ts`)
 - [ ] (선택) D 스캔 펄스 강약
 - [ ] 프리셋 순회(영역 안) 약한 펄 — 영역 넘김과 차별
-- [x] 햅틱 적용: 모드 래치 · 버튼 · 노브 디텐트 (`src/haptic.ts`)
-- [x] 햅틱 강도 상향 (≥~30ms) + kind별 레이트리밋 — 짧은 펄스는 안 느껴짐
+- [ ] **메트로놈 박 햅틱** — 보류 (오디오–UI 싱크·고BPM 피로). 후보: RAF 플레이헤드 경계

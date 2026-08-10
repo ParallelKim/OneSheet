@@ -1,11 +1,11 @@
 /**
- * Mobile haptic — progressive enhancement.
- * Android: navigator.vibrate. iOS: no official API → no-op.
- * Call only from user-gesture handlers (pointer/click/key).
+ * Mobile haptic — progressive enhancement (채택).
+ * Android: navigator.vibrate. Verified when device is NOT silent
+ * (Silent/DND/power-save → API may return true with no motor).
+ * iOS: no official API → no-op.
+ * Call from user-gesture handlers (pointer/click/key).
  *
- * Pulses are ≥100ms — short values are often imperceptible on phone motors.
- * Do NOT call vibrate(0) before a pattern: on some Android builds that cancels
- * the subsequent pulse.
+ * Pulses ≥100ms. Do NOT call vibrate(0) before a pattern.
  */
 
 export type HapticKind = "tick" | "detent" | "latch" | "mark";

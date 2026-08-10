@@ -31,8 +31,8 @@
 ### 기계 섀시 (서비스 기본 정책)
 
 **PO식:** 4×4·LCD·transport는 **고정**. 모드(GRID/DEG/RHY)는 같은 키의 **뱅크** — 레이아웃이 바뀌는 화면 전환이 아님.  
-모드 피드백 초안: transport **래치 점등** + 패드 **LED/잉크 재매핑** (딤→페이드). ❌ Y-flip / 와이프 / 그리드 재배치.  
-상세: `docs/transition-vocabulary.md` § 모드 전환 트랜지션 초안.
+모드 피드백: transport **래치** + **고정 16키**에서 라벨/점등만 즉시 갱신. ❌ Y-flip / 와이프 / 그리드 재배치 / 딜레이 딤.  
+상세: `docs/transition-vocabulary.md`.
 
 적용됨 (우선 후보):
 - 메트로 armed → 점등 (`--dur-armed` + 추 `--point`)
@@ -42,19 +42,21 @@
 - KEY ♭/♯ → 반음 키 단위 순회 + 슬롯머신 롤 (표시 슬롯 **고정폭**)
 - piano 사운드폰트도 워밍 (동시 다성 still-loading 스킵 완화)
   - piano는 보이스 스택(쉼표@ 버그 회피) + `gm_piano:1` + 모드 진입 시 워밍
+- **햅틱 (Android)** — tick/detent/latch/mark. 기기 무음이 아닌 **진동**일 때 검증됨
 
 아직 (모드):
-- [x] 고정 16키 DOM + 즉시 뱅크 전환 (딜레이 딤 제거 — 버벅임 원인)
+- [x] 고정 16키 DOM + 즉시 뱅크 전환
 - [x] rhy-slot 높이 예약 (패드 리플로우 금지)
 - [ ] (선택) 스캔 펄스 D
 
 ### 햅틱
 
-- **Android:** `navigator.vibrate` (펄스 ≥~30ms — 짧은 값은 모터에 안 느껴짐).
-- **iOS:** 공식 API 없음 → no-op.
-- **적용:** `src/haptic.ts` — tick/detent/latch/mark ≥100ms. `vibrate(0)` 취소 제거(일부 안드에서 후속 펄스 죽임).
-- **디버그:** URL `?haptic=1` → `1·100ms` / `2·latch` / `3·500ms` / `4·diag` (pointerdown).
-- **주의:** `api-ok`인데 손이 안 울리면 Chrome이 true를 줘도 **OS/OEM이 웹 진동을 막는 경우**가 많음 (절전·진동 off·일부 삼성 등).
+- **상태: 채택·검증됨** (2026-08-10). 무음→진동으로 바꾸면 동작.
+- **Android:** `src/haptic.ts` — ≥100ms, kind별 갭, 모드 latch는 `pointerdown`. `vibrate(0)` 선취소 없음.
+- **iOS:** no-op (공식 API 없음).
+- **`true`인데 무감:** Silent / DND / 절전 / 터치 햅틱 off — 코드 버그 아님 ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/vibrate)).
+- **디버그:** `?haptic=1`
+- **TODO (보류):** 메트로놈 **박마다** 진동 — Strudel 오디오와 샘플 싱크 어려움. 후보로 RAF 플레이헤드 경계만 적어 둠. 상세: `docs/transition-vocabulary.md` § 메트로놈 클릭 햅틱.
 
 ---
 
