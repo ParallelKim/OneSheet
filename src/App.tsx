@@ -26,7 +26,7 @@ import {
 import { getCycleTime } from "./engine";
 
 type Face = "simple" | "studio";
-/** fold → (swap) edge → open → idle */
+/** fold → (swap) edge → open → idle — 하단 도크 Y축 회전문 */
 type FlipPhase = "idle" | "fold" | "edge" | "open";
 
 function loadSimpleSheet(): SheetState {
@@ -198,9 +198,76 @@ function StudioSlotPad({
   );
 }
 
+function StudioDock({
+  studio,
+  sounding,
+  onNavigate,
+  onToggleChain,
+  onSelectSlot,
+  onClearSlot,
+}: {
+  studio: StudioState;
+  sounding: number | null;
+  onNavigate: (href: string) => void;
+  onToggleChain: () => void;
+  onSelectSlot: (index: number) => void;
+  onClearSlot: (index: number) => void;
+}) {
+  return (
+    <div className="studio-rail" aria-label="studio slots">
+      <div className="studio-rail-top">
+        <ModeChip
+          href="/"
+          label="SIMPLE"
+          current="STUDIO"
+          onNavigate={onNavigate}
+        />
+        <button
+          type="button"
+          className={`chip studio-chain${studio.chain ? " on" : ""}`}
+          aria-pressed={studio.chain}
+          aria-label="chain"
+          onClick={onToggleChain}
+        >
+          <span className="chip-v">CHAIN</span>
+        </button>
+      </div>
+      <div className="studio-slots" role="list">
+        {Array.from({ length: STUDIO_SLOT_COUNT }, (_, i) => (
+          <StudioSlotPad
+            key={i}
+            index={i}
+            filled={studio.slots[i] != null}
+            active={studio.active === i}
+            live={sounding === i}
+            mark={studio.slots[i]?.key ?? "·"}
+            onSelect={() => onSelectSlot(i)}
+            onClear={() => onClearSlot(i)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SimpleDock({ onNavigate }: { onNavigate: (href: string) => void }) {
+  return (
+    <div className="studio-rail page-rail" aria-label="page">
+      <div className="studio-rail-top">
+        <ModeChip
+          href="/studio"
+          label="STUDIO"
+          current="SIMPLE"
+          onNavigate={onNavigate}
+        />
+      </div>
+    </div>
+  );
+}
+
 /**
- * 심플↔스튜디오: 도크(슬롯)는 고정, 차트 패널만 X축 플립.
- * 스튜디오 슬롯 상태는 언마운트하지 않고 유지.
+ * 차트는 고정. 하단 도크만 세로축(rotateY) 회전문 —
+ * SIMPLE 면 ↔ STUDIO 슬롯 면.
  */
 export default function App() {
   const path = usePathname();
@@ -216,7 +283,6 @@ export default function App() {
   studioRef.current = studio;
   const flipping = flipPhase !== "idle";
 
-  // 브라우저 뒤로가기 등 — 플립 중이 아니면 페이스 동기화
   useEffect(() => {
     if (flipping) return;
     const next = pathToFace(path);
@@ -313,8 +379,8 @@ export default function App() {
     setStudio((prev) => updateActiveSheet(prev, next));
   }, []);
 
-  const panelClass = [
-    "app-flip-panel",
+  const turnClass = [
+    "dock-turntable",
     flipDir < 0 ? "dir-back" : "dir-fwd",
     flipPhase === "idle" ? "is-idle" : "",
     flipPhase === "fold" ? "is-fold" : "",
@@ -324,83 +390,51 @@ export default function App() {
     .filter(Boolean)
     .join(" ");
 
-  const showStudioDock = face === "studio";
-
   return (
     <div className="app-shell">
-      <div className="app-flip-stage">
-        <div
-          className={panelClass}
-          onTransitionEnd={onFlipTransitionEnd}
-        >
-          {face === "studio" ? (
-            <SimpleSheet
-              sheet={activeSheet(studio)}
-              onChange={onChangeStudioSheet}
-              patternOf={patternOf}
-              playbackKey={`${studio.active}:${studio.chain}:${order.join(",")}`}
-              className="app-panel"
-            />
-          ) : (
-            <SimpleSheet
-              sheet={simpleSheet}
-              onChange={onChangeSimple}
-              syncUrl
-              className="app-panel"
-            />
-          )}
-        </div>
+      <div className="app-chart">
+        {face === "studio" ? (
+          <SimpleSheet
+            sheet={activeSheet(studio)}
+            onChange={onChangeStudioSheet}
+            patternOf={patternOf}
+            playbackKey={`${studio.active}:${studio.chain}:${order.join(",")}`}
+            className="app-panel"
+          />
+        ) : (
+          <SimpleSheet
+            sheet={simpleSheet}
+            onChange={onChangeSimple}
+            syncUrl
+            className="app-panel"
+          />
+        )}
       </div>
 
-      <div className="app-dock" aria-hidden={flipping ? true : undefined}>
-        {showStudioDock ? (
-          <div className="studio-rail" aria-label="studio slots">
-            <div className="studio-rail-top">
-              <ModeChip
-                href="/"
-                label="SIMPLE"
-                current="STUDIO"
+      <div className="app-dock">
+        <div className="dock-turn-stage">
+          <div
+            className={turnClass}
+            onTransitionEnd={onFlipTransitionEnd}
+          >
+            {face === "studio" ? (
+              <StudioDock
+                studio={studio}
+                sounding={sounding}
                 onNavigate={navigateWithFlip}
-              />
-              <button
-                type="button"
-                className={`chip studio-chain${studio.chain ? " on" : ""}`}
-                aria-pressed={studio.chain}
-                aria-label="chain"
-                onClick={() =>
+                onToggleChain={() =>
                   setStudio((prev) => ({ ...prev, chain: !prev.chain }))
                 }
-              >
-                <span className="chip-v">CHAIN</span>
-              </button>
-            </div>
-            <div className="studio-slots" role="list">
-              {Array.from({ length: STUDIO_SLOT_COUNT }, (_, i) => (
-                <StudioSlotPad
-                  key={i}
-                  index={i}
-                  filled={studio.slots[i] != null}
-                  active={studio.active === i}
-                  live={sounding === i}
-                  mark={studio.slots[i]?.key ?? "·"}
-                  onSelect={() => setStudio((prev) => setActiveSlot(prev, i))}
-                  onClear={() => setStudio((prev) => clearSlot(prev, i))}
-                />
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="studio-rail page-rail" aria-label="page">
-            <div className="studio-rail-top">
-              <ModeChip
-                href="/studio"
-                label="STUDIO"
-                current="SIMPLE"
-                onNavigate={navigateWithFlip}
+                onSelectSlot={(i) =>
+                  setStudio((prev) => setActiveSlot(prev, i))
+                }
+                onClearSlot={(i) => setStudio((prev) => clearSlot(prev, i))}
               />
-            </div>
+            ) : (
+              <SimpleDock onNavigate={navigateWithFlip} />
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
