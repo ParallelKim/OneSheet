@@ -125,10 +125,10 @@ button {
 
 /* 하단 도크 회전문 (세로축 = CSS rotateY) */
 .app-dock {
-  --dock-pad: 8px;
-  --dock-gap: 6px;
-  --dock-chip-h: 2.55rem;
-  --dock-slot: 2.55rem;
+  --dock-pad: 10px;
+  --dock-gap: 8px;
+  --dock-chip-h: 3rem;
+  --dock-slot: 3rem;
   flex-shrink: 0;
   margin: 0 12px;
   height: calc(
@@ -1183,7 +1183,12 @@ button {
   color: inherit;
   height: var(--dock-chip-h);
   min-height: var(--dock-chip-h);
+  min-width: 7rem;
+  padding: 0 1.15rem;
   box-sizing: border-box;
+  justify-content: center;
+  --chip-type: 0.84rem;
+  font-size: var(--chip-type);
 }
 
 .mode-chip:active {
@@ -1202,10 +1207,12 @@ button {
 
 .page-rail {
   justify-content: center;
+  align-items: center;
 }
 
 .page-rail .studio-rail-top {
-  justify-content: flex-start;
+  width: 100%;
+  justify-content: center;
 }
 
 .studio-rail-top {
@@ -1221,7 +1228,12 @@ button {
   flex: 0 0 auto;
   height: var(--dock-chip-h);
   min-height: var(--dock-chip-h);
+  min-width: 5.5rem;
+  padding: 0 1rem;
   box-sizing: border-box;
+  justify-content: center;
+  --chip-type: 0.84rem;
+  font-size: var(--chip-type);
 }
 
 .studio-chain.on {
