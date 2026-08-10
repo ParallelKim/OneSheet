@@ -37,10 +37,26 @@ function loadStudio(): StudioState {
   return createDefaultStudio();
 }
 
-function ModeLink({ href, label }: { href: string; label: string }) {
+function ModeChip({
+  href,
+  label,
+  current,
+}: {
+  href: string;
+  label: string;
+  /** 지금 있는 쪽 라벨 (표시용) */
+  current: string;
+}) {
   return (
-    <a className="mode-link" href={href}>
-      {label}
+    <a
+      className="chip mode-chip"
+      href={href}
+      aria-label={`${current} — go to ${label}`}
+    >
+      <span className="chip-pair">
+        <span className="chip-k">PAGE</span>
+        <span className="chip-v">{label}</span>
+      </span>
     </a>
   );
 }
@@ -55,7 +71,13 @@ export function SimplePage() {
       sheet={sheet}
       onChange={onChange}
       syncUrl
-      nav={<ModeLink href="/studio" label="STUDIO" />}
+      dock={
+        <div className="studio-rail page-rail" aria-label="page">
+          <div className="studio-rail-top">
+            <ModeChip href="/studio" label="STUDIO" current="SIMPLE" />
+          </div>
+        </div>
+      }
     />
   );
 }
@@ -122,10 +144,10 @@ export function StudioPage() {
       onChange={onChangeSheet}
       patternOf={patternOf}
       playbackKey={`${studio.active}:${studio.chain}:${order.join(",")}`}
-      nav={<ModeLink href="/" label="SIMPLE" />}
       dock={
         <div className="studio-rail" aria-label="studio slots">
           <div className="studio-rail-top">
+            <ModeChip href="/" label="SIMPLE" current="STUDIO" />
             <button
               type="button"
               className={`chip studio-chain${studio.chain ? " on" : ""}`}
