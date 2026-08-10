@@ -138,6 +138,10 @@ export function SimpleSheet({
   // 엔진은 마운트 직후 백그라운드 기동 (Play를 기다리지 않음)
   useEffect(() => {
     void initStrudelEngine().catch((err) => console.warn("engine boot", err));
+    return () => {
+      hushStrudel();
+      playingRef.current = false;
+    };
   }, []);
 
   // 첫 포인터에서 오디오 unlock (iOS: 제스처 안에서 동기)

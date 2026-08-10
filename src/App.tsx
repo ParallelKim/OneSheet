@@ -37,6 +37,28 @@ function loadStudio(): StudioState {
   return createDefaultStudio();
 }
 
+function usePathname(): string {
+  const [path, setPath] = useState(() =>
+    typeof window !== "undefined" ? window.location.pathname : "/",
+  );
+  useEffect(() => {
+    const sync = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+  return path;
+}
+
+/** 심플↔스튜디오 — 풀 리로드 없이 전환 (문서 캐시로 옛 UI가 뜨는 것 방지) */
+function navigateApp(to: string) {
+  const next = new URL(to, window.location.origin).pathname;
+  if (next === window.location.pathname && window.location.search === "") {
+    return;
+  }
+  history.pushState(history.state, "", next);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
 function ModeChip({
   href,
   label,
@@ -51,6 +73,13 @@ function ModeChip({
       className="chip mode-chip"
       href={href}
       aria-label={`${current}, switch to ${label}`}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+          return;
+        }
+        e.preventDefault();
+        navigateApp(href);
+      }}
     >
       <span className="chip-v">{label}</span>
     </a>
@@ -260,9 +289,9 @@ export function StudioPage() {
   );
 }
 
-/** pathname 기준 라우트 (리액트 라우터 없이) */
+/** pathname 기준 라우트 (풀 리로드 없이 popstate로 갱신) */
 export default function App() {
-  const path = typeof window !== "undefined" ? window.location.pathname : "/";
-  if (path.startsWith("/studio")) return <StudioPage />;
-  return <SimplePage />;
+  const path = usePathname();
+  if (path.startsWith("/studio")) return <StudioPage key="studio" />;
+  return <SimplePage key="simple" />;
 }
