@@ -42,7 +42,7 @@
 - KEY ♭/♯ → 반음 키 단위 순회 + 슬롯머신 롤 (표시 슬롯 **고정폭**)
 - piano 사운드폰트도 워밍 (동시 다성 still-loading 스킵 완화)
   - piano는 보이스 스택(쉼표@ 버그 회피) + `gm_piano:1` + 모드 진입 시 워밍
-- **햅틱 (Android)** — tick/detent/latch/mark. 기기 무음이 아닌 **진동**일 때 검증됨
+- **햅틱 (Android, 보조)** — tick/detent/latch/mark. 핵심 UX 아님; 진동 프로필에서 검증
 
 아직 (모드):
 - [x] 고정 16키 DOM + 즉시 뱅크 전환
@@ -51,12 +51,13 @@
 
 ### 햅틱
 
+- **역할: 보조만 · 핵심 아님.** 기기 설정(무음/DND/절전/터치 햅틱 off)·iOS에 따라 **경고 없이** 안 울릴 수 있음. UX는 시각·소리만으로 성립해야 함.
 - **상태: 채택·검증됨** (2026-08-10). 무음→진동으로 바꾸면 동작.
 - **Android:** `src/haptic.ts` — ≥100ms, kind별 갭, 모드 latch는 `pointerdown`. `vibrate(0)` 선취소 없음.
 - **iOS:** no-op (공식 API 없음).
 - **`true`인데 무감:** Silent / DND / 절전 / 터치 햅틱 off — 코드 버그 아님 ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/vibrate)).
 - **디버그:** `?haptic=1`
-- **TODO (보류):** 메트로놈 **박마다** 진동 — Strudel 오디오와 샘플 싱크 어려움. 후보로 RAF 플레이헤드 경계만 적어 둠. 상세: `docs/transition-vocabulary.md` § 메트로놈 클릭 햅틱.
+- **TODO (보류):** 메트로놈 **박마다** 진동 — Strudel 오디오와 샘플 싱크 어려움. 후보로 RAF 플레이헤드 경계만 적어 둠. 상세: `docs/transition-vocabulary.md` § 햅틱.
 
 ---
 

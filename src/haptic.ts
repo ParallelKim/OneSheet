@@ -1,10 +1,10 @@
 /**
- * Mobile haptic — progressive enhancement (채택).
- * Android: navigator.vibrate. Verified when device is NOT silent
- * (Silent/DND/power-save → API may return true with no motor).
- * iOS: no official API → no-op.
- * Call from user-gesture handlers (pointer/click/key).
+ * Mobile haptic — auxiliary only, never core UX (채택).
+ * Device settings (silent/DND/power-save/touch-haptic off) or iOS may
+ * kill the motor with no warning; vibrate() can still return true.
+ * Visual + audio must carry the interaction alone.
  *
+ * Android: navigator.vibrate when OS allows. Call from gesture handlers.
  * Pulses ≥100ms. Do NOT call vibrate(0) before a pattern.
  */
 
