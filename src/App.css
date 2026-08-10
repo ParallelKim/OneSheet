@@ -230,35 +230,35 @@ button {
   flex-shrink: 0;
 }
 
-/* 리듬 악세서리 — 섀시 예약 슬롯 (상승·래치). 새 페이지 아님 */
+/* 리듬 악세서리 — 높이 예약 고정(패드 리플로우 금지). 열림은 점등만 */
 .rhy-slot {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
+  --rhy-slot-h: 4.85rem;
+  height: var(--rhy-slot-h);
   margin: 0;
   flex-shrink: 0;
+  overflow: hidden;
+  opacity: 0;
   pointer-events: none;
-  transition:
-    grid-template-rows var(--dur-armed) var(--ease-presence),
-    opacity var(--dur-armed) var(--ease-presence);
+  transition: opacity var(--dur-armed) var(--ease-presence);
 }
 
 .rhy-slot.is-open {
-  grid-template-rows: 1fr;
   opacity: 1;
   pointer-events: auto;
 }
 
 .rhy-slot-inner {
-  min-height: 0;
-  overflow: hidden;
+  height: var(--rhy-slot-h);
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 6px;
+  box-sizing: border-box;
 }
 
 .rhy-slot .rhy-meta {
   margin-top: 0;
+  margin-bottom: 0;
 }
 
 .rhy-slot .brush-row {
@@ -818,24 +818,36 @@ button {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
-/* 현재 마디 = 한 행 (약한 위계) */
+/* 현재 마디 = 한 행 (약한 위계) — 차트 렌즈에서만 점등 */
 .pad-ind-bar {
   grid-column: 1 / -1;
   grid-row: calc(var(--mark-bar) + 1);
   background: rgba(255, 255, 255, 0.05);
   box-shadow: none;
+  opacity: 0;
+  transition: opacity var(--dur-presence) var(--ease-presence);
+}
+
+.pad-ind-bar.is-on {
+  opacity: 1;
 }
 
 /*
  * 재생 링: 정사각 inset 레이어 좌표.
  * overflow:hidden → wrap 고스트(±4열)만 클립. 본 링은 레이어 안에 들어감.
  * 바깥 glow 금지 — app/레이어에 잘림.
+ * 렌즈별 오버레이는 상시 마운트, .is-on 으로만 점등.
  */
 .pad-play {
   z-index: 2;
   pointer-events: none;
-  opacity: var(--play-on);
+  opacity: 0;
   overflow: hidden;
+  transition: opacity var(--dur-presence) var(--ease-presence);
+}
+
+.pad-play.is-on {
+  opacity: var(--play-on);
 }
 
 .pad-play-orb {
@@ -889,19 +901,24 @@ button {
   gap: var(--pad-gap);
 }
 
-/* 모드 뱅크 재매핑 — 같은 16키, 불·잉크만 (❌ flip/와이프) */
-.pad-stage.remap-out .pad-grid {
-  opacity: 0.16;
-  transition: opacity 0.1s var(--ease-presence);
+/* 같은 키 위 잉크만 — 뱅크 전환 시 짧게 밝아짐 (격자 不动) */
+.pad-ink {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 0;
 }
 
-.pad-stage.remap-in .pad-grid {
-  animation: pad-remap-in 0.24s var(--ease-presence) both;
+.pad-stage.bank-flash .pad-ink {
+  animation: pad-ink-flash 0.18s var(--ease-presence) both;
 }
 
-@keyframes pad-remap-in {
+@keyframes pad-ink-flash {
   from {
-    opacity: 0.16;
+    opacity: 0.4;
   }
   to {
     opacity: 1;
@@ -981,6 +998,11 @@ button {
 .pad.tone {
   justify-content: center;
   overflow: hidden;
+}
+
+.pad .pad-ink {
+  /* arcana / multi-line ink stays centered in the fixed key */
+  flex: 1 1 auto;
 }
 
 .pad.tone .pad-label {
@@ -1101,32 +1123,19 @@ button {
   .brush-hint,
   .tr-metro-bob,
   .tr-transport-icon .tr-glyph,
-  .rhy-slot {
+  .rhy-slot,
+  .pad-play,
+  .pad-ind-bar {
     transition: none !important;
   }
 
   .tr-btn .spin,
-  .pad-stage.remap-in .pad-grid {
+  .pad-stage.bank-flash .pad-ink {
     animation: none !important;
-  }
-
-  .pad-stage.remap-out .pad-grid,
-  .pad-stage.remap-in .pad-grid {
-    opacity: 1 !important;
   }
 
   .key-reel-track,
   .key-reel-track.is-moving {
     transition: none !important;
-  }
-
-  .rhy-slot {
-    grid-template-rows: 0fr;
-    opacity: 0;
-  }
-
-  .rhy-slot.is-open {
-    grid-template-rows: 1fr;
-    opacity: 1;
   }
 }
