@@ -1,0 +1,134 @@
+/* App shell + dock turntable (simple↔studio) */
+
+/* 심플↔스튜디오 셸 — 차트 고정, 하단 도크만 X축 플립(가로 패널) */
+.app-shell {
+  width: 100%;
+  max-width: 390px;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0 auto;
+  padding:
+    calc(24px + env(safe-area-inset-top, 0px))
+    0
+    calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.app-chart {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app.app-panel {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* 하단 도크 플립 (가로축 = CSS rotateX, 세로 중앙 피벗)
+ * 가로형 패널이라 Y(좌우 문짝)보다 X(상하 접힘)가 자연스럽다.
+ * 플립 면은 캐비티보다 작아 처음부터 검정 테가 보여 회전을 예고한다.
+ * 레이어: 캐비티(z0, 2D 검정) → 스테이지(z1, perspective만) → 플립 면(z2, flat).
+ * 검정·preserve-3d를 같은 노드에 두면 회전면이 배경 평면 뒤로 뚫린다. */
+.app-dock {
+  --dock-inset: 5px;
+  --dock-pad: 8px;
+  --dock-gap: 8px;
+  --dock-chip-h: 3rem;
+  --dock-slot: 3rem;
+  position: relative;
+  flex-shrink: 0;
+  margin: 0 12px;
+  height: calc(
+    var(--dock-inset) * 2 + var(--dock-pad) * 2 + var(--dock-chip-h) +
+      var(--dock-gap) + var(--dock-slot)
+  );
+  padding: var(--dock-inset);
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-box);
+  background: transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -3px 10px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* 2D 우물 — 3D 컨텍스트에 참여하지 않음 */
+.app-dock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: #000;
+  pointer-events: none;
+}
+
+.dock-turn-stage {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  perspective: 720px;
+  perspective-origin: 50% 50%;
+  /* preserve-3d / 배경 금지 — 자식 rotateX만으로 충분 */
+  transform-style: flat;
+  background: transparent;
+}
+
+.dock-turntable {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  transform-origin: 50% 50%;
+  transform: rotateX(0deg);
+  transform-style: flat;
+  transition: transform var(--dur-flip) var(--ease-flip);
+  will-change: transform;
+  backface-visibility: hidden;
+  background: var(--fill);
+  border-radius: calc(var(--radius-box) - var(--dock-inset) - 1px);
+  /* 슬롯·칩은 이 면에 납작히 붙는다 */
+  isolation: isolate;
+}
+
+.dock-turntable .studio-rail {
+  position: relative;
+  z-index: 1;
+}
+
+.dock-turntable.is-fold {
+  transform: rotateX(90deg);
+}
+
+.dock-turntable.is-edge {
+  transition: none;
+  transform: rotateX(-90deg);
+}
+
+.dock-turntable.is-open,
+.dock-turntable.is-idle {
+  transform: rotateX(0deg);
+}
+
+.dock-turntable.dir-back.is-fold {
+  transform: rotateX(-90deg);
+}
+
+.dock-turntable.dir-back.is-edge {
+  transition: none;
+  transform: rotateX(90deg);
+}

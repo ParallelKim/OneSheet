@@ -1,5 +1,6 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { haptic } from './haptic'
+import './ParamKnob.css'
 
 type ParamKnobProps = {
   label: string

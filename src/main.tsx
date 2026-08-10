@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import "@fontsource/geist-pixel/400.css";
 import "pretendard/dist/web/static/Pretendard-Regular.css";
 import "pretendard/dist/web/static/Pretendard-Bold.css";
+import "./styles/tokens.css";
+import "./styles/reset.css";
+import "./styles/a11y.css";
 import App from "./App.tsx";
 import { initFirebaseAnalytics } from "./firebase";
 

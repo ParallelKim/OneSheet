@@ -1,0 +1,89 @@
+/* Rhythm accessory slot — reserved height, brush row chrome lives with transport twin */
+
+.rhy-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 12px;
+  min-height: 22px;
+  flex-shrink: 0;
+}
+
+/* 리듬 악세서리 — 높이 예약 고정(패드 리플로우 금지). 열림은 점등만 */
+.rhy-slot {
+  --rhy-slot-h: 4.85rem;
+  height: var(--rhy-slot-h);
+  margin: 0;
+  flex-shrink: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-armed) var(--ease-presence);
+}
+
+.rhy-slot.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.rhy-slot-inner {
+  height: var(--rhy-slot-h);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+.rhy-slot .rhy-meta {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.rhy-slot .brush-row {
+  margin-bottom: 0;
+}
+
+.rhy-tag {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.rhy-tag-base {
+  color: var(--fg);
+}
+
+.rhy-tag-own {
+  color: var(--fg);
+}
+
+.rhy-tag-link {
+  color: var(--muted);
+}
+
+.rhy-hint {
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.rhy-reset {
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--fill);
+  color: var(--fg);
+}
+
+.rhy-reset:active {
+  transform: scale(0.97);
+}
