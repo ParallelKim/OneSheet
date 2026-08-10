@@ -50,6 +50,7 @@ import {
 } from "./engine";
 import { KeyReel } from "./KeyReel";
 import { ParamKnob } from "./ParamKnob";
+import { haptic, hapticDiag, hapticRaw } from "./haptic";
 import "./App.css";
 
 type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
@@ -108,6 +109,13 @@ export function SimpleSheet({
     dir: 1,
     gen: 0,
   });
+  /** 모드 전환 시 같은 키 위 잉크만 짧게 펄스 */
+  const [bankFlash, setBankFlash] = useState(false);
+  const bankFlashTimerRef = useRef<number | null>(null);
+  const hapticDebug =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("haptic");
+  const [hapticLog, setHapticLog] = useState("");
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
   const patternOfRef = useRef(patternOf);
@@ -122,6 +130,14 @@ export function SimpleSheet({
   useEffect(() => {
     patternOfRef.current = patternOf;
   }, [patternOf]);
+
+  useEffect(() => {
+    return () => {
+      if (bankFlashTimerRef.current != null) {
+        window.clearTimeout(bankFlashTimerRef.current);
+      }
+    };
+  }, []);
 
   const codeOf = useCallback((s: SheetState) => {
     const custom = patternOfRef.current;
@@ -275,6 +291,7 @@ export function SimpleSheet({
     if (soundMode === "piano") {
       void warmPianoFont().catch(() => undefined);
     }
+    haptic("latch");
     update((prev) => ({ ...prev, soundMode }));
   }, [update]);
 
@@ -283,6 +300,7 @@ export function SimpleSheet({
       update((prev) => {
         const next = shiftKey(prev.key, dir);
         if (next === prev.key) return prev;
+        haptic("detent");
         setKeySpin((s) => ({ dir, gen: s.gen + 1 }));
         return { ...prev, key: next };
       });
@@ -294,6 +312,7 @@ export function SimpleSheet({
     const gate = getPlaybackEpoch();
     // 제스처 콜스택에서 동기 unlock (async 전에)
     unlockAudioOutput();
+    haptic("mark");
 
     if (!isEngineReady()) {
       setEngine("loading");
@@ -337,6 +356,7 @@ export function SimpleSheet({
   }, [codeOf]);
 
   const onStop = useCallback(() => {
+    haptic("mark");
     hushStrudel();
     playingRef.current = false;
     setEngine((e) => (e === "error" ? e : "ready"));
@@ -344,29 +364,59 @@ export function SimpleSheet({
   }, []);
 
   const paintDegree = (degree: number | null) => {
+    const cur = sheetRef.current.degrees[selected] ?? null;
+    if (degree === null) haptic("mark");
+    else if (cur === degree) haptic("detent");
+    else haptic("tick");
     update((prev) => paintDegreeSlot(prev, selected, degree));
   };
 
   const paintTone = (axisId: ToneAxisId) => {
+    const axis = TONE_AXES.find((a) => a.id === axisId);
+    const before = axis
+      ? toneAxisPolarity(sheetRef.current.tones[selected], axis)
+      : "off";
+    const next = paintToneSlot(sheetRef.current, selected, axisId);
+    const after = axis ? toneAxisPolarity(next.tones[selected], axis) : "off";
+    haptic(before !== "off" && after === "off" ? "mark" : "detent");
     update((prev) => paintToneSlot(prev, selected, axisId));
   };
 
   const paintRhythm = (step: number) => {
     const bar = barIndex(selected);
-    update((prev) => {
-      const current = barRhythm(prev, bar)[step] ?? "rest";
-      const nextArt = current === brush ? "rest" : brush;
-      return paintRhythmStep(prev, bar, step, nextArt);
-    });
+    const current = barRhythm(sheetRef.current, bar)[step] ?? "rest";
+    const nextArt = current === brush ? "rest" : brush;
+    haptic(nextArt === "rest" || current === "rest" ? "mark" : "tick");
+    update((prev) => paintRhythmStep(prev, bar, step, nextArt));
   };
 
   const resetRhythmLink = () => {
     const bar = barIndex(selected);
+    haptic("mark");
     update((prev) => clearRhythmOverride(prev, bar));
   };
 
   const selectBar = (bar: number) => {
+    haptic("tick");
     setSelected(bar * BEATS + (selected % BEATS));
+  };
+
+  const switchMode = (next: Mode) => {
+    if (next === mode) return;
+    // 햅틱은 pointerdown에서 (안드 제스처 결합). 여기는 시각만.
+    setMode(next);
+    const reduce =
+      typeof window !== "undefined" &&
+      !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if (reduce) return;
+    if (bankFlashTimerRef.current != null) {
+      window.clearTimeout(bankFlashTimerRef.current);
+    }
+    setBankFlash(true);
+    bankFlashTimerRef.current = window.setTimeout(() => {
+      setBankFlash(false);
+      bankFlashTimerRef.current = null;
+    }, 180);
   };
 
   const playing = engine === "playing";
@@ -420,6 +470,7 @@ export function SimpleSheet({
             max={1}
             step={0.01}
             format={(v) => String(Math.round(v * 100))}
+            hapticBucket={(v) => Math.round(v * 20)}
             onChange={(gain) => update((prev) => ({ ...prev, gain }))}
           />
           <button
@@ -465,6 +516,7 @@ export function SimpleSheet({
                       className={`chord-cell ${on ? "on" : ""} ${d === null ? "empty" : ""}`}
                       onClick={(e) => {
                         e.stopPropagation();
+                        haptic("tick");
                         setSelected(i);
                       }}
                       aria-label={`bar ${bi + 1} beat ${qi + 1}`}
@@ -514,7 +566,10 @@ export function SimpleSheet({
         <button
           type="button"
           className={`tr-btn metro ${sheet.metro ? "on" : ""}`}
-          onClick={() => update((prev) => ({ ...prev, metro: !prev.metro }))}
+          onClick={() => {
+            haptic("mark");
+            update((prev) => ({ ...prev, metro: !prev.metro }));
+          }}
           aria-pressed={sheet.metro}
           aria-label="metronome"
         >
@@ -558,8 +613,12 @@ export function SimpleSheet({
         <button
           type="button"
           className={`tr-btn ${mode === "chart" ? "on" : ""}`}
-          onClick={() => setMode("chart")}
+          onPointerDown={() => {
+            if (mode !== "chart") haptic("latch");
+          }}
+          onClick={() => switchMode("chart")}
           aria-label="chart"
+          aria-pressed={mode === "chart"}
         >
           <span className="tr-icon">▦</span>
           <span className="tr-label">GRID</span>
@@ -567,8 +626,12 @@ export function SimpleSheet({
         <button
           type="button"
           className={`tr-btn ${mode === "degree" ? "on" : ""}`}
-          onClick={() => setMode("degree")}
+          onPointerDown={() => {
+            if (mode !== "degree") haptic("latch");
+          }}
+          onClick={() => switchMode("degree")}
           aria-label="degree"
+          aria-pressed={mode === "degree"}
         >
           <span className="tr-icon">I</span>
           <span className="tr-label">DEG</span>
@@ -576,16 +639,23 @@ export function SimpleSheet({
         <button
           type="button"
           className={`tr-btn ${mode === "rhythm" ? "on" : ""}`}
-          onClick={() => setMode("rhythm")}
+          onPointerDown={() => {
+            if (mode !== "rhythm") haptic("latch");
+          }}
+          onClick={() => switchMode("rhythm")}
           aria-label="rhythm"
+          aria-pressed={mode === "rhythm"}
         >
           <span className="tr-icon">♩♪</span>
           <span className="tr-label">RHY</span>
         </button>
       </nav>
 
-      {mode === "rhythm" && (
-        <>
+      <div
+        className={`rhy-slot ${mode === "rhythm" ? "is-open" : ""}`}
+        aria-hidden={mode !== "rhythm"}
+      >
+        <div className="rhy-slot-inner">
           <div className="rhy-meta" aria-label="rhythm source">
             <span className={`rhy-tag rhy-tag-${rhyKind}`}>
               {rhyKind === "base" && "BASE · BAR 1"}
@@ -597,6 +667,7 @@ export function SimpleSheet({
                 type="button"
                 className="rhy-reset"
                 onClick={resetRhythmLink}
+                tabIndex={mode === "rhythm" ? undefined : -1}
               >
                 USE BASE
               </button>
@@ -611,169 +682,69 @@ export function SimpleSheet({
                 key={a.id}
                 type="button"
                 className={`brush ${brush === a.id ? "on" : ""}`}
-                onClick={() => setBrush(a.id)}
+                tabIndex={mode === "rhythm" ? undefined : -1}
+                onClick={() => {
+                  if (brush === a.id) return;
+                  haptic("tick");
+                  setBrush(a.id);
+                }}
               >
                 <span className="brush-mark">{a.label}</span>
                 <span className="brush-hint">{a.hint}</span>
               </button>
             ))}
           </div>
-        </>
-      )}
+        </div>
+      </div>
 
       <div
         ref={padStageRef}
-        className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode} rhy-${rhyKind}`}
+        className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode} rhy-${rhyKind}${bankFlash ? " bank-flash" : ""}`}
         style={{ "--mark-bar": markBar } as CSSProperties}
       >
         <div className="pad-board" ref={padBoardRef}>
           <div className="pad-back" aria-hidden>
-            {mode === "chart" && <div className="pad-ind pad-ind-bar" />}
+            <div
+              className={`pad-ind pad-ind-bar ${mode === "chart" ? "is-on" : ""}`}
+            />
           </div>
-          {/* 재생 링: main + 행 wrap(prev/next)로 오른쪽↔왼쪽 이어짐 */}
-          {mode === "chart" && (
-            <div className="pad-play" aria-hidden>
-              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-prev" />
-              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-main" />
-              <div className="pad-play-orb pad-play-orb-chart pad-play-orb-next" />
-            </div>
-          )}
-          {mode === "rhythm" && playBar === bar && (
-            <div className="pad-play pad-play-rhythm" aria-hidden>
-              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-prev" />
-              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-main" />
-              <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-next" />
-            </div>
-          )}
+          {/* 재생 링: 오버레이만 점등 — 패드 슬롯과 분리 */}
+          <div
+            className={`pad-play ${mode === "chart" ? "is-on" : ""}`}
+            aria-hidden
+          >
+            <div className="pad-play-orb pad-play-orb-chart pad-play-orb-prev" />
+            <div className="pad-play-orb pad-play-orb-chart pad-play-orb-main" />
+            <div className="pad-play-orb pad-play-orb-chart pad-play-orb-next" />
+          </div>
+          <div
+            className={`pad-play pad-play-rhythm ${mode === "rhythm" && playBar === bar ? "is-on" : ""}`}
+            aria-hidden
+          >
+            <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-prev" />
+            <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-main" />
+            <div className="pad-play-orb pad-play-orb-rhythm pad-play-orb-next" />
+          </div>
           <section className="pad-grid" aria-label={modeLabel(mode)}>
-            {mode === "chart" &&
-              Array.from({ length: SLOTS }, (_, i) => {
-                const degree = sheet.degrees[i] ?? null;
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
-                    onClick={() => setSelected(i)}
-                  >
-                    <span className="pad-sub">{(i % BEATS) + 1}</span>
-                    <span className="pad-label">{slotLabel(sheet.key, degree, sheet.tones[i])}</span>
-                    <span className="pad-roman">{slotRoman(degree)}</span>
-                  </button>
-                );
-              })}
-
-            {mode === "degree" &&
-              Array.from({ length: SLOTS }, (_, i) => {
-                if (i < 7) {
-                  const meta = DEGREE_META[i]!;
-                  const labelTones =
-                    currentDegree === i
-                      ? (sheet.tones[selected] ?? defaultTonesForDegree(i))
-                      : defaultTonesForDegree(i);
-                  return (
-                    <button
-                      key={meta.roman}
-                      type="button"
-                      className={`pad tool ${currentDegree === i ? "on" : ""} ${sheet.degrees.includes(i) ? "used" : ""}`}
-                      onClick={() => paintDegree(i)}
-                    >
-                      <span className="pad-label">{meta.roman}</span>
-                      <span className="pad-roman">
-                        {slotLabel(sheet.key, i, labelTones)}
-                      </span>
-                    </button>
-                  );
-                }
-                if (i === 7) {
-                  return (
-                    <button
-                      key="rest"
-                      type="button"
-                      className={`pad tool ${currentDegree === null ? "on" : ""}`}
-                      onClick={() => paintDegree(null)}
-                    >
-                      <span className="pad-label">∅</span>
-                      <span className="pad-roman"> </span>
-                    </button>
-                  );
-                }
-                const axis = TONE_AXES[i - 8];
-                if (!axis) {
-                  return (
-                    <div
-                      key={`tone-idle-${i}`}
-                      className="pad tone tone-idle"
-                      aria-hidden
-                    />
-                  );
-                }
-                const rootDeg = currentDegree;
-                if (rootDeg === null) {
-                  return (
-                    <div
-                      key={`tone-${axis.id}`}
-                      className="pad tone tone-idle"
-                      aria-hidden
-                    />
-                  );
-                }
-                const tones = sheet.tones[selected];
-                const on = toneAxisOn(tones, axis);
-                const label = toneAxisLabel(tones, axis);
-                const faces = toneAxisFaces(axis);
-                const polarity = toneAxisPolarity(tones, axis);
-                return (
-                  <button
-                    key={`tone-${axis.id}`}
-                    type="button"
-                    className={[
-                      "pad",
-                      "tone",
-                      "arcana",
-                      on ? "on" : "",
-                      axis.id === "1" ? "tone-root" : "",
-                      faces.polar ? "polar" : "mirror",
-                      faces.polar && polarity === "min" ? "reversed" : "",
-                      faces.polar && polarity === "maj" ? "upright" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={() => paintTone(axis.id)}
-                    aria-pressed={on}
-                    aria-label={label}
-                  >
-                    <span className="arcana-face">
-                      <span className="arcana-end maj">{faces.maj}</span>
-                      <span className="arcana-rule" aria-hidden />
-                      <span className="arcana-end min">{faces.min}</span>
-                    </span>
-                  </button>
-                );
-              })}
-
-            {mode === "rhythm" &&
-              Array.from({ length: BAR_STEPS }, (_, step) => {
-                const art = barRhythmRow[step] ?? "rest";
-                const beatNo = Math.floor(step / SUBDIV) + 1;
-                const sub = step % SUBDIV;
-                const subMark = ["1", "e", "&", "a"][sub]!;
-                return (
-                  <button
-                    key={step}
-                    type="button"
-                    className={`pad ${art === "rest" ? "empty" : ""} ${art === "D" || art === "U" || art === "X" ? "hit" : ""} ${rhyKind === "link" ? "rhy-link" : ""} ${rhyKind === "own" ? "rhy-own" : ""} ${rhyKind === "base" ? "rhy-base" : ""}`}
-                    onClick={() => paintRhythm(step)}
-                  >
-                    <span className="pad-sub">
-                      {beatNo}
-                      {subMark}
-                    </span>
-                    <span className="pad-label">{artLabel(art)}</span>
-                    <span className="pad-roman">{artHint(art)}</span>
-                  </button>
-                );
-              })}
+            {Array.from({ length: SLOTS }, (_, i) => (
+              <LaunchPad
+                key={i}
+                index={i}
+                mode={mode}
+                sheet={sheet}
+                selected={selected}
+                currentDegree={currentDegree}
+                barRhythmRow={barRhythmRow}
+                rhyKind={rhyKind}
+                onSelect={() => {
+                  haptic("tick");
+                  setSelected(i);
+                }}
+                onPaintDegree={paintDegree}
+                onPaintTone={paintTone}
+                onPaintRhythm={paintRhythm}
+              />
+            ))}
           </section>
         </div>
       </div>
@@ -781,8 +752,79 @@ export function SimpleSheet({
       {dock ? <div className="app-dock">{dock}</div> : null}
 
       {status ? <p className="status">{status}</p> : null}
+      {hapticDebug ? (
+        <div className="haptic-debug" role="status">
+          <p className="haptic-debug-log">{hapticLog || "press a button below"}</p>
+          <div className="haptic-debug-row">
+            <button
+              type="button"
+              className="haptic-debug-btn"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                const ok = hapticRaw(100);
+                setHapticLog(
+                  `BTN1 raw100 → ${ok ? "api-ok" : "api-fail"} · ${formatHapticDiag()}`,
+                );
+              }}
+            >
+              1·100ms
+            </button>
+            <button
+              type="button"
+              className="haptic-debug-btn"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                const ok = haptic("latch");
+                setHapticLog(
+                  `BTN2 latch → ${ok ? "api-ok" : "api-fail"} · ${formatHapticDiag()}`,
+                );
+              }}
+            >
+              2·latch
+            </button>
+            <button
+              type="button"
+              className="haptic-debug-btn"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                const ok = hapticRaw(500);
+                setHapticLog(
+                  `BTN3 raw500 → ${ok ? "api-ok" : "api-fail"} · ${formatHapticDiag()}`,
+                );
+              }}
+            >
+              3·500ms
+            </button>
+            <button
+              type="button"
+              className="haptic-debug-btn"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                setHapticLog(`BTN4 diag · ${formatHapticDiag()}`);
+              }}
+            >
+              4·diag
+            </button>
+          </div>
+          <p className="haptic-debug-hint">
+            auxiliary only — silent/DND may block with no warning. use device
+            vibrate profile.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function formatHapticDiag(): string {
+  const d = hapticDiag();
+  return [
+    `can=${d.canHaptic}`,
+    `api=${d.hasVibrate}`,
+    `secure=${d.secureContext}`,
+    `rm=${d.reducedMotion}`,
+    `err=${d.lastError ?? "-"}`,
+  ].join(" ");
 }
 
 function modeLabel(mode: Mode): string {
@@ -793,4 +835,167 @@ function modeLabel(mode: Mode): string {
 
 function artHint(art: Articulation): string {
   return ARTICULATIONS.find((a) => a.id === art)?.hint ?? art;
+}
+
+type LaunchPadProps = {
+  index: number;
+  mode: Mode;
+  sheet: SheetState;
+  selected: number;
+  currentDegree: number | null;
+  barRhythmRow: Articulation[];
+  rhyKind: ReturnType<typeof rhythmBarKind>;
+  onSelect: () => void;
+  onPaintDegree: (degree: number | null) => void;
+  onPaintTone: (axisId: ToneAxisId) => void;
+  onPaintRhythm: (step: number) => void;
+};
+
+/**
+ * 고정 슬롯 하나 — key는 부모가 index로 고정.
+ * 모드가 바뀌어도 같은 <button> 위에서 라벨·핸들러만 갱신.
+ */
+function LaunchPad({
+  index: i,
+  mode,
+  sheet,
+  selected,
+  currentDegree,
+  barRhythmRow,
+  rhyKind,
+  onSelect,
+  onPaintDegree,
+  onPaintTone,
+  onPaintRhythm,
+}: LaunchPadProps) {
+  if (mode === "chart") {
+    const degree = sheet.degrees[i] ?? null;
+    return (
+      <button
+        type="button"
+        className={`pad ${selected === i ? "on" : ""} ${degree === null ? "empty" : ""}`}
+        onClick={onSelect}
+      >
+        <span className="pad-ink">
+          <span className="pad-sub">{(i % BEATS) + 1}</span>
+          <span className="pad-label">
+            {slotLabel(sheet.key, degree, sheet.tones[i])}
+          </span>
+          <span className="pad-roman">{slotRoman(degree)}</span>
+        </span>
+      </button>
+    );
+  }
+
+  if (mode === "rhythm") {
+    const art = barRhythmRow[i] ?? "rest";
+    const beatNo = Math.floor(i / SUBDIV) + 1;
+    const sub = i % SUBDIV;
+    const subMark = ["1", "e", "&", "a"][sub]!;
+    const hit = art === "D" || art === "U" || art === "X";
+    return (
+      <button
+        type="button"
+        className={`pad ${art === "rest" ? "empty" : ""} ${hit ? "hit" : ""} ${rhyKind === "link" ? "rhy-link" : ""} ${rhyKind === "own" ? "rhy-own" : ""} ${rhyKind === "base" ? "rhy-base" : ""}`}
+        onClick={() => onPaintRhythm(i)}
+      >
+        <span className="pad-ink">
+          <span className="pad-sub">
+            {beatNo}
+            {subMark}
+          </span>
+          <span className="pad-label">{artLabel(art)}</span>
+          <span className="pad-roman">{artHint(art)}</span>
+        </span>
+      </button>
+    );
+  }
+
+  // degree lens
+  if (i < 7) {
+    const meta = DEGREE_META[i]!;
+    const labelTones =
+      currentDegree === i
+        ? (sheet.tones[selected] ?? defaultTonesForDegree(i))
+        : defaultTonesForDegree(i);
+    const used = sheet.degrees.includes(i);
+    return (
+      <button
+        type="button"
+        className={`pad tool ${currentDegree === i ? "on" : ""} ${used ? "used" : ""}`}
+        onClick={() => onPaintDegree(i)}
+      >
+        <span className="pad-ink">
+          <span className="pad-label">{meta.roman}</span>
+          <span className="pad-roman">
+            {slotLabel(sheet.key, i, labelTones)}
+          </span>
+        </span>
+      </button>
+    );
+  }
+
+  if (i === 7) {
+    return (
+      <button
+        type="button"
+        className={`pad tool ${currentDegree === null ? "on" : ""}`}
+        onClick={() => onPaintDegree(null)}
+      >
+        <span className="pad-ink">
+          <span className="pad-label">∅</span>
+          <span className="pad-roman"> </span>
+        </span>
+      </button>
+    );
+  }
+
+  const axis = TONE_AXES[i - 8];
+  if (!axis || currentDegree === null) {
+    return (
+      <button
+        type="button"
+        className="pad tone tone-idle"
+        disabled
+        aria-hidden
+        tabIndex={-1}
+      >
+        <span className="pad-ink" />
+      </button>
+    );
+  }
+
+  const tones = sheet.tones[selected];
+  const on = toneAxisOn(tones, axis);
+  const label = toneAxisLabel(tones, axis);
+  const faces = toneAxisFaces(axis);
+  const polarity = toneAxisPolarity(tones, axis);
+  return (
+    <button
+      type="button"
+      className={[
+        "pad",
+        "tone",
+        "arcana",
+        on ? "on" : "",
+        axis.id === "1" ? "tone-root" : "",
+        faces.polar ? "polar" : "mirror",
+        faces.polar && polarity === "min" ? "reversed" : "",
+        faces.polar && polarity === "maj" ? "upright" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      onClick={axis.id === "1" ? undefined : () => onPaintTone(axis.id)}
+      aria-pressed={on}
+      aria-label={label}
+    >
+      <span className="pad-ink">
+        <span className="arcana-face">
+          <span className="arcana-end maj">{faces.maj}</span>
+          <span className="arcana-rule" aria-hidden />
+          <span className="arcana-end min">{faces.min}</span>
+        </span>
+      </span>
+    </button>
+  );
 }

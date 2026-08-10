@@ -365,6 +365,41 @@ button {
   flex-shrink: 0;
 }
 
+/* 리듬 악세서리 — 높이 예약 고정(패드 리플로우 금지). 열림은 점등만 */
+.rhy-slot {
+  --rhy-slot-h: 4.85rem;
+  height: var(--rhy-slot-h);
+  margin: 0;
+  flex-shrink: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-armed) var(--ease-presence);
+}
+
+.rhy-slot.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.rhy-slot-inner {
+  height: var(--rhy-slot-h);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+.rhy-slot .rhy-meta {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.rhy-slot .brush-row {
+  margin-bottom: 0;
+}
+
 .rhy-tag {
   font-family: var(--font-ui);
   font-size: 0.68rem;
@@ -918,6 +953,105 @@ button {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
+/* 현재 마디 = 한 행 (약한 위계) — 차트 렌즈에서만 점등 */
+.pad-ind-bar {
+  grid-column: 1 / -1;
+  grid-row: calc(var(--mark-bar) + 1);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  opacity: 0;
+  transition: opacity var(--dur-presence) var(--ease-presence);
+}
+
+.pad-ind-bar.is-on {
+  opacity: 1;
+}
+
+/*
+ * 재생 링: 정사각 inset 레이어 좌표.
+ * overflow:hidden → wrap 고스트(±4열)만 클립. 본 링은 레이어 안에 들어감.
+ * 바깥 glow 금지 — app/레이어에 잘림.
+ * 렌즈별 오버레이는 상시 마운트, .is-on 으로만 점등.
+ */
+.pad-play {
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  overflow: hidden;
+  transition: opacity var(--dur-presence) var(--ease-presence);
+}
+
+.pad-play.is-on {
+  opacity: var(--play-on);
+}
+
+.pad-play-orb {
+  position: absolute;
+  width: var(--pad-cell);
+  height: var(--pad-cell);
+  border-radius: 50%;
+  border: 2px solid var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  transform: translate(-50%, -50%);
+  will-change: left, top;
+  box-sizing: border-box;
+}
+
+.pad-play-orb-chart.pad-play-orb-main {
+  left: calc(var(--play-col-f) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--play-row-f) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-play-orb-chart.pad-play-orb-next {
+  left: calc((var(--play-col-f) - 4) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--play-row-next) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-play-orb-chart.pad-play-orb-prev {
+  left: calc((var(--play-col-f) + 4) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--play-row-prev) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-play-orb-rhythm.pad-play-orb-main {
+  left: calc(var(--rhy-col-f) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--rhy-row-f) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-play-orb-rhythm.pad-play-orb-next {
+  left: calc((var(--rhy-col-f) - 4) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--rhy-row-next) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-play-orb-rhythm.pad-play-orb-prev {
+  left: calc((var(--rhy-col-f) + 4) * var(--pad-stride) + var(--pad-cell) / 2);
+  top: calc(var(--rhy-row-prev) * var(--pad-stride) + var(--pad-cell) / 2);
+}
+
+.pad-grid {
+  /* JS ResizeObserver가 --pad-cell-px / --pad-stride-px 를 심음 (정원 보장) */
+  --pad-cell: var(--pad-cell-px, calc((100cqw - 2 * var(--pad-inset) - 3 * var(--pad-gap)) / 4));
+  --pad-stride: var(--pad-stride-px, calc(var(--pad-cell) + var(--pad-gap)));
+  position: absolute;
+  inset: var(--pad-inset);
+}
+
+.pad-back {
+  z-index: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: var(--pad-gap);
+  pointer-events: none;
+  overflow: visible;
+}
+
+.pad-ind {
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
 /* 현재 마디 = 한 행 (약한 위계) */
 .pad-ind-bar {
   grid-column: 1 / -1;
@@ -989,6 +1123,30 @@ button {
   gap: var(--pad-gap);
 }
 
+/* 같은 키 위 잉크 — 뱅크 전환 시 짧게 밝아짐 (격자 고정) */
+.pad-ink {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 0;
+}
+
+.pad-stage.bank-flash .pad-ink {
+  animation: pad-ink-flash 0.18s var(--ease-presence) both;
+}
+
+@keyframes pad-ink-flash {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .pad {
   width: 100%;
   height: 100%;
@@ -1041,6 +1199,11 @@ button {
 .pad.empty .pad-roman,
 .pad.ghost {
   opacity: 0.35;
+}
+
+.pad .pad-ink {
+  /* arcana / multi-line ink stays centered in the fixed key */
+  flex: 1 1 auto;
 }
 
 .pad .pad-label,
@@ -1168,6 +1331,52 @@ button {
   flex-shrink: 0;
 }
 
+.haptic-debug {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 12px 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--fill);
+  flex-shrink: 0;
+}
+
+.haptic-debug-log,
+.haptic-debug-hint {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.haptic-debug-hint {
+  font-size: 0.55rem;
+  opacity: 0.85;
+}
+
+.haptic-debug-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.haptic-debug-btn {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 8px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--fill-2);
+  color: var(--fg);
+  min-height: 2.2rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tr-btn,
   .brush,
@@ -1182,11 +1391,15 @@ button {
   .brush-hint,
   .tr-metro-bob,
   .tr-transport-icon .tr-glyph,
+  .rhy-slot,
+  .pad-play,
+  .pad-ind-bar,
   .dock-turntable {
     transition: none !important;
   }
 
-  .tr-btn .spin {
+  .tr-btn .spin,
+  .pad-stage.bank-flash .pad-ink {
     animation: none !important;
   }
 

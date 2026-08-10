@@ -1,10 +1,10 @@
 # OneSheet 핸드오프
 
-작성 시점: 2026-08-10 · 브랜치 `cursor/session-share-4663` · PR #14
+작성 시점: 2026-08-10 · 브랜치 `cursor/mode-chassis-transition-7153` (onto main / PR #14 셸)
 
 철학: **write simple play loop** — 심플 & 루프. 모노톤 기본.
 
-## 이 PR (#14) — 닫는 범위
+## 이 PR (#14) — 닫는 범위 (main에 머지됨)
 
 **심플 엔진 + 스튜디오 셸(도크 UX)까지.** 여러 시트 세션의 *뼈대*는 들어갔고, 세션 기능 마무리는 **다음 PR**.
 
@@ -23,7 +23,7 @@
 
 ## 다음 PR — 여러 세션 마무리
 
-이 PR에서 **의도적으로 남긴** 것. 여기서 더 얹지 말고 새 브랜치/PR로.
+이 PR(#14)에서 **의도적으로 남긴** 것. 여기서 더 얹지 말고 새 브랜치/PR로.
 
 1. **스튜디오 포맷** — `?u=` JSON → SheetDoc급 **비트팩**(길이·공유). 읽기 호환 전략 정하기.
 2. **CHAIN 순서** — 지금 = 슬롯 인덱스 채운 순. 임의 순서 편집이 필요하면 축만 남기고 UI는 최소.
@@ -31,7 +31,7 @@
 4. **심플↔스튜디오 재료 이동** — 한 장을 슬롯으로 / 슬롯을 `?s=`로. 필요할 때만; 복제 UI 남발 금지.
 5. **검증** — 모바일 롱프레스·회전문·`?u=` 왕복·CHAIN 재생 끊김.
 
-다음 에이전트: 위 목록에서 **한 축만** 잡고 PR을 연다. 도크 턴테이블·고정 높이는 이 PR에서 끝난 것으로 본다.
+다음 에이전트: 위 목록에서 **한 축만** 잡고 PR을 연다. 도크 턴테이블·고정 높이는 #14에서 끝난 것으로 본다.
 
 ---
 
@@ -40,6 +40,13 @@
 상태는 점프하지 않고 **전환으로** 바뀐다. 아르카나는 **한** 사례(양극 회전)일 뿐.
 **성격 경계(realm):** 영역 안 순회 ≠ 영역 넘김. 활성↔비활성(∅/`rest`)은 활성 안 프리셋 순회와 분리.
 2상태도 전환 — 메타포는 기능·UI가 고른다. 어휘: **`docs/transition-vocabulary.md`** · 레퍼런스: **`docs/design-references.md`**
+
+### 기계 섀시 (서비스 기본 정책)
+
+**PO식:** 4×4·LCD·transport는 **고정**. 모드(GRID/DEG/RHY)는 같은 키의 **뱅크** — 레이아웃이 바뀌는 화면 전환이 아님.  
+모드 피드백: transport **래치** + **고정 16키**에서 라벨/점등만 즉시 갱신. ❌ Y-flip / 와이프 / 그리드 재배치 / 딜레이 딤.  
+(심플↔스튜디오 도크 Y-flip은 **페이지 면** — 패드 뱅크 전환과 축이 다름.)  
+상세: `docs/transition-vocabulary.md`. 구현: `src/SimpleSheet.tsx`.
 
 적용됨:
 - 메트로 armed → 점등 (`--dur-armed` + 추 `--point`)
@@ -50,6 +57,22 @@
 - 심플↔스튜디오 → 하단 도크 **X-flip** (세로 중앙, 인셋 면+검정 테로 예고, 짧은 dur)
 - piano 사운드폰트 워밍 (동시 다성 still-loading 스킵 완화)
   - piano는 보이스 스택(쉼표@ 버그 회피) + `gm_piano:1` + 모드 진입 시 워밍
+- **햅틱 (Android, 보조)** — tick/detent/latch/mark. 핵심 UX 아님; 진동 프로필에서 검증
+
+아직 (모드):
+- [x] 고정 16키 DOM + 즉시 뱅크 전환 (`SimpleSheet`)
+- [x] rhy-slot 높이 예약 (패드 리플로우 금지)
+- [ ] (선택) 스캔 펄스 D
+
+### 햅틱
+
+- **역할: 보조만 · 핵심 아님.** 기기 설정(무음/DND/절전/터치 햅틱 off)·iOS에 따라 **경고 없이** 안 울릴 수 있음. UX는 시각·소리만으로 성립해야 함.
+- **상태: 채택·검증됨** (2026-08-10). 무음→진동으로 바꾸면 동작.
+- **Android:** `src/haptic.ts` — ≥100ms, kind별 갭, 모드 latch는 `pointerdown`. `vibrate(0)` 선취소 없음.
+- **iOS:** no-op (공식 API 없음).
+- **`true`인데 무감:** Silent / DND / 절전 / 터치 햅틱 off — 코드 버그 아님 ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/vibrate)).
+- **디버그:** `?haptic=1`
+- **TODO (보류):** 메트로놈 **박마다** 진동 — Strudel 오디오와 샘플 싱크 어려움. 후보로 RAF 플레이헤드 경계만 적어 둠. 상세: `docs/transition-vocabulary.md` § 햅틱.
 
 ---
 
@@ -98,9 +121,9 @@
 |--|------|----------|
 | 쿼리 | **`?s=`** | **`?u=`** |
 | 포맷 | SheetDoc **v3** 비트팩 (읽기 v3/v2/v1) | JSON (`studioDoc.ts`) — **다음 PR에서 비트팩** |
-| 코드 | `sheetDoc.ts`, `shareQuery.ts` | `studioDoc.ts` |
+| 쓰기 | `syncSheetQuery` (replace) | `syncStudioQuery` |
+| 비우기 | `?s=` 제거 → 빈 시트 | 슬롯 롱프레스 클리어 |
 
-```bash
-npm test && npm run build
-npm run dev -- --host 0.0.0.0 --port 5173
-```
+---
+
+로컬: `npm run dev -- --host 0.0.0.0 --port 5173` · 테스트: `npm test` · 빌드: `npm run build`

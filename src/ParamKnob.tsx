@@ -1,4 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { haptic } from './haptic'
 
 type ParamKnobProps = {
   label: string
@@ -21,6 +22,13 @@ type ParamKnobProps = {
    * multi-turn ≈ 2.5px/unit for finer control.
    */
   dragPxPerUnit?: number
+  /** Detent pulse when snapped value changes (default true). */
+  hapticDetent?: boolean
+  /**
+   * Bucket for detent — fire when this changes (not every micro-step).
+   * Default: raw snapped value. VOL: percent/5 etc.
+   */
+  hapticBucket?: (value: number) => number | string
 }
 
 const SWEEP_DEG = 270
@@ -50,11 +58,14 @@ export function ParamKnob({
   disabled = false,
   turns = 1,
   dragPxPerUnit,
+  hapticDetent = true,
+  hapticBucket = (v) => v,
 }: ParamKnobProps) {
   const dragRef = useRef<{
     pointerId: number
     startY: number
     startValue: number
+    lastBucket: number | string
   } | null>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -73,9 +84,29 @@ export function ParamKnob({
         ? DRAG_PX
         : DRAG_PX / range)
 
-  function commitFromDeltaY(startValue: number, deltaY: number) {
-    const next = snap(startValue - deltaY / pxPerUnit, step)
-    onChange(clamp(next, min, max))
+  function emitValue(next: number, from: number) {
+    const clamped = clamp(next, min, max)
+    if (
+      hapticDetent &&
+      hapticBucket(clamped) !== hapticBucket(from)
+    ) {
+      haptic('detent')
+    }
+    onChange(clamped)
+  }
+
+  function commitFromDeltaY(
+    startValue: number,
+    deltaY: number,
+    lastBucket: number | string,
+  ) {
+    const next = clamp(snap(startValue - deltaY / pxPerUnit, step), min, max)
+    const bucket = hapticBucket(next)
+    if (hapticDetent && bucket !== lastBucket) {
+      haptic('detent')
+      if (dragRef.current) dragRef.current.lastBucket = bucket
+    }
+    onChange(next)
   }
 
   function onPointerDown(e: PointerEvent<HTMLButtonElement>) {
@@ -86,14 +117,16 @@ export function ParamKnob({
       pointerId: e.pointerId,
       startY: e.clientY,
       startValue: value,
+      lastBucket: hapticBucket(value),
     }
     setDragging(true)
+    if (hapticDetent) haptic('tick')
   }
 
   function onPointerMove(e: PointerEvent<HTMLButtonElement>) {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
-    commitFromDeltaY(drag.startValue, e.clientY - drag.startY)
+    commitFromDeltaY(drag.startValue, e.clientY - drag.startY, drag.lastBucket)
   }
 
   function endDrag(e: PointerEvent<HTMLButtonElement>) {
@@ -117,7 +150,7 @@ export function ParamKnob({
     else if (e.key === 'End') next = max
     else return
     e.preventDefault()
-    onChange(clamp(snap(next, step), min, max))
+    emitValue(snap(next, step), value)
   }
 
   return (
