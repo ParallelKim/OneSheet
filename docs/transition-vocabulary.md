@@ -201,6 +201,72 @@ OneSheet는 **한 대의 물리 기계**다. Pocket Operator처럼 **격자와 �
 
 ---
 
+## 햅틱 (모바일 우선 · 조사 2026-08-10)
+
+목표: PO/런치패드처럼 **누름·디텐트·래치**를 손끝으로도 말하게.  
+현재 코드베이스: 햅틱 호출 **없음**.
+
+### 플랫폼 현실
+
+| 환경 | 가능? | 수단 |
+|------|-------|------|
+| **Android** Chrome / Edge / Samsung | ✅ | `navigator.vibrate(ms \| pattern)` — Vibration API |
+| **iOS / iPadOS** (Safari·Chrome 등 전부 WebKit) | ❌ 공식 API 없음 | WebKit **Oppose** Vibration API. 네이티브 Taptic은 웹에 미노출 |
+| Firefox Desktop | ❌ | v129+ 제거 |
+| Firefox Android | △ | API 흔적 있으나 실진동 비활성/부분 |
+| Desktop 대부분 | no-op | 모터 없음 |
+
+제약 (Android에서도):
+- **유저 제스처** 이후 (Chrome). `pointerdown`/`click` 콜스택에서 호출하는 편이 안전.
+- 백그라운드/비가시 탭에서는 억제.
+- 남용 방지 rate limit 가능 → 짧은 펄스만.
+
+### iOS 우회 (비표준 · Fragile)
+
+- iOS 18+에서 `<input type="checkbox" switch>` 토글 시 시스템 햅틱이 나는 것을 이용한 **히든 스위치 클릭** 트릭 (일부 npm: `web-haptics` / `haptics` 등).
+- **공식 API 아님.** Apple 패치로 다중 틱이 막히거나(보고: 최근 iOS에서 단일 틱만) 언제든 깨질 수 있음.
+- React concurrent / `await` 뒤 호출은 제스처 체인이 끊겨 실패하기 쉬움 → **동기 pointer 핸들러**에서만.
+- OneSheet 기본 경로로 **의존하지 말 것.** 실험·progressive만.
+
+### OneSheet에 맞는 운용 (초안)
+
+햅틱은 **시각 전환의 보조**. 없어도 UX가 성립해야 함 (progressive enhancement).
+
+| 인터랙션 | Realm | 햅틱 후보 | 비고 |
+|----------|-------|-----------|------|
+| 패드 프레스 / 칠하기 | — | 아주 짧음 ~8–15ms | 매 타건. 과하면 피로 |
+| KEY ♯/♭ · 프리셋 순회 | 영역 안 | 단일 틱 ~10–20ms | 디텐트 |
+| rest↔hit · ∅ · 메트로 armed | 영역 넘김 | 조금 더 길거나 2연타 `[12, 30, 12]` | 점등과 짝 |
+| 모드 GRID/DEG/RHY 래치 | 뱅크 | 단일 중간 틱 ~20–30ms | transport 래치와 동기 |
+| PLAY/STOP | 영역 넘김 | STOP만 짧게, 또는 생략 | 소리 ADSR이 주 신호 |
+| 플레이헤드 매 스텝 | — | ❌ | 루프 중 진동 지옥 |
+
+구현 스케치 (Android 우선):
+
+```ts
+export function haptic(kind: "tick" | "detent" | "latch" | "mark"): void {
+  if (typeof navigator === "undefined" || !navigator.vibrate) return;
+  const pattern =
+    kind === "tick" ? 10 :
+    kind === "detent" ? 14 :
+    kind === "latch" ? 24 :
+    [12, 28, 12]; // mark = 영역 넘김
+  try { navigator.vibrate(pattern); } catch { /* no-op */ }
+}
+```
+
+- `pointerdown`/`click` **안**에서만. `setTimeout`/`await` 뒤 X.
+- `prefers-reduced-motion`이면 햅틱도 끄기 (접근성 한 축).
+- iOS 스위치 트릭은 **별 플래그/실험** — 기본 off.
+
+### 결론
+
+- **줄 수 있다 — Android에서.** 모바일 우선이어도 iOS는 공식 경로가 없어 **시각(점등·래치)이 본체**, 햅틱은 Android 보너스.
+- 네이티브 랩(Capacitor 등) 없이는 iOS Taptic **신뢰 불가**. SPA 유지 전제면 Vibration 의존 금지.
+- 영역 안 = 약한 틱, 영역 넘김/모드 래치 = 조금 분명 — 시각 realm 규칙과 동일 문법.
+
+---
+
 ## 고를 때 질문
 
 1. 이 컨트롤은 **영역 안 순회**인가, **영역 넘김**(성격 변화)인가?
@@ -208,7 +274,8 @@ OneSheet는 **한 대의 물리 기계**다. Pocket Operator처럼 **격자와 �
 3. 같은 물체가 바뀌는가, 아니면 불이 붙는가? (모노 위 포인트/점등은 Nothing 축)
 4. **섀시(격자·존)가 움직이는가?** → 움직이면 기본 정책 위반. 다시 고른다.
 5. 소리의 어택/릴리즈와 **한 문장으로** 설명할 수 있는가?
-6. why를 한 줄로 못 쓰면 → 스타일링. 빼거나 다시 고른다.
+6. 햅틱이 꺼져도 같은 문장이 성립하는가? (progressive)
+7. why를 한 줄로 못 쓰면 → 스타일링. 빼거나 다시 고른다.
 
 ---
 
@@ -218,6 +285,8 @@ OneSheet는 **한 대의 물리 기계**다. Pocket Operator처럼 **격자와 �
 - [x] KEY: 반음 키 단위 + 슬롯머신 롤
 - [x] **섀시 정책** 문서화 — 모드 = 같은 16키 뱅크 (PO)
 - [x] 모드 전환 초안: 래치 + LED 재매핑 (❌ Y-flip/와이프)
+- [x] 햅틱 조사 — Android `vibrate` / iOS 공식 불가 · progressive
 - [ ] 모드 전환 A+B(+C) 시제품
 - [ ] (선택) D 스캔 펄스 강약
 - [ ] 프리셋 순회(영역 안) 약한 펄 — 영역 넘김과 차별
+- [ ] (선택) `haptic()` 헬퍼 + Android 디텐트/래치 와이어
