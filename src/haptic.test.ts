@@ -14,7 +14,7 @@ describe("haptic", () => {
     expect(() => haptic("tick")).not.toThrow();
   });
 
-  it("calls vibrate with tick pattern", () => {
+  it("calls vibrate with tick pattern after cancel", () => {
     const vibrate = vi.fn(() => true);
     vi.stubGlobal("navigator", { vibrate });
     vi.stubGlobal("window", {
@@ -22,7 +22,8 @@ describe("haptic", () => {
     });
     resetHapticClock();
     haptic("tick");
-    expect(vibrate).toHaveBeenCalledWith(10);
+    expect(vibrate).toHaveBeenCalledWith(0);
+    expect(vibrate).toHaveBeenCalledWith(32);
   });
 
   it("uses mark pattern for realm cross", () => {
@@ -33,7 +34,7 @@ describe("haptic", () => {
     });
     resetHapticClock();
     haptic("mark");
-    expect(vibrate).toHaveBeenCalledWith([12, 28, 12]);
+    expect(vibrate).toHaveBeenLastCalledWith([40, 32, 55]);
   });
 
   it("skips when prefers-reduced-motion", () => {
@@ -48,15 +49,17 @@ describe("haptic", () => {
     expect(vibrate).not.toHaveBeenCalled();
   });
 
-  it("rate-limits rapid calls", () => {
+  it("rate-limits same kind but allows latch after tick", () => {
     const vibrate = vi.fn(() => true);
     vi.stubGlobal("navigator", { vibrate });
     vi.stubGlobal("window", {
       matchMedia: () => ({ matches: false }),
     });
     resetHapticClock();
-    haptic("detent");
-    haptic("detent");
-    expect(vibrate).toHaveBeenCalledTimes(1);
+    haptic("tick");
+    haptic("tick");
+    haptic("latch");
+    const patterns = vibrate.mock.calls.map((c) => (c as unknown as [number | number[]])[0]);
+    expect(patterns.filter((p) => p !== 0)).toEqual([32, [48, 36, 64]]);
   });
 });

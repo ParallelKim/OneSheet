@@ -2,25 +2,38 @@
  * Mobile haptic — progressive enhancement.
  * Android: navigator.vibrate. iOS: no official API → no-op.
  * Call only from user-gesture handlers (pointer/click/key).
+ *
+ * Durations are intentionally ≥ ~30ms — shorter pulses are often
+ * imperceptible on phone vibration motors.
  */
 
 export type HapticKind = "tick" | "detent" | "latch" | "mark";
 
 const PATTERNS: Record<HapticKind, number | number[]> = {
   /** pad press / select / brush */
-  tick: 10,
+  tick: 32,
   /** KEY · preset · knob step */
-  detent: 14,
-  /** mode / sound-mode bank latch */
-  latch: 24,
+  detent: 45,
+  /** mode / sound-mode bank latch — double knock */
+  latch: [48, 36, 64],
   /** realm cross: ∅ · rest↔hit · metro · play/stop */
-  mark: [12, 28, 12],
+  mark: [40, 32, 55],
 };
 
-/** Min gap between pulses — knobs / rapid taps won't buzz-spam. */
-const MIN_GAP_MS = 32;
+/** Per-kind gaps — latch/mark must not be blocked by recent ticks. */
+const MIN_GAP_MS: Record<HapticKind, number> = {
+  tick: 28,
+  detent: 36,
+  latch: 90,
+  mark: 70,
+};
 
-let lastAt = 0;
+const lastAt: Record<HapticKind, number> = {
+  tick: 0,
+  detent: 0,
+  latch: 0,
+  mark: 0,
+};
 
 function reducedMotion(): boolean {
   try {
@@ -44,16 +57,21 @@ export function canHaptic(): boolean {
 export function haptic(kind: HapticKind): void {
   if (!canHaptic()) return;
   const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-  if (now - lastAt < MIN_GAP_MS) return;
-  lastAt = now;
+  if (now - lastAt[kind] < MIN_GAP_MS[kind]) return;
+  lastAt[kind] = now;
   try {
+    // Cancel any in-flight buzz so the new pattern starts cleanly
+    navigator.vibrate(0);
     navigator.vibrate(PATTERNS[kind]);
   } catch {
     /* no-op */
   }
 }
 
-/** Test helper — reset rate-limit clock. */
+/** Test helper — reset rate-limit clocks. */
 export function resetHapticClock(): void {
-  lastAt = 0;
+  lastAt.tick = 0;
+  lastAt.detent = 0;
+  lastAt.latch = 0;
+  lastAt.mark = 0;
 }

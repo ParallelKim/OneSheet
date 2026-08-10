@@ -230,6 +230,41 @@ button {
   flex-shrink: 0;
 }
 
+/* 리듬 악세서리 — 섀시 예약 슬롯 (상승·래치). 새 페이지 아님 */
+.rhy-slot {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin: 0;
+  flex-shrink: 0;
+  pointer-events: none;
+  transition:
+    grid-template-rows var(--dur-armed) var(--ease-presence),
+    opacity var(--dur-armed) var(--ease-presence);
+}
+
+.rhy-slot.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.rhy-slot-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rhy-slot .rhy-meta {
+  margin-top: 0;
+}
+
+.rhy-slot .brush-row {
+  margin-bottom: 0;
+}
+
 .rhy-tag {
   font-family: var(--font-ui);
   font-size: 0.68rem;
@@ -854,6 +889,25 @@ button {
   gap: var(--pad-gap);
 }
 
+/* 모드 뱅크 재매핑 — 같은 16키, 불·잉크만 (❌ flip/와이프) */
+.pad-stage.remap-out .pad-grid {
+  opacity: 0.16;
+  transition: opacity 0.1s var(--ease-presence);
+}
+
+.pad-stage.remap-in .pad-grid {
+  animation: pad-remap-in 0.24s var(--ease-presence) both;
+}
+
+@keyframes pad-remap-in {
+  from {
+    opacity: 0.16;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .pad {
   width: 100%;
   height: 100%;
@@ -1046,16 +1100,33 @@ button {
   .tr-label,
   .brush-hint,
   .tr-metro-bob,
-  .tr-transport-icon .tr-glyph {
+  .tr-transport-icon .tr-glyph,
+  .rhy-slot {
     transition: none !important;
   }
 
-  .tr-btn .spin {
+  .tr-btn .spin,
+  .pad-stage.remap-in .pad-grid {
     animation: none !important;
+  }
+
+  .pad-stage.remap-out .pad-grid,
+  .pad-stage.remap-in .pad-grid {
+    opacity: 1 !important;
   }
 
   .key-reel-track,
   .key-reel-track.is-moving {
     transition: none !important;
+  }
+
+  .rhy-slot {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+
+  .rhy-slot.is-open {
+    grid-template-rows: 1fr;
+    opacity: 1;
   }
 }

@@ -44,15 +44,14 @@
   - piano는 보이스 스택(쉼표@ 버그 회피) + `gm_piano:1` + 모드 진입 시 워밍
 
 아직 (모드):
-- [ ] 래치 + 패드 재매핑 시제품 (A+B+C)
+- [x] 래치 + 패드 재매핑 시제품 (A+B+C) — `remap-out/in` + `rhy-slot` 상승
 - [ ] (선택) 스캔 펄스 D
 
-### 햅틱 (조사)
+### 햅틱
 
-- **Android:** `navigator.vibrate`로 디텐트/래치 가능 (제스처 안, 짧은 펄스).
-- **iOS:** Vibration API **없음** (WebKit Oppose). 스위치 트릭은 비표준·깨지기 쉬움 → 기본 의존 X.
-- 본체는 시각 전환. 햅틱 = progressive. 상세: `docs/transition-vocabulary.md` § 햅틱.
-- **적용됨:** `src/haptic.ts` — 모드 래치 · transport/패드/KEY · BPM/VOL 노브 디텐트. `prefers-reduced-motion` 시 끔.
+- **Android:** `navigator.vibrate` (펄스 ≥~30ms — 짧은 값은 모터에 안 느껴짐).
+- **iOS:** 공식 API 없음 → no-op.
+- **적용:** `src/haptic.ts` — 모드 latch 더블노크 · 버튼 · 노브 디텐트. `prefers-reduced-motion` 시 끔.
 
 ---
 

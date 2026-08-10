@@ -83,6 +83,8 @@ export default function App() {
   const [sheet, setSheet] = useState<SheetState>(loadInitialSheet);
   const [selected, setSelected] = useState(0);
   const [mode, setMode] = useState<Mode>("chart");
+  /** transport 래치 표시 — 패드 재매핑보다 먼저 바뀜 */
+  const [latchMode, setLatchMode] = useState<Mode>("chart");
   const [brush, setBrush] = useState<Articulation>("D");
   const [engine, setEngine] = useState<EngineState>("idle");
   const [status, setStatus] = useState("");
@@ -93,6 +95,9 @@ export default function App() {
     dir: 1,
     gen: 0,
   });
+  /** 모드 뱅크 재매핑: out(딤) → swap → in(페이드) */
+  const [remapPhase, setRemapPhase] = useState<"idle" | "out" | "in">("idle");
+  const remapTimerRef = useRef<number | null>(null);
   const sheetRef = useRef(sheet);
   const playingRef = useRef(false);
   const staffRef = useRef<HTMLDivElement>(null);
@@ -108,6 +113,14 @@ export default function App() {
     const id = window.setTimeout(() => syncSheetQuery(sheet), 160);
     return () => window.clearTimeout(id);
   }, [sheet]);
+
+  useEffect(() => {
+    return () => {
+      if (remapTimerRef.current != null) {
+        window.clearTimeout(remapTimerRef.current);
+      }
+    };
+  }, []);
 
   // 엔진은 마운트 직후 백그라운드 기동 (Play를 기다리지 않음)
   useEffect(() => {
@@ -349,9 +362,30 @@ export default function App() {
   };
 
   const switchMode = (next: Mode) => {
-    if (next === mode) return;
+    if (next === mode || remapPhase !== "idle") return;
     haptic("latch");
-    setMode(next);
+    const reduce =
+      typeof window !== "undefined" &&
+      !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    // Transport 래치는 즉시 (주 신호)
+    setLatchMode(next);
+    if (reduce) {
+      setMode(next);
+      return;
+    }
+    if (remapTimerRef.current != null) {
+      window.clearTimeout(remapTimerRef.current);
+    }
+    // A+B: 딤 → 뱅크 스왑 → 페이드 인 (격자 기하 유지)
+    setRemapPhase("out");
+    remapTimerRef.current = window.setTimeout(() => {
+      setMode(next);
+      setRemapPhase("in");
+      remapTimerRef.current = window.setTimeout(() => {
+        setRemapPhase("idle");
+        remapTimerRef.current = null;
+      }, 240);
+    }, 110);
   };
 
   const playing = engine === "playing";
@@ -404,6 +438,7 @@ export default function App() {
             max={1}
             step={0.01}
             format={(v) => String(Math.round(v * 100))}
+            hapticBucket={(v) => Math.round(v * 20)}
             onChange={(gain) => update((prev) => ({ ...prev, gain }))}
           />
           <button
@@ -545,35 +580,41 @@ export default function App() {
         </button>
         <button
           type="button"
-          className={`tr-btn ${mode === "chart" ? "on" : ""}`}
+          className={`tr-btn ${latchMode === "chart" ? "on" : ""}`}
           onClick={() => switchMode("chart")}
           aria-label="chart"
+          aria-pressed={latchMode === "chart"}
         >
           <span className="tr-icon">▦</span>
           <span className="tr-label">GRID</span>
         </button>
         <button
           type="button"
-          className={`tr-btn ${mode === "degree" ? "on" : ""}`}
+          className={`tr-btn ${latchMode === "degree" ? "on" : ""}`}
           onClick={() => switchMode("degree")}
           aria-label="degree"
+          aria-pressed={latchMode === "degree"}
         >
           <span className="tr-icon">I</span>
           <span className="tr-label">DEG</span>
         </button>
         <button
           type="button"
-          className={`tr-btn ${mode === "rhythm" ? "on" : ""}`}
+          className={`tr-btn ${latchMode === "rhythm" ? "on" : ""}`}
           onClick={() => switchMode("rhythm")}
           aria-label="rhythm"
+          aria-pressed={latchMode === "rhythm"}
         >
           <span className="tr-icon">♩♪</span>
           <span className="tr-label">RHY</span>
         </button>
       </nav>
 
-      {mode === "rhythm" && (
-        <>
+      <div
+        className={`rhy-slot ${latchMode === "rhythm" ? "is-open" : ""}`}
+        aria-hidden={latchMode !== "rhythm"}
+      >
+        <div className="rhy-slot-inner">
           <div className="rhy-meta" aria-label="rhythm source">
             <span className={`rhy-tag rhy-tag-${rhyKind}`}>
               {rhyKind === "base" && "BASE · BAR 1"}
@@ -610,12 +651,12 @@ export default function App() {
               </button>
             ))}
           </div>
-        </>
-      )}
+        </div>
+      </div>
 
       <div
         ref={padStageRef}
-        className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode} rhy-${rhyKind}`}
+        className={`pad-stage ${playing ? "is-playing" : ""} mode-${mode} rhy-${rhyKind}${remapPhase !== "idle" ? ` remap-${remapPhase}` : ""}`}
         style={{ "--mark-bar": markBar } as CSSProperties}
       >
         <div className="pad-board" ref={padBoardRef}>

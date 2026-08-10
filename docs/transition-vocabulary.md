@@ -286,8 +286,8 @@ export function haptic(kind: "tick" | "detent" | "latch" | "mark"): void {
 - [x] **섀시 정책** 문서화 — 모드 = 같은 16키 뱅크 (PO)
 - [x] 모드 전환 초안: 래치 + LED 재매핑 (❌ Y-flip/와이프)
 - [x] 햅틱 조사 — Android `vibrate` / iOS 공식 불가 · progressive
-- [ ] 모드 전환 A+B(+C) 시제품
+- [x] 모드 전환 A+B+C 시제품 — transport 즉시 래치 · 패드 딤→페이드 · rhy-slot 상승
 - [ ] (선택) D 스캔 펄스 강약
 - [ ] 프리셋 순회(영역 안) 약한 펄 — 영역 넘김과 차별
-- [ ] (선택) `haptic()` 헬퍼 + Android 디텐트/래치 와이어
 - [x] 햅틱 적용: 모드 래치 · 버튼 · 노브 디텐트 (`src/haptic.ts`)
+- [x] 햅틱 강도 상향 (≥~30ms) + kind별 레이트리밋 — 짧은 펄스는 안 느껴짐
