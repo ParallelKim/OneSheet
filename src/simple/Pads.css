@@ -36,10 +36,13 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  overflow: visible;
+  align-items: center;
+  /* 세로가 부족할 때 보드가 도크·rhy-slot 위로 넘치지 않게 */
+  container-type: size;
+  overflow: hidden;
 }
 
-/* 풀폭 보드. 정사각 + cqw로 셀 길이 하나로 고정(링 정원) */
+/* 가용 영역에 맞는 정사각 — min(가로 100%, 세로 100cqh) */
 .pad-board {
   --pad-inset: 12px;
   --pad-gap: 8px;
@@ -47,7 +50,9 @@
   container-type: size;
   position: relative;
   isolation: isolate;
-  width: 100%;
+  width: min(100%, 100cqh);
+  max-width: 100%;
+  max-height: 100%;
   aspect-ratio: 1;
   flex-shrink: 0;
   overflow: visible;
