@@ -18,13 +18,20 @@ Current UI: single 4×4 launchpad (chart / degree / rhythm lenses), LCD bar bead
 - Hosting live deploy (local): `npm run deploy`
 - Hosting preview channel (local): `npm run deploy:preview`
 
-## Verify
+## Verify (에이전트)
 
-1. Start the dev server and open `http://localhost:5173`.
-2. Confirm 4×4 launchpad, LCD bar beads, degree/rhythm lenses, and transport (play / metronome / modes).
-3. Click Play (browser gesture required for audio). Editing while playing should re-evaluate via Strudel.
-4. Rhythm mode: select a bar in LCD, paint D/U/X/hold/rest on the 16th grid.
-5. `npm test` — SheetState → Strudel 변환 테스트.
+시각·브라우저 확인은 **사람이 한다.** 에이전트는 computerUse / 브라우저 GUI / 화면 녹화로 검증하지 않는다.
+
+1. `npm test` — SheetState → Strudel 변환
+2. `npm run build` — 타입·번들
+3. (선택) `npm run dev -- --host 0.0.0.0 --port 5173` 기동만 — UI 클릭·스크린샷 불필요
+
+## Verify (사람)
+
+1. Dev server → `http://localhost:5173` (심플) · `/studio` (스튜디오 직접)
+2. 4×4 · LCD · DEG/RHY · transport · 재생(제스처 필요)
+3. RHY: LCD 마디 선택 후 16분 그리드에 D/U/X/hold/rest
+4. 스튜디오: 슬롯·CHAIN · 심플과 인앱 플립 없음
 
 ## Firebase Hosting
 

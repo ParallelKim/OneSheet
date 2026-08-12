@@ -1,0 +1,11 @@
+---
+description: 시각 검증은 사람 — 에이전트는 computerUse/브라우저 GUI 금지
+alwaysApply: true
+---
+
+# Visual QA
+
+- **사람이** UI·레이아웃·오디오 제스처를 확인한다.
+- 에이전트는 `computerUse` 서브에이전트, 브라우저 GUI 조작, `RecordScreen`으로 시각 검증하지 않는다.
+- 에이전트 검증은 `npm test` / `npm run build` (필요 시 dev 기동만)로 충분하다.
+- 상세: `AGENTS.md` § Verify
