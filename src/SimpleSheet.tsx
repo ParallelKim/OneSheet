@@ -51,7 +51,13 @@ import {
 import { KeyReel } from "./KeyReel";
 import { ParamKnob } from "./ParamKnob";
 import { haptic, hapticDiag, hapticRaw } from "./haptic";
-import "./App.css";
+import "./simple/AppPanel.css";
+import "./simple/Lcd.css";
+import "./simple/Transport.css";
+import "./simple/RhythmSlot.css";
+import "./simple/Pads.css";
+import "./simple/Status.css";
+import "./simple/HapticDebug.css";
 
 type EngineState = "idle" | "loading" | "ready" | "playing" | "error";
 /** 렌즈: 같은 4×4 패드의 의미를 바꾼다 */

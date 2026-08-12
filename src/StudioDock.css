@@ -1,0 +1,111 @@
+/* Studio dock — CHAIN + 8 slots (/studio only) */
+
+.app-nav {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 12px;
+  flex-shrink: 0;
+  min-height: 1.1rem;
+}
+
+.studio-rail {
+  height: 100%;
+  margin: 0;
+  padding: var(--dock-pad);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dock-gap);
+}
+
+.studio-rail-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--dock-chip-h);
+  flex-shrink: 0;
+}
+
+.studio-chain {
+  flex: 0 0 auto;
+  height: var(--dock-chip-h);
+  min-height: var(--dock-chip-h);
+  min-width: 5.5rem;
+  padding: 0 1rem;
+  box-sizing: border-box;
+  justify-content: center;
+  --chip-type: 0.84rem;
+  font-size: var(--chip-type);
+}
+
+.studio-chain.on {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.studio-chain.on .chip-k,
+.studio-chain.on .chip-v {
+  color: inherit;
+  text-shadow: none;
+}
+
+.studio-slots {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  height: var(--dock-slot);
+  flex-shrink: 0;
+}
+
+.studio-slot {
+  aspect-ratio: auto;
+  height: 100%;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px;
+  min-width: 0;
+  color: var(--muted);
+  transition:
+    background var(--dur-presence) var(--ease-presence),
+    border-color var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
+}
+
+.studio-slot.filled {
+  color: var(--fg);
+}
+
+.studio-slot.active {
+  border-color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--fg);
+}
+
+.studio-slot.sounding {
+  background: var(--fill-2);
+}
+
+.studio-slot.empty {
+  opacity: 0.55;
+}
+
+.studio-slot-n {
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.studio-slot-mark {
+  font-size: 0.68rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}

@@ -29,7 +29,7 @@
 2. **CHAIN 순서** — 지금 = 슬롯 인덱스 채운 순. 임의 순서 편집이 필요하면 축만 남기고 UI는 최소.
 3. **한 장 길이** — 5+마디(또는 슬롯당 확장)가 세션 조합과 맞는지 먼저 해체. 송폼 마법사로 가지 말 것.
 4. **심플↔스튜디오 재료 이동** — 한 장을 슬롯으로 / 슬롯을 `?s=`로. 필요할 때만; 복제 UI 남발 금지.
-5. **검증** — 모바일 롱프레스·회전문·`?u=` 왕복·CHAIN 재생 끊김.
+5. **검증** — 모바일 롱프레스·`/studio` 직접 진입·`?u=` 왕복·CHAIN 재생 끊김.
 
 다음 에이전트: 위 목록에서 **한 축만** 잡고 PR을 연다. 심플↔스튜디오 인앱 플립은 제거됨 — `/studio` 직접 진입.
 
@@ -47,6 +47,8 @@
 모드 피드백: transport **래치** + **고정 16키**에서 라벨/점등만 즉시 갱신. ❌ Y-flip / 와이프 / 그리드 재배치 / 딜레이 딤.  
 (스튜디오는 URL 진입 면 — 패드 뱅크(GRID/DEG/RHY)와 축이 다름.)  
 상세: `docs/transition-vocabulary.md`. 구현: `src/SimpleSheet.tsx`.
+
+스타일: 모놀리식 `App.css` 제거. `src/styles/`(tokens·reset·a11y) + `AppShell`/`StudioDock` + `simple/*` + `KeyReel`/`ParamKnob` 옆 CSS.
 
 적용됨:
 - 메트로 armed → 점등 (`--dur-armed` + 추 `--point`)

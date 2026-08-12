@@ -1,0 +1,50 @@
+/* KeyReel — fixed-width slot-machine glyph */
+
+/* 키 릴 — 고정폭 + 뷰포트 정확히 1행 (두 키가 동시에 비치지 않게) */
+.key-reel {
+  --key-reel-h: var(--chip-type);
+  --key-reel-w: 2.75ch;
+  display: inline-block;
+  vertical-align: middle;
+  width: var(--key-reel-w);
+  min-width: var(--key-reel-w);
+  max-width: var(--key-reel-w);
+  height: var(--key-reel-h);
+  overflow: hidden;
+  contain: paint;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  line-height: var(--key-reel-h);
+}
+
+.key-reel-track {
+  display: block;
+  width: 100%;
+  transform: translate3d(0, calc(var(--key-y, 0) * var(--key-reel-h)), 0);
+  transition: none;
+  will-change: transform;
+}
+
+.key-reel-track.is-moving {
+  transition: transform 0.28s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.key-reel-item {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--key-reel-h);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: inherit;
+  font-weight: 400;
+  font-size: var(--key-reel-h);
+  line-height: var(--key-reel-h);
+  color: var(--fg);
+  white-space: nowrap;
+  text-align: center;
+  text-shadow:
+    0.45px 0 0 currentColor,
+    -0.45px 0 0 currentColor;
+}

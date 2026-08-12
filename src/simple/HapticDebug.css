@@ -1,0 +1,47 @@
+/* ?haptic=1 debug panel */
+
+.haptic-debug {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 12px 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--fill);
+  flex-shrink: 0;
+}
+
+.haptic-debug-log,
+.haptic-debug-hint {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.haptic-debug-hint {
+  font-size: 0.55rem;
+  opacity: 0.85;
+}
+
+.haptic-debug-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.haptic-debug-btn {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 8px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--fill-2);
+  color: var(--fg);
+  min-height: 2.2rem;
+}

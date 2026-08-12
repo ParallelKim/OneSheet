@@ -1,0 +1,289 @@
+/* LCD meta, staff/chart beads, shared .chip chrome */
+
+.lcd {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-box);
+  border: 1px solid var(--line);
+  background: var(--fill);
+  box-shadow: var(--shadow);
+  flex-shrink: 0;
+}
+
+.lcd-meta {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+/* 얇은 한 줄 차트 — 16등분 그리드에 마디/커서/선택 정렬 */
+.staff {
+  --play-phase: -1;
+  --mark-bar: 0;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.staff-back {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 마디: 약한 밴드 (4등분 = measure) */
+.ind-measure {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 25%;
+  z-index: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateX(calc(var(--mark-bar) * 100%));
+  transition: transform 0.12s ease;
+}
+
+/* 재생 헤드: Guitar Pro식 세로 커서 */
+.ind-cursor {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: calc(max(0, var(--play-phase)) * 100%);
+  z-index: 2;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--fg);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.45),
+    0 0 6px rgba(255, 255, 255, 0.35);
+  opacity: 0;
+  transform: translateX(-50%);
+  will-change: left;
+}
+
+.staff.is-playing .ind-cursor {
+  opacity: 1;
+}
+
+.staff-front {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: stretch;
+}
+
+.measure {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: stretch;
+  min-width: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  background: transparent;
+  border-left: 1px solid var(--fg);
+}
+
+.measure:first-child {
+  border-left: 2px solid var(--fg);
+}
+
+.measure:last-child {
+  border-right: 2px solid var(--fg);
+}
+
+/* RHY 모드: 마디 = BASE / LINK / OWN */
+.measure.rhy-show {
+  position: relative;
+}
+
+.measure.rhy-show::after {
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.measure.rhy-show.rhy-base::after {
+  background: var(--fg);
+  opacity: 0.85;
+}
+
+.measure.rhy-show.rhy-link::after {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--muted) 0 3px,
+    transparent 3px 6px
+  );
+  opacity: 0.9;
+}
+
+.measure.rhy-show.rhy-own::after {
+  background: var(--fg);
+  opacity: 0.55;
+  height: 3px;
+}
+
+.chord-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.2rem;
+  padding: 4px 2px;
+  border-radius: 6px;
+  background: transparent;
+  transition:
+    background-color var(--dur-presence) var(--ease-presence),
+    box-shadow var(--dur-presence) var(--ease-presence);
+}
+
+.chord-cell.on {
+  background: var(--fg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.chord-cell.on .chord-name,
+.chord-cell.on .chord-deg {
+  color: var(--bg);
+}
+
+.chord-cell.empty .chord-name,
+.chord-cell.empty .chord-deg {
+  opacity: 0.3;
+}
+
+.chord-cell.on.empty .chord-name,
+.chord-cell.on.empty .chord-deg {
+  opacity: 0.7;
+}
+
+.chord-name {
+  font-size: clamp(0.58rem, 2.4vw, 0.72rem);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted);
+  text-align: center;
+  transition:
+    opacity var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
+}
+
+.chord-deg {
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  text-align: center;
+  transition:
+    opacity var(--dur-presence) var(--ease-presence),
+    color var(--dur-presence) var(--ease-presence);
+}
+
+.chip {
+  --chip-row-h: 1.35rem;
+  --chip-type: 0.72rem;
+  /* Bold 페이스 없음 → Pretendard로 폴백되지 않게 스택에서 제외 */
+  --font-chip: "Geist Pixel", system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  min-width: 0;
+  min-height: calc(var(--chip-row-h) + 12px);
+  box-sizing: border-box;
+  font-family: var(--font-chip);
+  font-size: var(--chip-type);
+  font-weight: 400;
+  line-height: 1;
+  font-synthesis: none;
+}
+
+.key-chip {
+  gap: 4px;
+}
+
+.key-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--chip-row-h);
+  height: var(--chip-row-h);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--fill);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: var(--chip-type);
+  font-weight: 400;
+  line-height: 1;
+  text-shadow:
+    0.45px 0 0 currentColor,
+    -0.45px 0 0 currentColor;
+}
+
+.key-step:active {
+  transform: scale(0.94);
+  background: var(--fill-2);
+}
+
+.chip,
+.chip .chip-k,
+.chip .chip-v,
+.chip .key-step,
+.chip .key-reel,
+.chip .key-reel-item,
+.knob-chip {
+  font-family: var(--font-chip);
+}
+
+/* 라벨+값: 같은 Geist Pixel·크기, 값은 emph(가짜 bold)만 */
+.chip-pair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.chip-k,
+.chip-v {
+  display: inline-block;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  box-sizing: border-box;
+}
+
+.chip-k {
+  color: var(--muted);
+}
+
+.chip-v {
+  color: var(--fg);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0.45px 0 0 currentColor,
+    -0.45px 0 0 currentColor;
+}

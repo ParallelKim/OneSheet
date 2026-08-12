@@ -1,0 +1,32 @@
+/* prefers-reduced-motion — central */
+
+@media (prefers-reduced-motion: reduce) {
+  .tr-btn,
+  .brush,
+  .pad,
+  .chord-cell,
+  .chord-name,
+  .chord-deg,
+  .pad .pad-label,
+  .pad .pad-roman,
+  .pad .pad-sub,
+  .tr-label,
+  .brush-hint,
+  .tr-metro-bob,
+  .tr-transport-icon .tr-glyph,
+  .rhy-slot,
+  .pad-play,
+  .pad-ind-bar {
+    transition: none !important;
+  }
+
+  .tr-btn .spin,
+  .pad-stage.bank-flash .pad-ink {
+    animation: none !important;
+  }
+
+  .key-reel-track,
+  .key-reel-track.is-moving {
+    transition: none !important;
+  }
+}

@@ -1,0 +1,23 @@
+/* Design tokens — color, type, motion durations */
+
+:root {
+  --bg: #111;
+  --fg: #ececec;
+  --muted: #888;
+  --line: #333;
+  --fill: #1c1c1c;
+  --fill-2: #2a2a2a;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-on: 0 0 0 1px var(--fg), 0 4px 14px rgba(0, 0, 0, 0.55);
+  --radius: 999px;
+  --radius-box: 16px;
+  /* 기본: Geist Pixel / 한글·폴백: Pretendard */
+  --font: "Geist Pixel", "Pretendard", system-ui, sans-serif;
+  --font-ui: "Pretendard", system-ui, sans-serif;
+  /* 영역 넘김(활성↔비활성·armed) — Nothing식 모노 점등. 포인트는 한 신호만 */
+  --point: #ff3b30;
+  --ease-presence: cubic-bezier(0.33, 1, 0.32, 1);
+  --dur-presence: 0.22s;
+  --dur-armed: 0.28s;
+  --dur-glyph: 0.2s;
+}

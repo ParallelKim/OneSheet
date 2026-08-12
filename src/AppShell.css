@@ -1,0 +1,82 @@
+/* App shell — chart + optional studio dock (/studio only) */
+
+.app-shell {
+  width: 100%;
+  max-width: 390px;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0 auto;
+  padding:
+    calc(24px + env(safe-area-inset-top, 0px))
+    0
+    calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.app-chart {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app.app-panel {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* 스튜디오 도크 — `/studio`에서만 마운트. 플립/심플 칩 없음.
+ * 레이어: 캐비티(z0, 검정) → 면(z1, --fill) 위에 슬롯. */
+.app-dock {
+  --dock-inset: 5px;
+  --dock-pad: 8px;
+  --dock-gap: 8px;
+  --dock-chip-h: 3rem;
+  --dock-slot: 3rem;
+  position: relative;
+  flex-shrink: 0;
+  margin: 0 12px;
+  height: calc(
+    var(--dock-inset) * 2 + var(--dock-pad) * 2 + var(--dock-chip-h) +
+      var(--dock-gap) + var(--dock-slot)
+  );
+  padding: var(--dock-inset);
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-box);
+  background: transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -3px 10px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.app-dock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: #000;
+  pointer-events: none;
+}
+
+.app-dock > .studio-rail {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  background: var(--fill);
+  border-radius: calc(var(--radius-box) - var(--dock-inset) - 1px);
+}
