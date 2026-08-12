@@ -123,11 +123,8 @@ button {
   min-height: 0;
 }
 
-/* 하단 도크 플립 (가로축 = CSS rotateX, 세로 중앙 피벗)
- * 가로형 패널이라 Y(좌우 문짝)보다 X(상하 접힘)가 자연스럽다.
- * 플립 면은 캐비티보다 작아 처음부터 검정 테가 보여 회전을 예고한다.
- * 레이어: 캐비티(z0, 2D 검정) → 스테이지(z1, perspective만) → 플립 면(z2, flat).
- * 검정·preserve-3d를 같은 노드에 두면 회전면이 배경 평면 뒤로 뚫린다. */
+/* 스튜디오 도크 — `/studio` 직접 진입 시에만 마운트. 플립/심플 칩 없음.
+ * 레이어: 캐비티(z0, 검정) → 면(z1, --fill) 위에 슬롯. */
 .app-dock {
   --dock-inset: 5px;
   --dock-pad: 8px;
@@ -154,7 +151,7 @@ button {
   isolation: isolate;
 }
 
-/* 2D 우물 — 3D 컨텍스트에 참여하지 않음 */
+/* 2D 우물 — 도크 캐비티 */
 .app-dock::before {
   content: "";
   position: absolute;
@@ -165,59 +162,12 @@ button {
   pointer-events: none;
 }
 
-.dock-turn-stage {
+.app-dock > .studio-rail {
   position: relative;
   z-index: 1;
   height: 100%;
-  perspective: 720px;
-  perspective-origin: 50% 50%;
-  /* preserve-3d / 배경 금지 — 자식 rotateX만으로 충분 */
-  transform-style: flat;
-  background: transparent;
-}
-
-.dock-turntable {
-  position: relative;
-  z-index: 2;
-  height: 100%;
-  transform-origin: 50% 50%;
-  transform: rotateX(0deg);
-  transform-style: flat;
-  transition: transform var(--dur-flip) var(--ease-flip);
-  will-change: transform;
-  backface-visibility: hidden;
   background: var(--fill);
   border-radius: calc(var(--radius-box) - var(--dock-inset) - 1px);
-  /* 슬롯·칩은 이 면에 납작히 붙는다 */
-  isolation: isolate;
-}
-
-.dock-turntable .studio-rail {
-  position: relative;
-  z-index: 1;
-}
-
-.dock-turntable.is-fold {
-  transform: rotateX(90deg);
-}
-
-.dock-turntable.is-edge {
-  transition: none;
-  transform: rotateX(-90deg);
-}
-
-.dock-turntable.is-open,
-.dock-turntable.is-idle {
-  transform: rotateX(0deg);
-}
-
-.dock-turntable.dir-back.is-fold {
-  transform: rotateX(-90deg);
-}
-
-.dock-turntable.dir-back.is-edge {
-  transition: none;
-  transform: rotateX(90deg);
 }
 
 .lcd {
@@ -910,18 +860,21 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  overflow: visible;
+  align-items: center;
+  container-type: size;
+  overflow: hidden;
 }
 
-/* 풀폭 보드. 정사각 + cqw로 셀 길이 하나로 고정(링 정원) */
+/* 가용 영역 안 정사각 — 도크·rhy-slot과 겹치지 않게 */
 .pad-board {
   --pad-inset: 12px;
   --pad-gap: 8px;
-  /* 자손의 cqw = 보드 가로(=세로, aspect 1) */
   container-type: size;
   position: relative;
   isolation: isolate;
-  width: 100%;
+  width: min(100%, 100cqh);
+  max-width: 100%;
+  max-height: 100%;
   aspect-ratio: 1;
   flex-shrink: 0;
   overflow: visible;
@@ -1393,8 +1346,7 @@ button {
   .tr-transport-icon .tr-glyph,
   .rhy-slot,
   .pad-play,
-  .pad-ind-bar,
-  .dock-turntable {
+  .pad-ind-bar {
     transition: none !important;
   }
 
@@ -1406,13 +1358,6 @@ button {
   .key-reel-track,
   .key-reel-track.is-moving {
     transition: none !important;
-  }
-
-  .dock-turntable.is-fold,
-  .dock-turntable.is-edge,
-  .dock-turntable.is-open,
-  .dock-turntable.is-idle {
-    transform: none !important;
   }
 }
 
@@ -1467,7 +1412,7 @@ button {
 .studio-rail-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 8px;
   height: var(--dock-chip-h);
   flex-shrink: 0;

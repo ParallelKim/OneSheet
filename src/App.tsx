@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
   type PointerEvent,
-  type TransitionEvent,
 } from "react";
 import { createInitialSheet, toStrudel, toStrudelChain, type SheetState } from "./sheet";
 import { readSheetFromSearch } from "./shareQuery";
@@ -26,8 +25,6 @@ import {
 import { getCycleTime } from "./engine";
 
 type Face = "simple" | "studio";
-/** fold → (swap) edge → open → idle — 하단 도크 X축 플립(세로 중앙) */
-type FlipPhase = "idle" | "fold" | "edge" | "open";
 
 function loadSimpleSheet(): SheetState {
   try {
@@ -53,17 +50,6 @@ function pathToFace(path: string): Face {
   return path.startsWith("/studio") ? "studio" : "simple";
 }
 
-function faceToPath(face: Face): string {
-  return face === "studio" ? "/studio" : "/";
-}
-
-function preferReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-}
-
 function usePathname(): string {
   const [path, setPath] = useState(() =>
     typeof window !== "undefined" ? window.location.pathname : "/",
@@ -74,44 +60,6 @@ function usePathname(): string {
     return () => window.removeEventListener("popstate", sync);
   }, []);
   return path;
-}
-
-function pushPath(to: string) {
-  const next = new URL(to, window.location.origin).pathname;
-  if (next === window.location.pathname && window.location.search === "") {
-    return;
-  }
-  history.pushState(history.state, "", next);
-  window.dispatchEvent(new PopStateEvent("popstate"));
-}
-
-function ModeChip({
-  href,
-  label,
-  current,
-  onNavigate,
-}: {
-  href: string;
-  label: string;
-  current: string;
-  onNavigate: (href: string) => void;
-}) {
-  return (
-    <a
-      className="chip mode-chip"
-      href={href}
-      aria-label={`${current}, switch to ${label}`}
-      onClick={(e) => {
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
-          return;
-        }
-        e.preventDefault();
-        onNavigate(href);
-      }}
-    >
-      <span className="chip-v">{label}</span>
-    </a>
-  );
 }
 
 const LONG_PRESS_MS = 480;
@@ -134,7 +82,7 @@ function StudioSlotPad({
   onClear: () => void;
 }) {
   const timerRef = useRef<number | null>(null);
-  const clearedRef = useRef(false);
+  const longRef = useRef(false);
 
   const clearTimer = () => {
     if (timerRef.current != null) {
@@ -145,26 +93,23 @@ function StudioSlotPad({
 
   const onPointerDown = (e: PointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
-    clearedRef.current = false;
+    longRef.current = false;
     clearTimer();
-    if (!filled) return;
     timerRef.current = window.setTimeout(() => {
+      longRef.current = true;
       timerRef.current = null;
-      clearedRef.current = true;
       onClear();
     }, LONG_PRESS_MS);
   };
 
   const onPointerUp = () => {
+    const wasLong = longRef.current;
     clearTimer();
+    if (!wasLong) onSelect();
   };
 
-  const onClick = () => {
-    if (clearedRef.current) {
-      clearedRef.current = false;
-      return;
-    }
-    onSelect();
+  const onPointerCancel = () => {
+    clearTimer();
   };
 
   return (
@@ -181,15 +126,14 @@ function StudioSlotPad({
         .join(" ")}
       aria-label={
         filled
-          ? `sheet ${index + 1}${active ? ", active" : ""}. Hold to clear`
-          : `empty slot ${index + 1}`
+          ? `slot ${index + 1} ${mark}${active ? ", selected" : ""}`
+          : `slot ${index + 1} empty`
       }
       aria-pressed={active}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      onPointerLeave={onPointerUp}
-      onClick={onClick}
+      onPointerCancel={onPointerCancel}
+      onPointerLeave={onPointerCancel}
       onContextMenu={(e) => e.preventDefault()}
     >
       <span className="studio-slot-n">{index + 1}</span>
@@ -201,14 +145,12 @@ function StudioSlotPad({
 function StudioDock({
   studio,
   sounding,
-  onNavigate,
   onToggleChain,
   onSelectSlot,
   onClearSlot,
 }: {
   studio: StudioState;
   sounding: number | null;
-  onNavigate: (href: string) => void;
   onToggleChain: () => void;
   onSelectSlot: (index: number) => void;
   onClearSlot: (index: number) => void;
@@ -216,12 +158,6 @@ function StudioDock({
   return (
     <div className="studio-rail" aria-label="studio slots">
       <div className="studio-rail-top">
-        <ModeChip
-          href="/"
-          label="SIMPLE"
-          current="STUDIO"
-          onNavigate={onNavigate}
-        />
         <button
           type="button"
           className={`chip studio-chain${studio.chain ? " on" : ""}`}
@@ -250,44 +186,19 @@ function StudioDock({
   );
 }
 
-function SimpleDock({ onNavigate }: { onNavigate: (href: string) => void }) {
-  return (
-    <div className="studio-rail page-rail" aria-label="page">
-      <div className="studio-rail-top">
-        <ModeChip
-          href="/studio"
-          label="STUDIO"
-          current="SIMPLE"
-          onNavigate={onNavigate}
-        />
-      </div>
-    </div>
-  );
-}
-
 /**
- * 차트는 고정. 하단 도크만 가로축(rotateX) 플립 —
- * SIMPLE 면 ↔ STUDIO 슬롯 면.
+ * `/` = 심플 한 장. `/studio` = 직접 진입할 때만 스튜디오 도크.
+ * 심플↔스튜디오 인앱 플립/칩 전환 없음.
  */
 export default function App() {
   const path = usePathname();
+  const face = pathToFace(path);
   const [simpleSheet, setSimpleSheet] = useState<SheetState>(loadSimpleSheet);
   const [studio, setStudio] = useState<StudioState>(loadStudio);
-  const [face, setFace] = useState<Face>(() => pathToFace(path));
-  const [flipPhase, setFlipPhase] = useState<FlipPhase>("idle");
-  const [flipDir, setFlipDir] = useState<1 | -1>(1);
   const [sounding, setSounding] = useState<number | null>(null);
 
-  const pendingFaceRef = useRef<Face | null>(null);
   const studioRef = useRef(studio);
   studioRef.current = studio;
-  const flipping = flipPhase !== "idle";
-
-  useEffect(() => {
-    if (flipping) return;
-    const next = pathToFace(path);
-    setFace((prev) => (prev === next ? prev : next));
-  }, [path, flipping]);
 
   useEffect(() => {
     if (face !== "studio") return;
@@ -325,52 +236,6 @@ export default function App() {
     return () => cancelAnimationFrame(raf);
   }, [face, studio.chain, order]);
 
-  const commitFace = useCallback((next: Face) => {
-    setFace(next);
-    pushPath(faceToPath(next));
-  }, []);
-
-  const navigateWithFlip = useCallback(
-    (href: string) => {
-      const next = pathToFace(href);
-      if (next === face && !flipping) {
-        pushPath(faceToPath(next));
-        return;
-      }
-      if (flipping) return;
-
-      if (preferReducedMotion()) {
-        commitFace(next);
-        return;
-      }
-
-      pendingFaceRef.current = next;
-      setFlipDir(next === "studio" ? 1 : -1);
-      setFlipPhase("fold");
-    },
-    [face, flipping, commitFace],
-  );
-
-  const onFlipTransitionEnd = (e: TransitionEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget) return;
-    if (e.propertyName !== "transform") return;
-
-    if (flipPhase === "fold") {
-      const next = pendingFaceRef.current;
-      if (next) commitFace(next);
-      pendingFaceRef.current = null;
-      setFlipPhase("edge");
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setFlipPhase("open"));
-      });
-      return;
-    }
-
-    if (flipPhase === "open") {
-      setFlipPhase("idle");
-    }
-  };
-
   const onChangeSimple = useCallback((next: SheetState) => {
     setSimpleSheet(next);
   }, []);
@@ -379,19 +244,8 @@ export default function App() {
     setStudio((prev) => updateActiveSheet(prev, next));
   }, []);
 
-  const turnClass = [
-    "dock-turntable",
-    flipDir < 0 ? "dir-back" : "dir-fwd",
-    flipPhase === "idle" ? "is-idle" : "",
-    flipPhase === "fold" ? "is-fold" : "",
-    flipPhase === "edge" ? "is-edge" : "",
-    flipPhase === "open" ? "is-open" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
   return (
-    <div className="app-shell">
+    <div className={`app-shell${face === "simple" ? " is-simple" : " is-studio"}`}>
       <div className="app-chart">
         {face === "studio" ? (
           <SimpleSheet
@@ -411,31 +265,21 @@ export default function App() {
         )}
       </div>
 
-      <div className="app-dock">
-        <div className="dock-turn-stage">
-          <div
-            className={turnClass}
-            onTransitionEnd={onFlipTransitionEnd}
-          >
-            {face === "studio" ? (
-              <StudioDock
-                studio={studio}
-                sounding={sounding}
-                onNavigate={navigateWithFlip}
-                onToggleChain={() =>
-                  setStudio((prev) => ({ ...prev, chain: !prev.chain }))
-                }
-                onSelectSlot={(i) =>
-                  setStudio((prev) => setActiveSlot(prev, i))
-                }
-                onClearSlot={(i) => setStudio((prev) => clearSlot(prev, i))}
-              />
-            ) : (
-              <SimpleDock onNavigate={navigateWithFlip} />
-            )}
-          </div>
+      {face === "studio" ? (
+        <div className="app-dock" aria-label="studio">
+          <StudioDock
+            studio={studio}
+            sounding={sounding}
+            onToggleChain={() =>
+              setStudio((prev) => ({ ...prev, chain: !prev.chain }))
+            }
+            onSelectSlot={(i) =>
+              setStudio((prev) => setActiveSlot(prev, i))
+            }
+            onClearSlot={(i) => setStudio((prev) => clearSlot(prev, i))}
+          />
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
