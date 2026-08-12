@@ -1,6 +1,5 @@
-/* Studio dock rail / slots / CHAIN / mode chip */
+/* Studio dock — CHAIN + 8 slots (/studio only) */
 
-/* —— Studio —— */
 .app-nav {
   display: flex;
   justify-content: flex-end;
@@ -8,24 +7,6 @@
   padding: 0 12px;
   flex-shrink: 0;
   min-height: 1.1rem;
-}
-
-.mode-chip {
-  flex: 0 0 auto;
-  text-decoration: none;
-  color: inherit;
-  height: var(--dock-chip-h);
-  min-height: var(--dock-chip-h);
-  min-width: 7rem;
-  padding: 0 1.15rem;
-  box-sizing: border-box;
-  justify-content: center;
-  --chip-type: 0.84rem;
-  font-size: var(--chip-type);
-}
-
-.mode-chip:active {
-  transform: scale(0.97);
 }
 
 .studio-rail {
@@ -38,20 +19,10 @@
   gap: var(--dock-gap);
 }
 
-.page-rail {
-  justify-content: center;
-  align-items: center;
-}
-
-.page-rail .studio-rail-top {
-  width: 100%;
-  justify-content: center;
-}
-
 .studio-rail-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 8px;
   height: var(--dock-chip-h);
   flex-shrink: 0;

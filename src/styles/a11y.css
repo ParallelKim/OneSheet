@@ -16,8 +16,7 @@
   .tr-transport-icon .tr-glyph,
   .rhy-slot,
   .pad-play,
-  .pad-ind-bar,
-  .dock-turntable {
+  .pad-ind-bar {
     transition: none !important;
   }
 
@@ -29,12 +28,5 @@
   .key-reel-track,
   .key-reel-track.is-moving {
     transition: none !important;
-  }
-
-  .dock-turntable.is-fold,
-  .dock-turntable.is-edge,
-  .dock-turntable.is-open,
-  .dock-turntable.is-idle {
-    transform: none !important;
   }
 }

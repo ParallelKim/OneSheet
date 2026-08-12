@@ -1,6 +1,5 @@
-/* App shell + dock turntable (simple↔studio) */
+/* App shell — chart + optional studio dock (/studio only) */
 
-/* 심플↔스튜디오 셸 — 차트 고정, 하단 도크만 X축 플립(가로 패널) */
 .app-shell {
   width: 100%;
   max-width: 390px;
@@ -36,11 +35,8 @@
   min-height: 0;
 }
 
-/* 하단 도크 플립 (가로축 = CSS rotateX, 세로 중앙 피벗)
- * 가로형 패널이라 Y(좌우 문짝)보다 X(상하 접힘)가 자연스럽다.
- * 플립 면은 캐비티보다 작아 처음부터 검정 테가 보여 회전을 예고한다.
- * 레이어: 캐비티(z0, 2D 검정) → 스테이지(z1, perspective만) → 플립 면(z2, flat).
- * 검정·preserve-3d를 같은 노드에 두면 회전면이 배경 평면 뒤로 뚫린다. */
+/* 스튜디오 도크 — `/studio`에서만 마운트. 플립/심플 칩 없음.
+ * 레이어: 캐비티(z0, 검정) → 면(z1, --fill) 위에 슬롯. */
 .app-dock {
   --dock-inset: 5px;
   --dock-pad: 8px;
@@ -67,7 +63,6 @@
   isolation: isolate;
 }
 
-/* 2D 우물 — 3D 컨텍스트에 참여하지 않음 */
 .app-dock::before {
   content: "";
   position: absolute;
@@ -78,57 +73,10 @@
   pointer-events: none;
 }
 
-.dock-turn-stage {
+.app-dock > .studio-rail {
   position: relative;
   z-index: 1;
   height: 100%;
-  perspective: 720px;
-  perspective-origin: 50% 50%;
-  /* preserve-3d / 배경 금지 — 자식 rotateX만으로 충분 */
-  transform-style: flat;
-  background: transparent;
-}
-
-.dock-turntable {
-  position: relative;
-  z-index: 2;
-  height: 100%;
-  transform-origin: 50% 50%;
-  transform: rotateX(0deg);
-  transform-style: flat;
-  transition: transform var(--dur-flip) var(--ease-flip);
-  will-change: transform;
-  backface-visibility: hidden;
   background: var(--fill);
   border-radius: calc(var(--radius-box) - var(--dock-inset) - 1px);
-  /* 슬롯·칩은 이 면에 납작히 붙는다 */
-  isolation: isolate;
-}
-
-.dock-turntable .studio-rail {
-  position: relative;
-  z-index: 1;
-}
-
-.dock-turntable.is-fold {
-  transform: rotateX(90deg);
-}
-
-.dock-turntable.is-edge {
-  transition: none;
-  transform: rotateX(-90deg);
-}
-
-.dock-turntable.is-open,
-.dock-turntable.is-idle {
-  transform: rotateX(0deg);
-}
-
-.dock-turntable.dir-back.is-fold {
-  transform: rotateX(-90deg);
-}
-
-.dock-turntable.dir-back.is-edge {
-  transition: none;
-  transform: rotateX(90deg);
 }

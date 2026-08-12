@@ -20,6 +20,4 @@
   --dur-presence: 0.22s;
   --dur-armed: 0.28s;
   --dur-glyph: 0.2s;
-  --dur-flip: 0.16s;
-  --ease-flip: cubic-bezier(0.4, 0.02, 0.2, 1);
 }
