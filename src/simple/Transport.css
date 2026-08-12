@@ -1,0 +1,131 @@
+/* Transport + shared tr/brush button chrome */
+
+.transport,
+.brush-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  flex-shrink: 0;
+  margin: 0 12px;
+}
+
+.tr-btn,
+.brush {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 40px;
+  padding: 5px 2px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--fill);
+  box-shadow: var(--shadow);
+  flex-shrink: 0;
+  transition:
+    background-color var(--dur-armed) var(--ease-presence),
+    border-color var(--dur-armed) var(--ease-presence),
+    color var(--dur-armed) var(--ease-presence),
+    box-shadow var(--dur-armed) var(--ease-presence);
+}
+
+.tr-btn:active,
+.brush:active,
+.bead:active,
+.chip:active {
+  transform: scale(0.97);
+}
+
+.tr-btn.on,
+.brush.on {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+  box-shadow: var(--shadow-on);
+}
+
+/* 메트로 armed — 모노 점등 + 포인트 한 점(아이콘 추) */
+.tr-btn.metro.on {
+  background: var(--fg);
+}
+
+.tr-btn.metro.on .tr-metro-bob {
+  fill: var(--point);
+}
+
+.tr-btn.on .tr-label,
+.brush.on .brush-hint {
+  color: var(--bg);
+  transition: color var(--dur-armed) var(--ease-presence);
+}
+
+.tr-icon,
+.brush-mark {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tr-icon .tr-metro {
+  display: block;
+  width: 1.1rem;
+  height: 1.1rem;
+  overflow: visible;
+}
+
+.tr-metro-bob {
+  transition: fill var(--dur-armed) var(--ease-presence);
+}
+
+/* PLAY↔STOP 글리프 모프 (크로스페이드) */
+.tr-transport-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.tr-transport-icon .tr-glyph {
+  grid-area: 1 / 1;
+  transition: opacity var(--dur-glyph) var(--ease-presence);
+  line-height: 1;
+}
+
+.tr-transport-icon .tr-glyph.is-off {
+  opacity: 0;
+}
+
+.tr-transport-icon .tr-glyph.is-on {
+  opacity: 1;
+}
+
+.tr-btn.loading .tr-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0.9rem;
+}
+
+.tr-btn .spin {
+  width: 0.72rem;
+  height: 0.72rem;
+  border: 1.5px solid var(--muted);
+  border-top-color: var(--fg);
+  border-radius: 50%;
+  animation: tr-spin 0.65s linear infinite;
+}
+
+@keyframes tr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tr-label,
+.brush-hint {
+  font-size: 0.58rem;
+  color: var(--muted);
+  transition: color var(--dur-armed) var(--ease-presence);
+}

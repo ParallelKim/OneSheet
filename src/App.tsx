@@ -24,6 +24,8 @@ import {
   type StudioState,
 } from "./studioDoc";
 import { getCycleTime } from "./engine";
+import "./AppShell.css";
+import "./StudioDock.css";
 
 type Face = "simple" | "studio";
 /** fold → (swap) edge → open → idle — 하단 도크 X축 플립(세로 중앙) */

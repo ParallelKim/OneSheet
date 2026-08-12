@@ -48,6 +48,8 @@
 (심플↔스튜디오 도크 Y-flip은 **페이지 면** — 패드 뱅크 전환과 축이 다름.)  
 상세: `docs/transition-vocabulary.md`. 구현: `src/SimpleSheet.tsx`.
 
+스타일: 모놀리식 `App.css` 제거. `src/styles/`(tokens·reset·a11y) + `AppShell`/`StudioDock` + `simple/*` + `KeyReel`/`ParamKnob` 옆 CSS.
+
 적용됨:
 - 메트로 armed → 점등 (`--dur-armed` + 추 `--point`)
 - 리듬 rest↔hit → 점등 (bg/border)

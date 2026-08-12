@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { formatKeyGlyph } from "./sheet";
+import "./KeyReel.css";
 
 type KeyReelProps = {
   value: string;
