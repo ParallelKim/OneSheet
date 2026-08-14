@@ -296,7 +296,7 @@
   pointer-events: none;
 }
 
-/* 아르카나: 가로선 + 정/역 회전. 여백은 고정 gap으로 일관 */
+/* 아르카나: 가로선 + 정/역. 면 회전은 Motion(ArcanaFace). */
 .pad.tone.arcana {
   padding: 0.2em 0.15em;
 }
@@ -311,12 +311,6 @@
   height: auto;
   max-height: 100%;
   min-height: 0;
-  transition: transform 0.38s cubic-bezier(0.33, 1.15, 0.42, 1);
-  transform: rotate(0deg);
-}
-
-.pad.tone.arcana.reversed .arcana-face {
-  transform: rotate(180deg);
 }
 
 .pad.tone.arcana .arcana-end {

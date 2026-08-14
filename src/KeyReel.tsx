@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { formatKeyGlyph } from "./sheet";
 import "./KeyReel.css";
 
@@ -22,12 +23,16 @@ type Phase =
       moving: boolean;
     };
 
+const ROLL_EASE: [number, number, number, number] = [0.25, 0.1, 0.25, 1];
+
 /**
  * 오도미터 릴: 뷰포트에는 항상 한 칸만.
  * ♯ = 새 키가 위에서 내려옴 (스트립 ↓)
  * ♭ = 새 키가 아래에서 올라옴 (스트립 ↑)
+ * y 기하는 Motion — CSS transition 제거.
  */
 export function KeyReel({ value, dir, gen }: KeyReelProps) {
+  const reduce = useReducedMotion();
   const [phase, setPhase] = useState<Phase>({ kind: "idle", key: value });
   const shown = useRef(value);
   const lastGen = useRef(0);
@@ -40,6 +45,11 @@ export function KeyReel({ value, dir, gen }: KeyReelProps) {
     const to = value;
     if (from === to) return;
     shown.current = to;
+
+    if (reduce) {
+      setPhase({ kind: "idle", key: to });
+      return;
+    }
 
     // ♯(+): [to, from] — 시작 y=-1(from) → y=0(to). 스트립이 아래로, 새 키가 위에서 진입
     // ♭(−): [from, to] — 시작 y=0(from) → y=-1(to). 스트립이 위로, 새 키가 아래에서 진입
@@ -56,35 +66,39 @@ export function KeyReel({ value, dir, gen }: KeyReelProps) {
       });
     });
     return () => cancelAnimationFrame(id);
-  }, [value, dir, gen]);
+  }, [value, dir, gen, reduce]);
 
   const settle = () => {
     setPhase({ kind: "idle", key: shown.current });
   };
 
-  if (phase.kind === "idle") {
-    return (
-      <span className="key-reel" aria-live="polite">
-        <span className="key-reel-track" style={{ ["--key-y" as string]: "0" }}>
-          <span className="key-reel-item">{formatKeyGlyph(phase.key)}</span>
-        </span>
-      </span>
-    );
-  }
+  const y = phase.kind === "roll" ? phase.y : 0;
+  const moving = phase.kind === "roll" && phase.moving;
 
   return (
     <span className="key-reel" aria-live="polite">
-      <span
-        className={`key-reel-track${phase.moving ? " is-moving" : ""}`}
-        style={{ ["--key-y" as string]: String(phase.y) }}
-        onTransitionEnd={(e) => {
-          if (e.propertyName !== "transform") return;
-          settle();
+      <motion.span
+        className="key-reel-track"
+        initial={false}
+        animate={{ y: `calc(${y} * var(--key-reel-h))` }}
+        transition={
+          moving && !reduce
+            ? { duration: 0.28, ease: ROLL_EASE }
+            : { duration: 0 }
+        }
+        onAnimationComplete={() => {
+          if (moving) settle();
         }}
       >
-        <span className="key-reel-item">{formatKeyGlyph(phase.top)}</span>
-        <span className="key-reel-item">{formatKeyGlyph(phase.bottom)}</span>
-      </span>
+        {phase.kind === "idle" ? (
+          <span className="key-reel-item">{formatKeyGlyph(phase.key)}</span>
+        ) : (
+          <>
+            <span className="key-reel-item">{formatKeyGlyph(phase.top)}</span>
+            <span className="key-reel-item">{formatKeyGlyph(phase.bottom)}</span>
+          </>
+        )}
+      </motion.span>
     </span>
   );
 }
