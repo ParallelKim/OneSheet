@@ -1,4 +1,4 @@
-/* prefers-reduced-motion — central */
+/* prefers-reduced-motion — central (CSS presence only; Motion uses useReducedMotion) */
 
 @media (prefers-reduced-motion: reduce) {
   .tr-btn,
@@ -24,11 +24,6 @@
   .tr-btn .spin,
   .pad-stage.bank-flash .pad-ink {
     animation: none !important;
-  }
-
-  .key-reel-track,
-  .key-reel-track.is-moving {
-    transition: none !important;
   }
 
   .dock-turntable.is-fold,

@@ -50,6 +50,7 @@ import {
 } from "./engine";
 import { KeyReel } from "./KeyReel";
 import { ParamKnob } from "./ParamKnob";
+import { ArcanaFace } from "./ArcanaFace";
 import { haptic, hapticDiag, hapticRaw } from "./haptic";
 import "./simple/AppPanel.css";
 import "./simple/Lcd.css";
@@ -996,11 +997,11 @@ function LaunchPad({
       aria-label={label}
     >
       <span className="pad-ink">
-        <span className="arcana-face">
+        <ArcanaFace reversed={faces.polar && polarity === "min"}>
           <span className="arcana-end maj">{faces.maj}</span>
           <span className="arcana-rule" aria-hidden />
           <span className="arcana-end min">{faces.min}</span>
-        </span>
+        </ArcanaFace>
       </span>
     </button>
   );

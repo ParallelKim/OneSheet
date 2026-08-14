@@ -50,6 +50,13 @@
 
 스타일: 모놀리식 `App.css` 제거. `src/styles/`(tokens·reset·a11y) + `AppShell`/`StudioDock` + `simple/*` + `KeyReel`/`ParamKnob` 옆 CSS.
 
+### Motion (점진 마이그레이션)
+
+- 패키지: `motion` (`motion/react`). **기하·레이아웃·제스처**만 JS. presence(점등·래치·opacity)는 CSS 유지.
+- 됨: KeyReel y-roll · ArcanaFace 180° 회전 (`useReducedMotion` 존중).
+- 남김(CSS): armed/metro · rhy-slot · pad hit/empty · PLAY 글리프 · bank-flash · `:active` scale.
+- 다음 후보: ParamKnob rotator, 필요 시 layout 애니. ❌ anime.js 전면 치환 아님.
+
 적용됨:
 - 메트로 armed → 점등 (`--dur-armed` + 추 `--point`)
 - 리듬 rest↔hit → 점등 (bg/border)
